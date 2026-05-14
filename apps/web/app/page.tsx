@@ -1,12 +1,13 @@
-import Link from 'next/link';
-
 export default function Home() {
   return (
-    <main>
+    <div>
       <h1>routar dev app</h1>
-      <nav>
-        <Link href="/todos">Todos (SSR)</Link>
-      </nav>
-    </main>
+      <p>Internal testbed for the routar library. JSONPlaceholder as backend.</p>
+      <ul>
+        <li><a href="/todos">Todos — SSR list + CSR mutations (create/update/delete)</a></li>
+        <li><a href="/posts">Posts — SSR list, path param detail, nested comments</a></li>
+        <li><a href="/users">Users — CSR with adapter (flatten nested fields)</a></li>
+      </ul>
+    </div>
   );
 }
