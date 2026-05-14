@@ -8,6 +8,7 @@
     "declarationMap": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
     "outDir": "./dist"
   },
   "include": ["src"],
