@@ -2,3 +2,5 @@ node_modules
 dist
 .worktrees
 *.tsbuildinfo
+.next
+next-env.d.ts

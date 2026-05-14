@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"remote/lib/executor.ts -> next/headers\":{\"id\":\"remote/lib/executor.ts -> next/headers\",\"files\":[\"static/chunks/_app-pages-browser_node_modules_next_dist_api_headers_js.js\"]}}"

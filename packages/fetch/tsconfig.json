@@ -8,8 +8,8 @@
     "declarationMap": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "outDir": "./dist",
-    "ignoreDeprecations": "6.0"
+    "rootDir": "./src",
+    "outDir": "./dist"
   },
   "include": ["src"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
