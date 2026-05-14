@@ -19,5 +19,8 @@
   },
   "peerDependencies": {
     "@routar/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
   }
 }
