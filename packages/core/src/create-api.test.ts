@@ -53,7 +53,7 @@ describe('createApi', () => {
       const api = createApi(executor, {
         ping: { method: 'GET' as const, path: '/ping', response: makeValidator({}) },
       });
-      await api.ping();
+      await api.ping({});
       expect(executor.execute).toHaveBeenCalledWith(
         expect.objectContaining({ url: '/ping' }),
       );
@@ -101,7 +101,7 @@ describe('createApi', () => {
     const api = createApi(executor, '/todos', {
       get: { method: 'GET' as const, path: '/', response: failValidator },
     });
-    await expect(api.get()).rejects.toBeInstanceOf(ValidationError);
+    await expect(api.get({})).rejects.toBeInstanceOf(ValidationError);
   });
 
   it('passes signal to executor', async () => {

@@ -4,8 +4,10 @@ import { createFetchExecutor, HttpError } from './create-fetch-executor.js';
 // Mock global fetch
 const originalFetch = globalThis.fetch;
 
+type AnyMock = ReturnType<typeof mock<(...args: any[]) => any>>;
+
 function mockFetch(response: Partial<Response>) {
-  globalThis.fetch = mock(async () => ({
+  (globalThis as any).fetch = mock(async () => ({
     ok: true,
     status: 200,
     statusText: 'OK',
@@ -34,7 +36,7 @@ describe('createFetchExecutor', () => {
     mockFetch({});
     const executor = createFetchExecutor('https://api.example.com');
     await executor.execute({ method: 'GET', url: '/todos', params: { page: '1' } });
-    const calledUrl = (globalThis.fetch as ReturnType<typeof mock>).mock.calls[0][0] as string;
+    const calledUrl = (globalThis.fetch as unknown as AnyMock).mock.calls[0][0] as string;
     expect(calledUrl).toContain('page=1');
   });
 
@@ -55,7 +57,7 @@ describe('createFetchExecutor', () => {
     mockFetch({});
     const executor = createFetchExecutor('https://api.example.com');
     await executor.execute({ method: 'GET', url: '/todos' });
-    const opts = (globalThis.fetch as ReturnType<typeof mock>).mock.calls[0][1] as RequestInit;
+    const opts = (globalThis.fetch as unknown as AnyMock).mock.calls[0][1] as RequestInit;
     expect((opts.headers as Record<string, string>)['Content-Type']).toBeUndefined();
   });
 
@@ -63,7 +65,7 @@ describe('createFetchExecutor', () => {
     mockFetch({});
     const executor = createFetchExecutor('https://api.example.com');
     await executor.execute({ method: 'POST', url: '/todos', body: { title: 'test' } });
-    const opts = (globalThis.fetch as ReturnType<typeof mock>).mock.calls[0][1] as RequestInit;
+    const opts = (globalThis.fetch as unknown as AnyMock).mock.calls[0][1] as RequestInit;
     expect((opts.headers as Record<string, string>)['Content-Type']).toBe('application/json');
   });
 });

@@ -4,13 +4,13 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "declaration": true,
-    "declarationMap": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "outDir": "./dist",
-    "ignoreDeprecations": "6.0"
+    "noEmit": true,
+    "ignoreDeprecations": "6.0",
+    "types": ["bun"]
   },
-  "include": ["src"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts"]
+  "include": [
+    "packages/*/src/**/*.test.ts"
+  ]
 }

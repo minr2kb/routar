@@ -45,7 +45,7 @@ export type InferResponse<TSpec extends EndpointSpec<any, any, any>> =
     ? R
     : ValidatorOutput<TSpec['response']>;
 
-export type RouterEndpoints = Record<string, EndpointSpec<RequestShape, Validator<unknown>, ((raw: unknown) => unknown) | undefined>>;
+export type RouterEndpoints = Record<string, EndpointSpec<RequestShape, Validator<unknown>, ((raw: any) => unknown) | undefined>>;
 
 export interface RouterDef<TEndpoints extends RouterEndpoints = RouterEndpoints> {
   prefix:    string;
