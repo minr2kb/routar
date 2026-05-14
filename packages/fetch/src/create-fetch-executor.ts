@@ -19,7 +19,7 @@ export function createFetchExecutor(
       const res = await fetch(fullURL.toString(), {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          ...(body != null ? { 'Content-Type': 'application/json' } : {}),
           ...defaultHeaders,
           ...headers,
         },
@@ -29,6 +29,9 @@ export function createFetchExecutor(
 
       if (!res.ok) {
         throw new HttpError(res.status, res.statusText);
+      }
+      if (res.status === 204 || res.headers.get('content-length') === '0') {
+        return null;
       }
       return res.json();
     },
