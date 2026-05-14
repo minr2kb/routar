@@ -44,7 +44,8 @@ export function createApi(
 
   if (typeof routerOrPrefixOrEndpoints === 'string') {
     prefix = routerOrPrefixOrEndpoints;
-    endpoints = endpointsArg!;
+    if (!endpointsArg) throw new Error('endpoints is required when prefix is provided');
+    endpoints = endpointsArg;
   } else if (
     'prefix' in routerOrPrefixOrEndpoints &&
     'endpoints' in routerOrPrefixOrEndpoints
@@ -60,7 +61,6 @@ export function createApi(
 
   for (const [key, spec] of Object.entries(endpoints)) {
     client[key] = async (params: RequestShape = {}, signal?: AbortSignal) => {
-      // Step 1: validate request if schema provided
       let validatedParams: RequestShape = params;
       if (spec.request) {
         try {
@@ -70,13 +70,11 @@ export function createApi(
         }
       }
 
-      // Step 2: build URL
       const url = resolvePath(
         joinPaths(prefix, spec.path),
         validatedParams?.path,
       );
 
-      // Step 3: execute
       const raw = await executor.execute({
         method: spec.method,
         url,
@@ -85,7 +83,6 @@ export function createApi(
         signal,
       });
 
-      // Step 4: validate response
       let validated: unknown;
       try {
         validated = spec.response.parse(raw);
@@ -93,7 +90,6 @@ export function createApi(
         throw new ValidationError('Response validation failed', err);
       }
 
-      // Step 5: apply adapter
       if (spec.adapter) {
         return spec.adapter(validated as any);
       }
