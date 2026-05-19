@@ -4,10 +4,8 @@ import axios from 'axios';
 
 const BASE_URL = 'https://jsonplaceholder.typicode.com';
 
-const clientInstance = axios.create({ baseURL: BASE_URL });
-
 // CSR executor — reuses the same axios instance (fast, interceptor-friendly)
-export const clientExecutor = createAxiosExecutor(() => clientInstance);
+export const clientExecutor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }));
 
 // SSR executor — fetch with per-request dynamic auth headers
 export const fetchExecutor = createFetchExecutor(BASE_URL, {

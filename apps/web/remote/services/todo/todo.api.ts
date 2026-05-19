@@ -1,4 +1,4 @@
-import { createApi, defineRouter } from '@routar/core';
+import { createApi, endpoint, defineRouter } from '@routar/core';
 import type { ApiTypes } from '@routar/core';
 import { z } from 'zod';
 import { clientExecutor, fetchExecutor } from '../../lib/executor';
@@ -17,11 +17,8 @@ const toTodoItem = (raw: z.infer<typeof TodoRawSchema>) => ({
   label: raw.completed ? `✓ ${raw.title}` : raw.title,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTodoItemAny = toTodoItem as (raw: any) => ReturnType<typeof toTodoItem>;
-
 export const TodoRouter = defineRouter('/todos', {
-  getList: {
+  getList: endpoint({
     method: 'GET' as const,
     path: '/',
     request: z.object({
@@ -33,18 +30,18 @@ export const TodoRouter = defineRouter('/todos', {
       }).optional(),
     }),
     response: TodoListRawSchema,
-    adapter: (raw: any) => (raw as z.infer<typeof TodoListRawSchema>).map(toTodoItem),
-  },
-  getDetail: {
+    adapter: (raw) => raw.map(toTodoItem),
+  }),
+  getDetail: endpoint({
     method: 'GET' as const,
     path: '/:id',
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: TodoRawSchema,
-    adapter: toTodoItemAny,
-  },
-  create: {
+    adapter: toTodoItem,
+  }),
+  create: endpoint({
     method: 'POST' as const,
     path: '/',
     request: z.object({
@@ -55,9 +52,9 @@ export const TodoRouter = defineRouter('/todos', {
       }),
     }),
     response: TodoRawSchema,
-    adapter: toTodoItemAny,
-  },
-  update: {
+    adapter: toTodoItem,
+  }),
+  update: endpoint({
     method: 'PATCH' as const,
     path: '/:id',
     request: z.object({
@@ -68,16 +65,16 @@ export const TodoRouter = defineRouter('/todos', {
       }),
     }),
     response: TodoRawSchema,
-    adapter: toTodoItemAny,
-  },
-  remove: {
+    adapter: toTodoItem,
+  }),
+  remove: endpoint({
     method: 'DELETE' as const,
     path: '/:id',
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: z.unknown(),
-  },
+  }),
 });
 
 export const todoApi = createApi(clientExecutor, TodoRouter);

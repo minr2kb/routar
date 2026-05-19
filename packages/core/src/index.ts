@@ -3,6 +3,7 @@ export type {
   HttpMethod,
   ExecuteOptions,
   Executor,
+  ExecutorMiddleware,
   Validator,
   ValidatorOutput,
   RequestShape,
@@ -15,7 +16,12 @@ export type {
 
 // core functions
 export { defineRouter } from './define-router.js';
+export { endpoint } from './define-endpoint.js';
 export { createApi } from './create-api.js';
+export { createExecutor } from './create-executor.js';
+
+// middleware
+export { defineMiddleware, withRetry, withTimeout, withLogger } from './middleware.js';
 
 // utilities (exported for executor implementors)
 export { joinPaths, resolvePath } from './utils/path.js';

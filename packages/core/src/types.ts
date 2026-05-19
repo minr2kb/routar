@@ -13,6 +13,11 @@ export interface Executor {
   execute(options: ExecuteOptions): Promise<unknown>;
 }
 
+export type ExecutorMiddleware = (
+  options: ExecuteOptions,
+  next: (options: ExecuteOptions) => Promise<unknown>,
+) => Promise<unknown>;
+
 export interface Validator<TOutput> {
   parse(data: unknown): TOutput;
 }
@@ -45,7 +50,7 @@ export type InferResponse<TSpec extends EndpointSpec<any, any, any>> =
     ? R
     : ValidatorOutput<TSpec['response']>;
 
-export type RouterEndpoints = Record<string, EndpointSpec<RequestShape, Validator<unknown>, ((raw: any) => unknown) | undefined>>;
+export type RouterEndpoints = Record<string, EndpointSpec<any, any, any>>;
 
 export interface RouterDef<TEndpoints extends RouterEndpoints = RouterEndpoints> {
   prefix:    string;
