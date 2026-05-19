@@ -5,14 +5,25 @@
 Define your API once — reuse it across any transport, environment, or HTTP client.
 
 ```ts
-const todoApi = createApi(executor, defineRouter('/todos', {
-  getList:   endpoint({ method: 'GET', path: '/',    response: TodoListSchema }),
-  getDetail: endpoint({ method: 'GET', path: '/:id', response: TodoSchema }),
-  create:    endpoint({ method: 'POST', path: '/',   response: TodoSchema }),
-}));
+import { z } from 'zod';
+import { endpoint, defineRouter, createApi } from '@routar/core';
+import { createFetchExecutor } from '@routar/fetch';
+
+const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.boolean() });
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+  create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
+                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+});
+
+const todoApi = createApi(createFetchExecutor('https://api.example.com'), todoRouter);
 
 const todos = await todoApi.getList({});                     // Todo[]
 const todo  = await todoApi.getDetail({ path: { id: 1 } }); // Todo
+const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 ```
 
 ---
