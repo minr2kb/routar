@@ -17,6 +17,7 @@ export type {
 // core functions
 export { defineRouter } from './define-router.js';
 export { endpoint } from './define-endpoint.js';
+export type { PathParams } from './define-endpoint.js';
 export { createApi } from './create-api.js';
 export { createExecutor } from './create-executor.js';
 

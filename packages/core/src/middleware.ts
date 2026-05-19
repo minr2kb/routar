@@ -1,9 +1,38 @@
 import type { ExecutorMiddleware } from './types.js';
 
+/**
+ * Identity helper that returns the middleware as-is.
+ *
+ * Wrap your middleware function with this to get full type inference on `opts`
+ * and `next` without having to annotate the type manually.
+ *
+ * @example
+ * ```ts
+ * const withCorrelationId = defineMiddleware((opts, next) =>
+ *   next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
+ * );
+ * ```
+ */
 export function defineMiddleware(fn: ExecutorMiddleware): ExecutorMiddleware {
   return fn;
 }
 
+/**
+ * Retries a failed request up to `count` additional times.
+ *
+ * By default all errors trigger a retry. Pass `shouldRetry` to skip retries
+ * for non-transient errors (e.g. 4xx responses).
+ *
+ * @param count - Number of retries (not counting the initial attempt).
+ * @param options.shouldRetry - Return `false` to stop retrying early.
+ *
+ * @example
+ * ```ts
+ * withRetry(3, {
+ *   shouldRetry: (err) => err instanceof HttpError && err.status >= 500,
+ * })
+ * ```
+ */
 export function withRetry(
   count: number,
   options?: { shouldRetry?: (error: unknown, attempt: number) => boolean },
@@ -23,6 +52,14 @@ export function withRetry(
   });
 }
 
+/**
+ * Aborts a request if it does not complete within `ms` milliseconds.
+ *
+ * Merges the timeout signal with any existing `AbortSignal` on the request,
+ * so whichever fires first wins.
+ *
+ * @param ms - Timeout in milliseconds.
+ */
 export function withTimeout(ms: number): ExecutorMiddleware {
   return defineMiddleware(async (opts, next) => {
     const controller = new AbortController();
@@ -40,6 +77,16 @@ export function withTimeout(ms: number): ExecutorMiddleware {
   });
 }
 
+/**
+ * Logs each request and its outcome (success duration or error).
+ *
+ * @param options.log - Custom logging function. Defaults to `console.log`.
+ *
+ * @example
+ * ```ts
+ * withLogger({ log: (msg, data) => logger.debug(msg, data) })
+ * ```
+ */
 export function withLogger(options?: {
   log?: (message: string, data?: unknown) => void;
 }): ExecutorMiddleware {
@@ -58,6 +105,7 @@ export function withLogger(options?: {
   });
 }
 
+/** Combines multiple AbortSignals into one that aborts when any of them fire. */
 function anySignal(signals: AbortSignal[]): AbortSignal {
   const controller = new AbortController();
   for (const signal of signals) {

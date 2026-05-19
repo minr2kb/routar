@@ -5,14 +5,73 @@ import type {
   ValidatorOutput,
 } from './types.js';
 
+/**
+ * Extracts `:param` segment names from a path template string as a union of
+ * string literals.
+ *
+ * @example
+ * ```ts
+ * type P = PathParams<'/:userId/posts/:postId'>; // 'userId' | 'postId'
+ * ```
+ */
+export type PathParams<TPath extends string> =
+  TPath extends `${string}:${infer Param}/${infer Rest}`
+    ? Param | PathParams<Rest>
+    : TPath extends `${string}:${infer Param}`
+      ? Param
+      : never;
+
+/**
+ * When `TPath` contains dynamic segments (`:param`), requires `request.path`
+ * to include all extracted param names. No constraint for static paths.
+ */
+type PathConstraint<TPath extends string> =
+  [PathParams<TPath>] extends [never]
+    ? {}
+    : { path: Record<PathParams<TPath>, unknown> };
+
+/**
+ * Type-safe endpoint definition helper.
+ *
+ * Use this instead of a plain object literal to get full type inference on
+ * `adapter` without requiring explicit annotations or `as any` casts.
+ * The four overloads cover every combination of optional `request` validator
+ * and optional `adapter` function while keeping all return-type fields
+ * required so that TypeScript can narrow them downstream.
+ *
+ * When `path` contains dynamic segments (e.g. `'/:id'`), TypeScript enforces
+ * that `request` includes a matching `path` field with those param names.
+ * A mismatch or missing key is a compile-time error.
+ *
+ * @example
+ * ```ts
+ * // ✅ path has ':id' → request.path.id is required
+ * const getDetail = endpoint({
+ *   method: 'GET',
+ *   path: '/:id',
+ *   request: z.object({ path: z.object({ id: z.number() }) }),
+ *   response: TodoSchema,
+ *   adapter: toTodoItem,
+ * });
+ *
+ * // ❌ compile error — 'id' is missing from request.path
+ * const broken = endpoint({
+ *   method: 'GET',
+ *   path: '/:id',
+ *   request: z.object({ query: z.object({ foo: z.string() }) }),
+ *   response: TodoSchema,
+ * });
+ * ```
+ */
 // request O + adapter O
 export function endpoint<
-  TRequest extends RequestShape,
+  TPath extends string,
+  TRequest extends RequestShape & PathConstraint<TPath>,
   TResponse extends Validator<unknown>,
   TOut,
 >(spec: {
   method: HttpMethod;
-  path: string;
+  path: TPath;
   request: Validator<TRequest>;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
@@ -26,11 +85,12 @@ export function endpoint<
 
 // request O + adapter X
 export function endpoint<
-  TRequest extends RequestShape,
+  TPath extends string,
+  TRequest extends RequestShape & PathConstraint<TPath>,
   TResponse extends Validator<unknown>,
 >(spec: {
   method: HttpMethod;
-  path: string;
+  path: TPath;
   request: Validator<TRequest>;
   response: TResponse;
 }): {

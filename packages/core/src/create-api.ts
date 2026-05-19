@@ -9,26 +9,61 @@ import type {
 import { joinPaths, resolvePath } from './utils/path.js';
 import { ValidationError } from './utils/validate.js';
 
+/** Callable type for a single endpoint on the generated API client. */
 type EndpointFn<TSpec extends EndpointSpec<any, any, any>> = (
   params: TSpec['request'] extends { parse: (data: unknown) => infer R } ? R : RequestShape,
   signal?: AbortSignal,
 ) => Promise<InferResponse<TSpec>>;
 
+/** Fully-typed API client produced by {@link createApi}. */
 type ApiClient<TEndpoints extends RouterEndpoints> = {
   [K in keyof TEndpoints]: EndpointFn<TEndpoints[K]>;
 };
 
+/**
+ * Builds a fully-typed API client from an {@link Executor} and a router
+ * (or bare endpoint map).
+ *
+ * Three call signatures are supported:
+ * - `createApi(executor, router)` — preferred; pass the result of {@link defineRouter}.
+ * - `createApi(executor, prefix, endpoints)` — inline router without {@link defineRouter}.
+ * - `createApi(executor, endpoints)` — no prefix; useful for flat endpoint maps.
+ *
+ * Each key in `endpoints` becomes a typed async function on the returned client.
+ * The function validates the request with `spec.request.parse` (if present),
+ * resolves path parameters, calls the executor, validates the response with
+ * `spec.response.parse`, and applies `spec.adapter` (if present).
+ *
+ * @param executor - Transport to use for every HTTP call.
+ * @param router - A {@link RouterDef} produced by {@link defineRouter}.
+ *
+ * @example
+ * ```ts
+ * const todoApi = createApi(executor, todoRouter);
+ * const todos = await todoApi.getList({});
+ * const todo  = await todoApi.getDetail({ path: { id: 1 } });
+ * ```
+ */
 export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   router: RouterDef<TEndpoints>,
 ): ApiClient<TEndpoints>;
 
+/**
+ * @param executor - Transport to use for every HTTP call.
+ * @param prefix - URL prefix prepended to every endpoint path.
+ * @param endpoints - Record of named endpoint specs.
+ */
 export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   prefix: string,
   endpoints: TEndpoints,
 ): ApiClient<TEndpoints>;
 
+/**
+ * @param executor - Transport to use for every HTTP call.
+ * @param endpoints - Record of named endpoint specs (no URL prefix).
+ */
 export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   endpoints: TEndpoints,
