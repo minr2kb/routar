@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "axios": "^1.16.1",
-    "@routar/core": "workspace:*",
     "tsup": "^8.0.0",
     "typescript": "^6.0.0"
   }
