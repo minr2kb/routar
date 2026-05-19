@@ -1,6 +1,93 @@
 # Routar 설계 결정 기록
 
-> 초기 설계의 문제점을 발견하고, 각각 어떻게 해결했는지 과정을 정리한 문서.
+> 초기 설계 철학부터 구현 과정에서 맞닥뜨린 문제들과 해결 방식을 순서대로 정리한 문서.
+
+---
+
+## 0. 설계 철학 — 왜 이 라이브러리를 만들었나
+
+### 출발점: 원시적인 fetch 래퍼의 한계
+
+API 레이어는 보통 단순한 fetch 래퍼로 시작한다. axios를 도입하면 JSON 직렬화와 응답 파싱이 자동화되지만, 코드베이스가 커질수록 세 가지 문제가 반드시 등장한다.
+
+| 문제 | 설명 |
+|------|------|
+| **명세 불명확** | Request 타입 안에서 path param인지 query인지 body인지 구분할 방법이 없다 |
+| **관계성 부재** | Request 타입과 Response 타입 사이의 연결고리가 코드에 없다 |
+| **런타임 무방비** | TypeScript 타입은 컴파일 타임에만 존재한다. 서버가 잘못된 응답을 내려도 런타임까지 감지하지 못한다 |
+
+### Zod 도입 — 런타임 안전성과 타입의 통합
+
+Zod를 도입하면 스키마 하나로 타입 추론과 런타임 검증을 동시에 달성할 수 있다. 그러나 바로 다음 문제가 생긴다.
+
+**transform 오염 문제**: `z.transform`으로 서버 응답을 클라이언트 모델로 변환하면 편리하지만, 스키마가 `ZodEffects`로 감싸져 `.extend()`, `.merge()`, `.partial()` 같은 조합 연산이 불가능해진다.
+
+```ts
+// ❌ transform을 schema에 직접 넣으면
+const TodoSchema = TodoRawSchema.transform(raw => ({ ...raw, label: raw.title }));
+// → ZodEffects가 되어 .extend() 불가능
+
+// ✅ Raw schema와 변환 로직을 분리
+const TodoRawSchema = z.object({ id: z.number(), title: z.string() }); // 순수, 조합 가능
+const toTodoItem = (raw: z.infer<typeof TodoRawSchema>) => ({ ...raw, label: raw.title });
+```
+
+이 원칙이 routar의 `response` + `adapter` 분리 설계로 이어졌다.
+
+**Request 명세화**: OpenAPI 스펙의 영향을 받아 path / query / body를 명시적으로 구분하는 구조를 채택했다.
+
+```ts
+const UpdateTodoRequest = z.object({
+  path: z.object({ id: z.number() }),
+  body: z.object({ title: z.string(), completed: z.boolean() }),
+});
+```
+
+### 핵심 통찰 — 스펙(무엇)과 실행(어떻게)의 분리
+
+SSR/CSR 이중 환경이 진짜 문제였다. Next.js에서 서버 컴포넌트는 httpOnly 쿠키를 자동 전송할 수 없어서, 같은 엔드포인트 스펙을 CSR용과 SSR용으로 중복 작성해야 했다.
+
+이 문제를 해결하는 핵심 아이디어: **"스펙은 한 번 정의하고, 실행 환경만 교체한다."**
+
+```
+기존: 인스턴스 생성 방식만 주입
+          → CSR 코드, SSR 코드를 별도로 작성
+
+개선: HTTP 실행 전체를 executor로 추상화
+          → 스펙은 공유, executor만 교체
+```
+
+```ts
+// 스펙은 한 번
+export const TodoRouter = defineRouter('/todos', { getList: ..., getDetail: ... });
+
+// 실행 환경만 교체
+export const todoApi       = createApi(clientExecutor, TodoRouter); // CSR
+export const todoServerApi = createApi(serverExecutor, TodoRouter); // SSR
+```
+
+### 설계 원칙
+
+1. **구조가 필요를 앞서지 않기** — 단순함부터 시작, 필요할 때만 분리한다. `createApi`에 인라인으로 작성하다가 재사용이 필요할 때 `defineRouter`로 분리하는 흐름을 강요하지 않는다.
+
+2. **스펙과 실행의 분리** — 엔드포인트 정의(무엇을)와 HTTP 실행(어떻게)을 명확히 분리한다. 같은 스펙으로 fetch, axios, mock executor를 자유롭게 교체할 수 있다.
+
+3. **레이어 간 단방향 의존** — 컴포넌트 → query hooks → api client → executor. 상위 레이어는 하위 레이어의 구현을 모른다.
+
+4. **타입과 런타임의 통합** — 타입이 컴파일 타임에만 존재하는 것이 아니라, Zod 스키마가 런타임에서도 검증을 수행한다. 타입과 런타임 행동이 항상 동기화된다.
+
+5. **공개 타입은 구현에서 역산** — 스키마를 직접 export하지 않고 `ApiTypes<typeof api>`로 함수 시그니처에서 타입을 역산한다. 내부 구현을 바꿔도 공개 타입이 자동으로 반영된다.
+
+### 레이어 구조
+
+```
+컴포넌트
+    └─ *.queries.ts    (TanStack Query 인터페이스, queryOptions / useMutation)
+         └─ *.api.ts   (스펙 정의 + executor 조합, 공개 타입 노출)
+              └─ executor.ts  (HTTP 실행, 인증, 미들웨어)
+```
+
+각 레이어의 책임이 명확히 분리되어 있어, 컴포넌트는 URL이나 executor의 존재를 알 필요가 없다.
 
 ---
 

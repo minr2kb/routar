@@ -10,6 +10,77 @@ TypeScript-first HTTP API client 라이브러리. 엔드포인트를 한 곳에 
 
 ---
 
+## 왜 만들었나
+
+### API 레이어에서 반복되는 세 가지 문제
+
+코드베이스가 커질수록 API 레이어에는 다음 세 가지 문제가 반드시 등장한다.
+
+| 문제 | 설명 |
+|------|------|
+| **명세 불명확** | Request 타입에서 path param인지 query인지 body인지 구분할 방법이 없다 |
+| **관계성 부재** | Request 타입과 Response 타입 사이의 연결고리가 코드에 없다 |
+| **런타임 무방비** | TypeScript 타입은 컴파일 타임에만 존재한다. 서버가 잘못된 응답을 내려도 런타임에서는 감지하지 못한다 |
+
+Zod 같은 런타임 검증 라이브러리로 세 번째는 해결할 수 있다. 그러나 다음 문제가 곧 따라온다.
+
+**transform 오염**: `z.transform`으로 서버 응답을 클라이언트 모델로 변환하면 스키마가 `ZodEffects`로 감싸진다. `.extend()`, `.merge()`, `.partial()` 같은 조합 연산이 불가능해지고, 스키마 재사용성이 무너진다.
+
+```ts
+// ❌ transform을 schema 안에 넣으면 ZodEffects로 오염
+const TodoSchema = TodoRawSchema.transform(raw => ({
+  ...raw,
+  label: raw.completed ? `✓ ${raw.title}` : raw.title,
+}));
+// TodoSchema.extend(...)  → 타입 에러
+
+// ✅ Raw schema와 변환 함수를 분리
+const TodoRawSchema = z.object({ id: z.number(), title: z.string(), completed: z.boolean() });
+const toTodoItem = (raw: z.infer<typeof TodoRawSchema>) => ({
+  ...raw,
+  label: raw.completed ? `✓ ${raw.title}` : raw.title,
+});
+```
+
+이 원칙이 routar의 `response` + `adapter` 분리 설계로 이어졌다.
+
+### 핵심 통찰 — 스펙과 실행의 분리
+
+SSR/CSR 이중 환경이 결정적인 계기였다. 서버 컴포넌트는 httpOnly 쿠키를 자동 전송할 수 없어서, 같은 엔드포인트 스펙을 CSR용과 SSR용으로 중복 작성해야 했다.
+
+**해결 아이디어: 스펙은 한 번 정의하고, 실행 환경(executor)만 교체한다.**
+
+```ts
+// 스펙은 한 번만 정의
+export const TodoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET', path: '/',    response: TodoListSchema }),
+  getDetail: endpoint({ method: 'GET', path: '/:id', response: TodoSchema }),
+});
+
+// 실행 환경만 교체 — 스펙 재사용
+export const todoApi       = createApi(clientExecutor, TodoRouter); // CSR (axios)
+export const todoServerApi = createApi(serverExecutor, TodoRouter); // SSR (fetch + 쿠키)
+```
+
+### 설계 원칙
+
+**1. 구조가 필요를 앞서지 않기**
+단순함부터 시작한다. 엔드포인트를 `createApi`에 인라인으로 작성하다가, 재사용이 필요할 때만 `defineRouter`로 분리한다. 과도한 추상화를 강요하지 않는다.
+
+**2. 스펙과 실행의 분리**
+엔드포인트 정의(무엇을 호출하는가)와 HTTP 실행(어떻게 호출하는가)을 명확히 분리한다. 같은 스펙으로 fetch, axios, mock executor를 자유롭게 교체할 수 있다.
+
+**3. 레이어 간 단방향 의존**
+컴포넌트 → query hooks → api client → executor. 상위 레이어는 하위 레이어의 구현을 알지 못한다. 컴포넌트는 URL이나 HTTP 클라이언트의 존재를 알 필요가 없다.
+
+**4. 타입과 런타임의 통합**
+TypeScript 타입이 컴파일 타임에만 존재하는 것이 아니라, 런타임에서도 동일한 스키마로 요청/응답을 검증한다. 타입과 실제 동작이 항상 일치한다.
+
+**5. 공개 타입은 구현에서 역산**
+스키마를 직접 export하지 않고, `ApiTypes<typeof api>`로 함수 시그니처에서 타입을 추출한다. 내부 구현을 바꿔도 공개 타입이 자동으로 반영된다.
+
+---
+
 ## 패키지 구성
 
 | 패키지 | 설명 |
