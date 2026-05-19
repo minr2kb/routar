@@ -174,7 +174,7 @@ endpoint({
 
 ### `defineRouter(prefix, endpoints)`
 
-엔드포인트들을 공통 URL prefix 아래 묶어 라우터 정의를 만듭니다.
+엔드포인트들을 공통 URL prefix 아래 묶어 라우터 정의를 만듭니다. 값으로 또 다른 `defineRouter`를 넣으면 중첩 라우터가 됩니다.
 
 ```ts
 import { defineRouter } from '@routar/core';
@@ -187,6 +187,62 @@ export const userRouter = defineRouter('/users', {
   remove:    endpoint({ method: 'DELETE', path: '/:id', request: IdRequest, response: z.unknown() }),
 });
 ```
+
+#### 중첩 라우터
+
+`defineRouter` 결과를 다른 `defineRouter`의 값으로 넣으면 prefix가 합쳐지고, API 클라이언트도 중첩 객체 구조로 생성됩니다.
+
+```ts
+export const apiRouter = defineRouter('/api', {
+  users: defineRouter('/users', {
+    getList:   endpoint({ method: 'GET',  path: '/',    response: UserListSchema }),
+    getDetail: endpoint({
+      method: 'GET',
+      path: '/:id',
+      request: z.object({ path: z.object({ id: z.number() }) }),
+      response: UserSchema,
+    }),
+
+    // 3단계 중첩도 가능
+    todos: defineRouter('/todos', {
+      getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
+      getDetail: endpoint({
+        method: 'GET',
+        path: '/:id',
+        request: z.object({ path: z.object({ id: z.number() }) }),
+        response: TodoSchema,
+      }),
+    }),
+  }),
+
+  posts: defineRouter('/posts', {
+    getList: endpoint({ method: 'GET', path: '/', response: PostListSchema }),
+  }),
+});
+```
+
+생성된 API 클라이언트는 중첩 구조 그대로 반영됩니다.
+
+```ts
+const api = createApi(executor, apiRouter);
+
+// URL: GET /api/users
+await api.users.getList({});
+
+// URL: GET /api/users/1
+await api.users.getDetail({ path: { id: 1 } });
+
+// URL: GET /api/users/todos
+await api.users.todos.getList({});
+
+// URL: GET /api/users/todos/5
+await api.users.todos.getDetail({ path: { id: 5 } });
+
+// URL: GET /api/posts
+await api.posts.getList({});
+```
+
+모든 단계의 타입이 완전히 추론됩니다. `api.users.todos.getDetail`의 파라미터 타입, 반환 타입 모두 IDE에서 자동 완성됩니다.
 
 ---
 

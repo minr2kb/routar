@@ -1,20 +1,32 @@
 import type { RouterDef, RouterEndpoints } from './types.js';
 
 /**
- * Groups a set of endpoint specs under a shared URL prefix.
+ * Groups a set of endpoint specs (and optional nested routers) under a shared
+ * URL prefix.
  *
  * The returned {@link RouterDef} can be passed directly to {@link createApi}
- * to produce a fully-typed API client.
+ * to produce a fully-typed API client. Nesting another {@link RouterDef} as a
+ * value creates a sub-client whose prefix is the concatenation of both prefixes.
  *
- * @param prefix - Base path prepended to every endpoint's `path` (e.g. `'/todos'`).
- * @param endpoints - Record of named {@link EndpointSpec}s.
+ * @param prefix - Base path prepended to every endpoint's `path` (e.g. `'/users'`).
+ * @param endpoints - Record of named {@link EndpointSpec}s or nested {@link RouterDef}s.
  *
  * @example
  * ```ts
+ * // Flat router
  * export const todoRouter = defineRouter('/todos', {
- *   getList: endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
+ *   getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
  *   getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema }),
- *   create:  endpoint({ method: 'POST', path: '/',    response: TodoSchema }),
+ *   create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema }),
+ * });
+ *
+ * // Nested router — api.users.todos.getList() resolves to GET /users/todos/
+ * export const userRouter = defineRouter('/users', {
+ *   getList: endpoint({ method: 'GET', path: '/', response: UserListSchema }),
+ *   todos: defineRouter('/todos', {
+ *     getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
+ *     getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema }),
+ *   }),
  * });
  * ```
  */

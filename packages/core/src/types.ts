@@ -105,8 +105,14 @@ export type InferResponse<TSpec extends EndpointSpec<any, any, any>> =
     ? R
     : ValidatorOutput<TSpec['response']>;
 
-/** A record of named {@link EndpointSpec}s, used as the value type in {@link RouterDef}. */
-export type RouterEndpoints = Record<string, EndpointSpec<any, any, any>>;
+/**
+ * A single entry inside a {@link RouterEndpoints} map.
+ * Either a leaf endpoint spec or a nested {@link RouterDef}.
+ */
+export type RouterEntry = EndpointSpec<any, any, any> | RouterDef<any>;
+
+/** A record of named {@link EndpointSpec}s or nested {@link RouterDef}s. */
+export type RouterEndpoints = Record<string, RouterEntry>;
 
 /** The return type of {@link defineRouter}. Passed directly to {@link createApi}. */
 export interface RouterDef<TEndpoints extends RouterEndpoints = RouterEndpoints> {

@@ -15,9 +15,16 @@ type EndpointFn<TSpec extends EndpointSpec<any, any, any>> = (
   signal?: AbortSignal,
 ) => Promise<InferResponse<TSpec>>;
 
-/** Fully-typed API client produced by {@link createApi}. */
+/**
+ * Fully-typed API client produced by {@link createApi}.
+ * Nested {@link RouterDef} entries become nested sub-client objects.
+ */
 type ApiClient<TEndpoints extends RouterEndpoints> = {
-  [K in keyof TEndpoints]: EndpointFn<TEndpoints[K]>;
+  [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<infer TNestedEndpoints>
+    ? ApiClient<TNestedEndpoints>
+    : TEndpoints[K] extends EndpointSpec<any, any, any>
+      ? EndpointFn<TEndpoints[K]>
+      : never;
 };
 
 /**
@@ -73,7 +80,7 @@ export function createApi(
   executor: Executor,
   routerOrPrefixOrEndpoints: RouterDef<any> | RouterEndpoints | string,
   endpointsArg?: RouterEndpoints,
-): Record<string, (params: any, signal?: AbortSignal) => Promise<unknown>> {
+): Record<string, any> {
   let prefix: string;
   let endpoints: RouterEndpoints;
 
@@ -92,44 +99,60 @@ export function createApi(
     endpoints = routerOrPrefixOrEndpoints as RouterEndpoints;
   }
 
-  const client: Record<string, (params: any, signal?: AbortSignal) => Promise<unknown>> = {};
+  return buildClient(executor, prefix, endpoints);
+}
 
-  for (const [key, spec] of Object.entries(endpoints)) {
-    client[key] = async (params: RequestShape = {}, signal?: AbortSignal) => {
-      let validatedParams: RequestShape = params;
-      if (spec.request) {
-        try {
-          validatedParams = spec.request.parse(params);
-        } catch (err) {
-          throw new ValidationError('Request validation failed', err);
+function buildClient(
+  executor: Executor,
+  prefix: string,
+  endpoints: RouterEndpoints,
+): Record<string, any> {
+  const client: Record<string, any> = {};
+
+  for (const [key, entry] of Object.entries(endpoints)) {
+    if ('prefix' in entry && 'endpoints' in entry) {
+      // Nested RouterDef — recurse with merged prefix
+      const nested = entry as RouterDef<any>;
+      client[key] = buildClient(executor, joinPaths(prefix, nested.prefix), nested.endpoints);
+    } else {
+      // Leaf EndpointSpec
+      const spec = entry as EndpointSpec<any, any, any>;
+      client[key] = async (params: RequestShape = {}, signal?: AbortSignal) => {
+        let validatedParams: RequestShape = params;
+        if (spec.request) {
+          try {
+            validatedParams = spec.request.parse(params);
+          } catch (err) {
+            throw new ValidationError('Request validation failed', err);
+          }
         }
-      }
 
-      const url = resolvePath(
-        joinPaths(prefix, spec.path),
-        validatedParams?.path,
-      );
+        const url = resolvePath(
+          joinPaths(prefix, spec.path),
+          validatedParams?.path,
+        );
 
-      const raw = await executor.execute({
-        method: spec.method,
-        url,
-        params: validatedParams?.query as Record<string, unknown> | undefined,
-        body: validatedParams?.body,
-        signal,
-      });
+        const raw = await executor.execute({
+          method: spec.method,
+          url,
+          params: validatedParams?.query as Record<string, unknown> | undefined,
+          body: validatedParams?.body,
+          signal,
+        });
 
-      let validated: unknown;
-      try {
-        validated = spec.response.parse(raw);
-      } catch (err) {
-        throw new ValidationError('Response validation failed', err);
-      }
+        let validated: unknown;
+        try {
+          validated = spec.response.parse(raw);
+        } catch (err) {
+          throw new ValidationError('Response validation failed', err);
+        }
 
-      if (spec.adapter) {
-        return spec.adapter(validated as any);
-      }
-      return validated;
-    };
+        if (spec.adapter) {
+          return spec.adapter(validated as any);
+        }
+        return validated;
+      };
+    }
   }
 
   return client;

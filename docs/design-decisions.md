@@ -424,7 +424,68 @@ TypeScript overload 특성상 에러 메시지는 last overload 기준으로 표
 
 ---
 
-## 8. 미해결 / 차후 작업
+## 8. 중첩 라우터 (Nested Router)
+
+### 배경
+
+도메인별로 라우터를 분리해서 관리할 때, `defineRouter` 안에 또 다른 `defineRouter`를 넣어 URL 계층과 API 클라이언트 구조를 동시에 표현하고 싶다는 요구.
+
+### 설계 결정
+
+**타입**: `RouterEndpoints`의 값 타입을 `EndpointSpec` 단독에서 `EndpointSpec | RouterDef`(= `RouterEntry`)로 확장.
+
+```ts
+// 변경 전
+type RouterEndpoints = Record<string, EndpointSpec<any, any, any>>;
+
+// 변경 후
+type RouterEntry = EndpointSpec<any, any, any> | RouterDef<any>;
+type RouterEndpoints = Record<string, RouterEntry>;
+```
+
+`ApiClient` 타입도 조건부 타입으로 값이 `RouterDef`이면 재귀적으로 중첩 클라이언트를 반환하도록 변경.
+
+```ts
+type ApiClient<TEndpoints extends RouterEndpoints> = {
+  [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<infer TNestedEndpoints>
+    ? ApiClient<TNestedEndpoints>
+    : TEndpoints[K] extends EndpointSpec<any, any, any>
+      ? EndpointFn<TEndpoints[K]>
+      : never;
+};
+```
+
+**런타임**: `createApi` 내부를 `buildClient` 재귀 함수로 분리. entry가 `prefix`와 `endpoints`를 가지면 `RouterDef`로 판단해 `joinPaths(prefix, nested.prefix)`로 prefix를 합치고 재귀 호출.
+
+```ts
+if ('prefix' in entry && 'endpoints' in entry) {
+  client[key] = buildClient(executor, joinPaths(prefix, nested.prefix), nested.endpoints);
+} else {
+  // 기존 EndpointSpec 처리
+}
+```
+
+### 결과
+
+```ts
+const api = createApi(executor, defineRouter('/api', {
+  users: defineRouter('/users', {
+    getList: endpoint({ method: 'GET', path: '/', response: UserListSchema }),
+    todos: defineRouter('/todos', {
+      getDetail: endpoint({ method: 'GET', path: '/:id', ... }),
+    }),
+  }),
+}));
+
+api.users.getList({});             // GET /api/users
+api.users.todos.getDetail({ path: { id: 1 } }); // GET /api/users/todos/1
+```
+
+기존 flat 라우터와 완전히 하위 호환. prefix 합산 규칙은 기존 `joinPaths`를 그대로 재사용.
+
+---
+
+## 9. 미해결 / 차후 작업
 
 ### per-request 헤더
 

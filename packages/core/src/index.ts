@@ -9,6 +9,7 @@ export type {
   RequestShape,
   EndpointSpec,
   InferResponse,
+  RouterEntry,
   RouterEndpoints,
   RouterDef,
   ApiTypes,
