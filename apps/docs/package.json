@@ -1,0 +1,17 @@
+{
+  "name": "@routar/docs",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001"
+  },
+  "dependencies": {
+    "next": "^15.3.2",
+    "nextra": "4.5.1",
+    "nextra-theme-docs": "4.5.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
