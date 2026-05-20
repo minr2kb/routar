@@ -1,0 +1,30 @@
+---
+title: Executors
+asIndexPage: true
+---
+
+# Executors
+
+An executor is the transport layer — it handles the actual HTTP call. routar ships with two built-in executors:
+
+| Package | Executor | Best for |
+|---------|----------|----------|
+| `@routar/fetch` | [`createFetchExecutor`](/executors/fetch) | SSR, Node.js 18+, zero dependencies |
+| `@routar/axios` | [`createAxiosExecutor`](/executors/axios) | CSR, existing Axios instances, interceptors |
+
+Both implement the same `Executor` interface and are interchangeable — you can use `@routar/fetch` on the server and `@routar/axios` in the browser with the exact same router definition.
+
+## Choosing an executor
+
+**Use `@routar/fetch` when:**
+- You need per-request dynamic headers (SSR / Server Components)
+- You want zero extra dependencies beyond routar itself
+- You're targeting Node.js 18+ or any modern browser
+
+**Use `@routar/axios` when:**
+- You already have an Axios instance with interceptors configured
+- You're building a CSR-only app and Axios is already a dependency
+
+## Custom executors
+
+Any HTTP client works with routar. Wrap it with [`createExecutor`](/api-reference/create-executor) from `@routar/core`. See the [Custom Executor](/guides/custom-executor) guide.

@@ -1,0 +1,69 @@
+---
+title: createFetchExecutor
+---
+
+# `createFetchExecutor(baseURL, options?)` — `@routar/fetch`
+
+Uses the native `fetch` API. Ideal for SSR where per-request dynamic headers are needed.
+
+```ts
+import { createFetchExecutor } from '@routar/fetch'
+
+const executor = createFetchExecutor('https://api.example.com')
+```
+
+## Options
+
+```ts
+createFetchExecutor(baseURL, {
+  defaultHeaders: async () => {
+    const token = await getServerToken()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+  middlewares: [withTimeout(5000)],
+})
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `defaultHeaders` | `() => Promise<Record<string, string>> \| Record<string, string>` | Applied to every request. Evaluated per-request, so safe for SSR token injection. |
+| `middlewares` | `ExecutorMiddleware[]` | Middleware chain for this executor |
+
+## Empty responses
+
+Responses with status `204` or a `Content-Length: 0` header resolve to `null` instead of attempting to parse JSON.
+
+## `HttpError`
+
+Non-2xx responses throw `HttpError`:
+
+```ts
+import { HttpError } from '@routar/fetch'
+
+try {
+  await todoApi.getDetail({ path: { id: 999 } })
+} catch (err) {
+  if (err instanceof HttpError) {
+    console.log(err.status)     // 404
+    console.log(err.statusText) // 'Not Found'
+  }
+}
+```
+
+## SSR usage (Next.js)
+
+```ts
+import { createFetchExecutor } from '@routar/fetch'
+import { withTimeout } from '@routar/core'
+
+export const serverExecutor = createFetchExecutor(process.env.API_BASE_URL!, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('access_token')?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+  middlewares: [withTimeout(10_000)],
+})
+```
+
+`defaultHeaders` is called on every request, so it picks up the current request's cookies in Server Components and Route Handlers.

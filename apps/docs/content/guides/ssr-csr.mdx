@@ -1,0 +1,96 @@
+---
+title: SSR / CSR Pattern
+---
+
+# SSR / CSR Pattern
+
+routar's core insight: define the endpoint spec once, swap the executor per environment.
+
+## The pattern
+
+```ts
+// remote/lib/executor.ts
+import axios from 'axios'
+import { createAxiosExecutor } from '@routar/axios'
+import { createFetchExecutor } from '@routar/fetch'
+import { withTimeout } from '@routar/core'
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
+
+// CSR — shared axios instance, browser cookies sent automatically
+export const clientExecutor = createAxiosExecutor(
+  axios.create({ baseURL: BASE_URL, withCredentials: true })
+)
+
+// SSR — fetch factory, injects httpOnly cookie per-request
+export const serverExecutor = createFetchExecutor(BASE_URL, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('access_token')?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+  middlewares: [withTimeout(10_000)],
+})
+```
+
+```ts
+// remote/services/todo/todo.api.ts
+import { defineRouter, createApi, endpoint } from '@routar/core'
+import { clientExecutor, serverExecutor } from '../../lib/executor'
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+})
+
+export const todoApi       = createApi(clientExecutor, todoRouter) // CSR
+export const todoServerApi = createApi(serverExecutor, todoRouter) // SSR
+
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+```
+
+## With TanStack Query
+
+Components only import from `*.queries.ts`, never from executors or api files directly.
+
+```ts
+// remote/services/todo/todo.queries.ts
+import { queryOptions, useMutation } from '@tanstack/react-query'
+import { todoApi, todoServerApi } from './todo.api'
+
+export const todoKeys = {
+  all:    () => ['todos'],
+  detail: (id: number) => ['todos', id],
+}
+
+export const todoListOptions = () =>
+  queryOptions({
+    queryKey: todoKeys.all(),
+    queryFn:  () => todoApi.getList({}),
+  })
+
+export const todoDetailOptions = (id: number) =>
+  queryOptions({
+    queryKey: todoKeys.detail(id),
+    queryFn:  () => todoApi.getDetail({ path: { id } }),
+  })
+
+// SSR prefetch
+export const prefetchTodoList = (queryClient: QueryClient) =>
+  queryClient.prefetchQuery({
+    queryKey: todoKeys.all(),
+    queryFn:  () => todoServerApi.getList({}),
+  })
+```
+
+## Dependency direction
+
+```
+Component
+  └─ *.queries.ts    (TanStack Query interface)
+       └─ *.api.ts   (spec + executor)
+            └─ executor.ts  (HTTP, auth, middleware)
+```
+
+Each layer only knows about the layer below it. Components never import executors.

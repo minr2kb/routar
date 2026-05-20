@@ -1,0 +1,74 @@
+---
+title: Error Handling
+---
+
+# Error Handling
+
+## Error types
+
+| Error | Package | Thrown when |
+|-------|---------|-------------|
+| `ValidationError` | `@routar/core` | Request or response validation fails |
+| `HttpError` | `@routar/fetch` | Server returns a non-2xx status |
+| `AxiosError` | `axios` | Network or HTTP error via Axios |
+
+## Handling errors
+
+```ts
+import { ValidationError } from '@routar/core'
+import { HttpError } from '@routar/fetch'
+
+try {
+  await todoApi.create({ body: { title: '' } })
+} catch (err) {
+  if (err instanceof ValidationError) {
+    // request or response schema failed
+    console.log(err.message)
+    console.log(err.cause) // original Zod/Valibot error
+  }
+  if (err instanceof HttpError) {
+    // fetch returned non-2xx
+    console.log(err.status)     // e.g. 422
+    console.log(err.statusText) // e.g. 'Unprocessable Entity'
+  }
+}
+```
+
+## Normalizing errors across transports
+
+Each transport throws its own error type. If you want a single `instanceof` check across fetch and axios, add a normalizer middleware:
+
+```ts
+import { defineMiddleware } from '@routar/core'
+import { HttpError } from '@routar/fetch'
+import { isAxiosError } from 'axios'
+
+const withErrorNormalizer = defineMiddleware(async (opts, next) => {
+  try {
+    return await next(opts)
+  } catch (err) {
+    if (isAxiosError(err)) {
+      throw new HttpError(err.response?.status ?? 0, err.message)
+    }
+    throw err
+  }
+})
+
+const executor = createAxiosExecutor(instance, {
+  middlewares: [withErrorNormalizer],
+})
+```
+
+## Retry only on server errors
+
+```ts
+import { withRetry } from '@routar/core'
+import { HttpError } from '@routar/fetch'
+
+withRetry(3, {
+  shouldRetry: (err) => {
+    if (err instanceof HttpError) return err.status >= 500
+    return true // retry on network errors
+  },
+})
+```

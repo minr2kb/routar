@@ -1,0 +1,61 @@
+---
+title: createAxiosExecutor
+---
+
+# `createAxiosExecutor(instanceOrFactory, options?)` — `@routar/axios`
+
+Accepts an `AxiosInstance` (CSR) or a factory function that returns one (SSR).
+
+```ts
+import axios from 'axios'
+import { createAxiosExecutor } from '@routar/axios'
+
+// CSR — shared instance
+const executor = createAxiosExecutor(axios.create({ baseURL: 'https://api.example.com' }))
+```
+
+## Instance vs. factory
+
+```ts
+// CSR — pass the instance directly
+const executor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }))
+
+// SSR — factory, called per-request for fresh headers
+const executor = createAxiosExecutor(async () => {
+  const token = await getServerToken()
+  return axios.create({
+    baseURL: BASE_URL,
+    headers: { Authorization: `Bearer ${token}` },
+  })
+})
+```
+
+The factory form is called on every request, making it safe for per-request auth headers in SSR environments.
+
+## Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `middlewares` | `ExecutorMiddleware[]` | Middleware chain for this executor |
+
+## Errors
+
+Axios errors propagate as `AxiosError`. All Axios-specific fields are preserved:
+
+```ts
+import { isAxiosError } from 'axios'
+
+try {
+  await todoApi.getDetail({ path: { id: 999 } })
+} catch (err) {
+  if (isAxiosError(err)) {
+    console.log(err.response?.status)  // 404
+    console.log(err.response?.data)    // server error body
+    console.log(err.config)            // request config
+  }
+}
+```
+
+## Instance detection
+
+`createAxiosExecutor` distinguishes an `AxiosInstance` from a factory function via duck-typing on the `interceptors` property. `AxiosInstance` objects always have `interceptors`; plain factory functions do not.

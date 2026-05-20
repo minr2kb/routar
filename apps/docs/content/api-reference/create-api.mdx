@@ -1,0 +1,76 @@
+---
+title: createApi()
+---
+
+# `createApi(executor, router)`
+
+Produces a fully-typed API client. Each endpoint becomes an async function with the signature `(params, signal?) => Promise<Response>`.
+
+```ts
+import { createApi } from '@routar/core'
+
+const todoApi = createApi(executor, todoRouter)
+
+// params follow { path?, query?, body? }
+await todoApi.getDetail({ path: { id: 1 } })
+await todoApi.create({ body: { title: 'buy milk' } })
+await todoApi.update({ path: { id: 1 }, body: { completed: true }, query: { version: 2 } })
+```
+
+## Overloads
+
+```ts
+// with a pre-built router
+createApi(executor, todoRouter)
+
+// inline with prefix
+createApi(executor, '/todos', { getList: endpoint({ ... }) })
+
+// inline without prefix
+createApi(executor, { getList: endpoint({ ... }) })
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `executor` | `Executor` | HTTP transport. Create with `createFetchExecutor` or `createAxiosExecutor`. |
+| `router` | `RouterDef \| RouterEndpoints` | Router definition or inline endpoints record |
+| `prefix` | `string` (optional) | URL prefix when passing endpoints inline |
+
+## Request params
+
+Request params map to `{ path?, query?, body? }` matching the `request` schema shape:
+
+```ts
+// request: z.object({ path: z.object({ id: z.number() }) })
+await api.getDetail({ path: { id: 1 } })
+
+// request: z.object({ query: z.object({ page: z.number() }) })
+await api.getList({ query: { page: 2 } })
+
+// request: z.object({ body: z.object({ title: z.string() }) })
+await api.create({ body: { title: 'buy milk' } })
+```
+
+## AbortSignal
+
+Pass an `AbortSignal` as the second argument to cancel a request:
+
+```ts
+const controller = new AbortController()
+const result = await todoApi.getList({}, controller.signal)
+
+controller.abort() // cancels the request
+```
+
+## SSR/CSR pattern
+
+The typical pattern is to create two clients from the same router — one for CSR, one for SSR:
+
+```ts
+export const todoApi       = createApi(clientExecutor, todoRouter) // CSR
+export const todoServerApi = createApi(serverExecutor, todoRouter) // SSR
+```
+
+See the [SSR/CSR guide](/guides/ssr-csr) for a complete example.

@@ -1,0 +1,90 @@
+---
+title: Custom Executor
+---
+
+# Custom Executor
+
+Any HTTP client works with routar. Use `createExecutor` to wrap it.
+
+## Basic example
+
+```ts
+import { createExecutor, serializeParams } from '@routar/core'
+
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  const fullURL = new URL(url)
+  if (params) {
+    serializeParams(params).forEach((v, k) => fullURL.searchParams.set(k, v))
+  }
+  const res = await fetch(fullURL.toString(), {
+    method,
+    body: body != null ? JSON.stringify(body) : undefined,
+    headers: { ...(body != null ? { 'Content-Type': 'application/json' } : {}), ...headers },
+    signal,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+})
+```
+
+`params` holds the `query` fields from your endpoint's `request` schema. Use `serializeParams` from `@routar/core` to turn them into a `URLSearchParams`-compatible string.
+
+## With `ky`
+
+```ts
+import ky from 'ky'
+import { createExecutor } from '@routar/core'
+
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  return ky(url, { method, json: body, searchParams: params, headers, signal }).json()
+})
+```
+
+## With `got`
+
+```ts
+import got from 'got'
+import { createExecutor } from '@routar/core'
+
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  const { body: data } = await got(url, {
+    method,
+    json: body,
+    searchParams: params,
+    headers,
+    signal,
+    responseType: 'json',
+  })
+  return data
+})
+```
+
+## Adding middleware
+
+Pass middlewares as the second argument. They apply to all requests through this executor.
+
+```ts
+import { createExecutor, withRetry, withTimeout, withLogger } from '@routar/core'
+
+const executor = createExecutor(transport, [
+  withTimeout(8_000),
+  withRetry(3),
+  withLogger(),
+])
+```
+
+## Validator compatibility
+
+The `response` schema only needs a `.parse(data: unknown): T` method. You can use Zod, Valibot, Yup, or a hand-rolled validator:
+
+```ts
+// hand-rolled validator
+const TodoValidator = {
+  parse(data: unknown): Todo {
+    if (typeof data !== 'object' || data === null) throw new Error('invalid')
+    return data as Todo
+  },
+}
+
+endpoint({ method: 'GET', path: '/', response: TodoValidator })
+```
