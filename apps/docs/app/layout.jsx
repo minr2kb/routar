@@ -18,9 +18,9 @@ export default async function RootLayout({ children }) {
       <Head />
       <body>
         <Layout
-          navbar={<Navbar logo={<b>routar</b>} projectLink="https://github.com/kbmin1129/routar" />}
+          navbar={<Navbar logo={<b>routar</b>} projectLink="https://github.com/minr2kb/routar" />}
           pageMap={pageMap}
-          docsRepositoryBase="https://github.com/kbmin1129/routar/tree/main/apps/docs"
+          docsRepositoryBase="https://github.com/minr2kb/routar/tree/main/apps/docs"
           footer={<Footer>MIT {new Date().getFullYear()} © routar</Footer>}
           sidebar={{ defaultMenuCollapseLevel: 1 }}
         >
