@@ -1,0 +1,205 @@
+---
+title: routar
+asIndexPage: true
+---
+
+import { Cards } from 'nextra/components'
+import { PackageInstall } from '../components/PackageInstall'
+
+<div style={{
+  textAlign: 'center',
+  padding: '80px 24px 56px',
+  maxWidth: '860px',
+  margin: '0 auto',
+}}>
+  <div style={{
+    display: 'inline-block',
+    fontSize: '12px',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    padding: '4px 14px',
+    borderRadius: '999px',
+    border: '1px solid rgba(99,102,241,0.35)',
+    color: 'rgb(99,102,241)',
+    marginBottom: '28px',
+  }}>
+    Schema-first · Type-safe · Transport-agnostic
+  </div>
+
+  <h1 style={{
+    fontSize: 'clamp(2.6rem, 6vw, 4rem)',
+    fontWeight: 800,
+    lineHeight: 1.1,
+    letterSpacing: '-0.03em',
+    marginBottom: '24px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  }}>
+    routar
+  </h1>
+
+  <p style={{
+    fontSize: '1.25rem',
+    lineHeight: 1.6,
+    color: 'var(--nextra-colors-gray-600, #4b5563)',
+    maxWidth: '560px',
+    margin: '0 auto 40px',
+  }}>
+    Define your API schema once. Get end-to-end type safety and runtime
+    validation — across any HTTP client, any environment.
+  </p>
+
+  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+    <a href="/getting-started" style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '10px 24px',
+      borderRadius: '8px',
+      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+      color: '#fff',
+      fontWeight: 600,
+      fontSize: '0.95rem',
+      textDecoration: 'none',
+    }}>
+      Get Started →
+    </a>
+    <a href="/api-reference" style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '10px 24px',
+      borderRadius: '8px',
+      border: '1px solid rgba(99,102,241,0.4)',
+      color: 'rgb(99,102,241)',
+      fontWeight: 600,
+      fontSize: '0.95rem',
+      textDecoration: 'none',
+    }}>
+      API Reference
+    </a>
+  </div>
+</div>
+
+<div style={{ maxWidth: '560px', margin: '0 auto 64px', padding: '0 24px' }}>
+  <PackageInstall packages={['@routar/core', '@routar/fetch']} />
+</div>
+
+<div style={{
+  maxWidth: '860px',
+  margin: '0 auto 64px',
+  padding: '0 24px',
+}}>
+
+```ts
+import { z } from 'zod'
+import { endpoint, defineRouter, createApi } from '@routar/core'
+import { createFetchExecutor } from '@routar/fetch'
+
+const TodoSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  completed: z.boolean(),
+})
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+  create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
+                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+})
+
+const todoApi = createApi(createFetchExecutor('https://api.example.com'), todoRouter)
+
+const todos = await todoApi.getList({})                          // Todo[]
+const todo  = await todoApi.getDetail({ path: { id: 1 } })      // Todo
+const next  = await todoApi.create({ body: { title: 'buy milk' } }) // Todo
+```
+
+</div>
+
+<div style={{
+  maxWidth: '860px',
+  margin: '0 auto 72px',
+  padding: '0 24px',
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+  gap: '16px',
+}}>
+  {[
+    { icon: '🔒', title: 'End-to-end type inference', desc: 'Request params, response shape, and adapter output — all inferred without a single any.' },
+    { icon: '✅', title: 'Runtime validation', desc: 'Zod, Valibot, Yup, or any object with .parse() validates both request and response at runtime.' },
+    { icon: '🔌', title: 'Transport agnostic', desc: 'Swap fetch, Axios, or your own HTTP client by changing one line. The schema stays the same.' },
+    { icon: '🧱', title: 'Composable middleware', desc: 'Retry, timeout, and logging as stackable functions. Add them to any executor without touching the schema.' },
+    { icon: '🗂️', title: 'Nested routers', desc: 'Mirror your URL structure directly in the type system. Nesting routes nests types.' },
+    { icon: '🌐', title: 'SSR / CSR ready', desc: 'Same endpoint definition, different executor per environment. Works in Server Components and the browser.' },
+  ].map(f => (
+    <div key={f.title} style={{
+      padding: '24px',
+      borderRadius: '12px',
+      border: '1px solid rgba(99,102,241,0.15)',
+      background: 'rgba(99,102,241,0.03)',
+    }}>
+      <div style={{ fontSize: '1.6rem', marginBottom: '10px' }}>{f.icon}</div>
+      <div style={{ fontWeight: 700, marginBottom: '6px', fontSize: '0.95rem' }}>{f.title}</div>
+      <div style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--nextra-colors-gray-600, #6b7280)' }}>{f.desc}</div>
+    </div>
+  ))}
+</div>
+
+<div style={{
+  maxWidth: '860px',
+  margin: '0 auto 72px',
+  padding: '0 24px',
+}}>
+
+## Packages
+
+<div style={{
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: '16px',
+  marginTop: '24px',
+}}>
+  {[
+    { name: '@routar/core', pkg: '@routar/core', desc: 'Endpoint definitions, router, API client factory, and middleware system.' },
+    { name: '@routar/fetch', pkg: '@routar/fetch', desc: 'Executor backed by the native fetch API. Zero extra dependencies.' },
+    { name: '@routar/axios', pkg: '@routar/axios', desc: 'Executor backed by Axios. Works with existing Axios instances and interceptors.' },
+  ].map(p => (
+    <div key={p.name} style={{
+      borderRadius: '12px',
+      border: '1px solid rgba(0,0,0,0.08)',
+    }}>
+      <code style={{
+        display: 'block',
+        fontWeight: 700,
+        fontSize: '0.95rem',
+        marginBottom: '12px',
+        color: 'rgb(99,102,241)',
+      }}>{p.name}</code>
+      <PackageInstall packages={p.pkg} />
+      <div style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--nextra-colors-gray-600, #6b7280)', marginTop: '12px' }}>{p.desc}</div>
+    </div>
+  ))}
+</div>
+
+</div>
+
+<div style={{
+  maxWidth: '860px',
+  margin: '0 auto 80px',
+  padding: '0 24px',
+}}>
+
+<Cards>
+  <Cards.Card title="Getting Started →" href="/getting-started" />
+  <Cards.Card title="Why routar? →" href="/why" />
+  <Cards.Card title="API Reference →" href="/api-reference" />
+  <Cards.Card title="Guides →" href="/guides/ssr-csr" />
+</Cards>
+
+</div>
