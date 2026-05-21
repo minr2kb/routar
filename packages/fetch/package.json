@@ -1,6 +1,16 @@
 {
   "name": "@routar/fetch",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "description": "Fetch-based executor for routar — transport adapter using the native fetch API",
+  "keywords": ["api", "http", "typescript", "fetch", "routar", "executor"],
+  "author": "Kyungbae Min",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minr2kb/routar.git",
+    "directory": "packages/fetch"
+  },
+  "homepage": "https://github.com/minr2kb/routar#readme",
   "type": "module",
   "exports": {
     ".": {
@@ -12,17 +22,16 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch"
   },
   "peerDependencies": {
-    "@routar/core": "workspace:*"
+    "@routar/core": "^0.1.0"
   },
   "devDependencies": {
     "tsup": "^8.5.1"
-  }
+  },
+  "publishConfig": { "access": "public" }
 }

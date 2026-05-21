@@ -1,0 +1,11 @@
+# @routar/axios
+
+Axios-based executor for [routar](https://github.com/kbmin1129/routar) — transport adapter using Axios.
+
+## Install
+
+```bash
+npm install @routar/core @routar/axios axios
+```
+
+See the [main README](https://github.com/kbmin1129/routar) for full documentation.

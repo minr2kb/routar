@@ -1,6 +1,16 @@
 {
   "name": "@routar/axios",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "description": "Axios-based executor for routar — transport adapter using Axios",
+  "keywords": ["api", "http", "typescript", "axios", "routar", "executor"],
+  "author": "Kyungbae Min",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minr2kb/routar.git",
+    "directory": "packages/axios"
+  },
+  "homepage": "https://github.com/minr2kb/routar#readme",
   "type": "module",
   "exports": {
     ".": {
@@ -12,20 +22,19 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch"
   },
   "peerDependencies": {
     "axios": ">=1.0.0",
-    "@routar/core": "workspace:*"
+    "@routar/core": "^0.1.0"
   },
   "devDependencies": {
     "axios": "^1.16.1",
     "tsup": "^8.0.0",
     "typescript": "^6.0.0"
-  }
+  },
+  "publishConfig": { "access": "public" }
 }
