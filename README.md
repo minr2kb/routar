@@ -1,4 +1,6 @@
 # routar
+<img width="1200" height="630" alt="routar" src="https://github.com/user-attachments/assets/a2462cf7-d072-48fe-975f-d8e569af9171" />
+
 
 **Schema-first HTTP API client with end-to-end type safety and runtime validation.**
 
