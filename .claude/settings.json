@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[PRE-COMMIT CHECKLIST] Before committing, verify all 4 steps are complete: (1) README updated (2) Tests updated (3) CLAUDE.md updated (4) apps/docs updated. Stop and complete any missing steps first.\"}}'",
+            "statusMessage": "Checking pre-commit requirements..."
+          }
+        ]
+      }
+    ]
+  }
+}
