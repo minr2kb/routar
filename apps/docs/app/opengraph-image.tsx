@@ -1,24 +1,15 @@
+import fs from 'fs'
+import path from 'path'
 import { ImageResponse } from 'next/og'
 
-export const runtime = 'edge'
 export const alt = 'routar – Schema-first HTTP API client'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-async function loadGeist() {
-  const [regular, bold] = await Promise.all([
-    fetch('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Regular.woff2').then(
-      (r) => r.arrayBuffer(),
-    ),
-    fetch('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Bold.woff2').then(
-      (r) => r.arrayBuffer(),
-    ),
-  ])
-  return { regular, bold }
-}
-
-export default async function OgImage() {
-  const { regular, bold } = await loadGeist()
+export default function OgImage() {
+  const fontsDir = path.join(process.cwd(), 'public', 'fonts')
+  const regular = fs.readFileSync(path.join(fontsDir, 'Geist-Regular.ttf'))
+  const bold = fs.readFileSync(path.join(fontsDir, 'Geist-Bold.ttf'))
 
   return new ImageResponse(
     (
@@ -47,10 +38,11 @@ export default async function OgImage() {
             style={{
               fontSize: '96px',
               fontWeight: 700,
-              color: '#fff',
               letterSpacing: '-4px',
               lineHeight: 1,
-              fontFamily: 'Geist',
+              background: 'linear-gradient(135deg, #ffffff 0%, #c7d2fe 100%)',
+              backgroundClip: 'text',
+              color: 'transparent',
             }}
           >
             routar
@@ -61,7 +53,6 @@ export default async function OgImage() {
               fontWeight: 400,
               color: 'rgba(255,255,255,0.65)',
               textAlign: 'center',
-              fontFamily: 'Geist',
             }}
           >
             Schema-first HTTP API client
@@ -84,7 +75,6 @@ export default async function OgImage() {
                   fontSize: '18px',
                   fontWeight: 400,
                   color: '#a5b4fc',
-                  fontFamily: 'Geist',
                 }}
               >
                 {tag}
