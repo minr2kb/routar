@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun x tsc --build
+
+      - run: bun test
+
+      - run: bun run build
+
+      - name: Check changeset exists
+        if: github.actor != 'github-actions[bot]'
+        run: bun x changeset status --since=origin/main

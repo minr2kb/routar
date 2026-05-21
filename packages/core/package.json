@@ -1,6 +1,16 @@
 {
   "name": "@routar/core",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "description": "Schema-first HTTP API client — endpoint definitions, typed router, API client factory, and middleware system",
+  "keywords": ["api", "http", "typescript", "zod", "schema", "type-safe", "fetch", "axios", "middleware", "rest"],
+  "author": "Kyungbae Min",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minr2kb/routar.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/minr2kb/routar#readme",
   "type": "module",
   "exports": {
     ".": {
@@ -12,11 +22,10 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch"
-  }
+  },
+  "publishConfig": { "access": "public" }
 }
