@@ -4,12 +4,32 @@ import { getPageMap } from 'nextra/page-map'
 import 'nextra-theme-docs/style.css'
 import './globals.css'
 
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://routar.dev'
+
 export const metadata = {
+  metadataBase: new URL(BASE_URL),
   title: {
     absolute: 'routar',
     template: '%s – routar',
   },
-  description: 'Schema-first HTTP API client with end-to-end type safety and runtime validation.',
+  description: 'Schema-first HTTP API client with end-to-end type safety and runtime validation. Define once, validate everywhere.',
+  keywords: ['routar', 'HTTP client', 'TypeScript', 'schema validation', 'Zod', 'type safety', 'API client', 'fetch', 'axios'],
+  authors: [{ name: 'Kyungbae Min', url: 'https://github.com/minr2kb' }],
+  creator: 'Kyungbae Min',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'routar',
+    title: 'routar – Schema-first HTTP API client',
+    description: 'Schema-first HTTP API client with end-to-end type safety and runtime validation.',
+    images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'routar' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'routar – Schema-first HTTP API client',
+    description: 'Schema-first HTTP API client with end-to-end type safety and runtime validation.',
+    images: ['/opengraph-image'],
+  },
 }
 
 export default async function RootLayout({ children }) {
