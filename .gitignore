@@ -4,3 +4,4 @@ dist
 *.tsbuildinfo
 .next
 next-env.d.ts
+**/.omc

@@ -32,6 +32,7 @@
     "@routar/core": "^0.1.0"
   },
   "devDependencies": {
+    "@routar/core": "workspace:*",
     "axios": "^1.16.1",
     "tsup": "^8.0.0",
     "typescript": "^6.0.0"
