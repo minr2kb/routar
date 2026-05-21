@@ -1,0 +1,9 @@
+{
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "linked": [["@routar/core", "@routar/fetch", "@routar/axios"]],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}
