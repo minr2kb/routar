@@ -8,4 +8,4 @@ Core package for [routar](https://github.com/kbmin1129/routar) — endpoint defi
 npm install @routar/core
 ```
 
-See the [main README](https://github.com/kbmin1129/routar) for full documentation.
+See the [documentation](https://routar.vercel.app) or the [main README](https://github.com/minr2kb/routar) for full documentation.

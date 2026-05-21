@@ -4,6 +4,7 @@
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "build": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build && bun run --filter '@routar/web' build && bun run --filter '@routar/docs' build",
+    "build:packages": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build",
     "test": "bun test",
     "typecheck": "tsc --build"
   },

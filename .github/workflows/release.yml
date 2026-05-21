@@ -19,7 +19,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: bun run build
+      - run: bun run build:packages
 
       - name: Create Release PR or Publish
         uses: changesets/action@v1
