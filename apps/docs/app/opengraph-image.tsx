@@ -5,7 +5,21 @@ export const alt = 'routar – Schema-first HTTP API client'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-export default function OgImage() {
+async function loadGeist() {
+  const [regular, bold] = await Promise.all([
+    fetch('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Regular.woff2').then(
+      (r) => r.arrayBuffer(),
+    ),
+    fetch('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Bold.woff2').then(
+      (r) => r.arrayBuffer(),
+    ),
+  ])
+  return { regular, bold }
+}
+
+export default async function OgImage() {
+  const { regular, bold } = await loadGeist()
+
   return new ImageResponse(
     (
       <div
@@ -17,7 +31,7 @@ export default function OgImage() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontFamily: 'Geist, system-ui, sans-serif',
           padding: '60px',
         }}
       >
@@ -32,10 +46,11 @@ export default function OgImage() {
           <div
             style={{
               fontSize: '96px',
-              fontWeight: 800,
+              fontWeight: 700,
               color: '#fff',
               letterSpacing: '-4px',
               lineHeight: 1,
+              fontFamily: 'Geist',
             }}
           >
             routar
@@ -43,8 +58,10 @@ export default function OgImage() {
           <div
             style={{
               fontSize: '30px',
+              fontWeight: 400,
               color: 'rgba(255,255,255,0.65)',
               textAlign: 'center',
+              fontFamily: 'Geist',
             }}
           >
             Schema-first HTTP API client
@@ -65,7 +82,9 @@ export default function OgImage() {
                   borderRadius: '999px',
                   padding: '8px 20px',
                   fontSize: '18px',
+                  fontWeight: 400,
                   color: '#a5b4fc',
+                  fontFamily: 'Geist',
                 }}
               >
                 {tag}
@@ -75,6 +94,12 @@ export default function OgImage() {
         </div>
       </div>
     ),
-    { ...size },
+    {
+      ...size,
+      fonts: [
+        { name: 'Geist', data: regular, weight: 400, style: 'normal' },
+        { name: 'Geist', data: bold, weight: 700, style: 'normal' },
+      ],
+    },
   )
 }
