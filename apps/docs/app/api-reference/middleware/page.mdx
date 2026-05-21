@@ -58,7 +58,7 @@ Logs each request with method, URL, and duration.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `log` | `(msg: string, data: object) => void` | `console.log` | Custom log function |
+| `log` | `(msg: string, data?: unknown) => void` | `console.log` | Custom log function |
 
 ```ts
 withLogger()
