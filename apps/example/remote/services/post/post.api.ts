@@ -1,4 +1,4 @@
-import { createApi, defineRouter } from '@routar/core';
+import { createApi, defineRouter, endpoint } from '@routar/core';
 import type { ApiTypes } from '@routar/core';
 import { z } from 'zod';
 import { clientExecutor, fetchExecutor } from '../../lib/executor';
@@ -19,7 +19,7 @@ const CommentRawSchema = z.object({
 });
 
 export const PostRouter = defineRouter('/posts', {
-  getList: {
+  getList: endpoint({
     method: 'GET' as const,
     path: '/',
     request: z.object({
@@ -30,24 +30,24 @@ export const PostRouter = defineRouter('/posts', {
       }).optional(),
     }),
     response: z.array(PostRawSchema),
-  },
-  getDetail: {
+  }),
+  getDetail: endpoint({
     method: 'GET' as const,
     path: '/:id',
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: PostRawSchema,
-  },
-  getComments: {
+  }),
+  getComments: endpoint({
     method: 'GET' as const,
     path: '/:id/comments',
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: z.array(CommentRawSchema),
-  },
-  create: {
+  }),
+  create: endpoint({
     method: 'POST' as const,
     path: '/',
     request: z.object({
@@ -58,7 +58,7 @@ export const PostRouter = defineRouter('/posts', {
       }),
     }),
     response: PostRawSchema,
-  },
+  }),
 });
 
 export const postApi = createApi(clientExecutor, PostRouter);

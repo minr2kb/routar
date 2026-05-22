@@ -79,18 +79,38 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 | `utils/params.ts` | `serializeParams` → `URLSearchParams` |
 | `utils/validate.ts` | `ValidationError` |
 
-### `apps/web/remote/` structure
+### `apps/example` structure
 
 ```
-lib/
-  executor.ts       clientExecutor (axios, CSR) + fetchExecutor (fetch + cookies, SSR)
-services/
-  <domain>/
-    <domain>.api.ts      defineRouter + createApi + ApiTypes export
-    <domain>.queries.ts  TanStack Query queryOptions / useMutation wrappers
+app/
+  api/todos/        local Route Handlers (GET/POST + GET/PATCH/DELETE /:id)
+  api/todos/_store.ts  in-memory store seeded via globalThis (survives hot-reload)
+  (pages)/          server components: prefetchQuery → HydrationBoundary → <Suspense>
+  providers.tsx     QueryClientProvider with useState (never pass QueryClient across boundary)
+  layout.tsx        root layout wrapping with Providers
+utils/
+  get-query-client.ts  isServer-based singleton — fresh per request on server, stable on client
+remote/
+  lib/executor.ts   clientExecutor (axios+interceptors, CSR) + fetchExecutor (fetch+cookies, SSR)
+                    localClientExecutor + localFetchExecutor (→ NEXT_PUBLIC_APP_URL)
+  services/
+    index.ts             re-export barrel: { todoServerApi, postServerApi, userServerApi }
+    <domain>/
+      <domain>.api.ts    defineRouter + endpoint() + createApi + ApiTypes export
+      <domain>.queries.ts  queryOptions factories + mutation hooks only (no wrapper hooks)
+components/
+  *Client.tsx       client components using useSuspenseQuery / useSuspenseQueries
 ```
 
-Components import only from `*.queries.ts` — never directly from `*.api.ts` or executors.
+**TanStack Query patterns:**
+- `queryOptions` factory is the single source of truth for key + queryFn — no separate KEYS object
+- Server pages: `prefetchQuery(queryOptions(params))` → `HydrationBoundary` → `<Suspense>`
+- Client components: `useSuspenseQuery(queryOptions(params))` — `data` always non-nullable
+- Multiple queries: `useSuspenseQueries({ queries: [...] })`
+- Invalidation: `queryKey: ['domain']` (prefix) or `queryOptions(id).queryKey` (specific)
+- `*.queries.ts` exports only `queryOptions` factories and mutation hooks — no `useXxx` wrappers
+
+**Shared contract pattern (todo):** `TodoRawSchema` exported from `todo.api.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
 
 ### PathParams enforcement
 

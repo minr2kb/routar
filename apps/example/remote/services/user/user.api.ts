@@ -1,4 +1,4 @@
-import { createApi, defineRouter } from '@routar/core';
+import { createApi, defineRouter, endpoint } from '@routar/core';
 import type { ApiTypes } from '@routar/core';
 import { z } from 'zod';
 import { clientExecutor, fetchExecutor } from '../../lib/executor';
@@ -25,25 +25,22 @@ const toUser = (raw: z.infer<typeof UserRawSchema>) => ({
   city: raw.address.city,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toUserAny = toUser as (raw: any) => ReturnType<typeof toUser>;
-
 export const UserRouter = defineRouter('/users', {
-  getList: {
+  getList: endpoint({
     method: 'GET' as const,
     path: '/',
     response: z.array(UserRawSchema),
-    adapter: (raw: any) => (raw as z.infer<typeof UserRawSchema>[]).map(toUser),
-  },
-  getDetail: {
+    adapter: (raw) => raw.map(toUser),
+  }),
+  getDetail: endpoint({
     method: 'GET' as const,
     path: '/:id',
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: UserRawSchema,
-    adapter: toUserAny,
-  },
+    adapter: toUser,
+  }),
 });
 
 export const userApi = createApi(clientExecutor, UserRouter);
