@@ -1,14 +1,11 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { createFetchExecutor, HttpError } from "./create-fetch-executor.js";
 
-// Mock global fetch
 const originalFetch = globalThis.fetch;
 
-type AnyMock = ReturnType<typeof mock<(...args: any[]) => any>>;
-
 function mockFetch(response: Partial<Response>) {
-  (globalThis as any).fetch = mock(
-    async () =>
+  const m = mock(
+    async (_url: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
       ({
         ok: true,
         status: 200,
@@ -18,6 +15,8 @@ function mockFetch(response: Partial<Response>) {
         ...response,
       }) as Response,
   );
+  globalThis.fetch = m as unknown as typeof fetch;
+  return m;
 }
 
 describe("createFetchExecutor", () => {
@@ -56,16 +55,10 @@ describe("createFetchExecutor", () => {
   });
 
   it("appends query params to URL", async () => {
-    mockFetch({});
+    const m = mockFetch({});
     const executor = createFetchExecutor("https://api.example.com");
-    await executor.execute({
-      method: "GET",
-      url: "/todos",
-      params: { page: "1" },
-    });
-    const calledUrl = (globalThis.fetch as unknown as AnyMock).mock
-      .calls[0][0] as string;
-    expect(calledUrl).toContain("page=1");
+    await executor.execute({ method: "GET", url: "/todos", params: { page: "1" } });
+    expect(String(m.mock.calls[0][0])).toContain("page=1");
   });
 
   it("throws HttpError on non-2xx", async () => {
@@ -79,36 +72,23 @@ describe("createFetchExecutor", () => {
   it("returns null for 204 responses", async () => {
     mockFetch({ ok: true, status: 204, headers: new Headers() });
     const executor = createFetchExecutor("https://api.example.com");
-    const result = await executor.execute({
-      method: "DELETE",
-      url: "/todos/1",
-    });
+    const result = await executor.execute({ method: "DELETE", url: "/todos/1" });
     expect(result).toBeNull();
   });
 
   it("does not set Content-Type for bodyless requests", async () => {
-    mockFetch({});
+    const m = mockFetch({});
     const executor = createFetchExecutor("https://api.example.com");
     await executor.execute({ method: "GET", url: "/todos" });
-    const opts = (globalThis.fetch as unknown as AnyMock).mock
-      .calls[0][1] as RequestInit;
-    expect(
-      (opts.headers as Record<string, string>)["Content-Type"],
-    ).toBeUndefined();
+    const headers = new Headers(m.mock.calls[0][1]?.headers);
+    expect(headers.get("Content-Type")).toBeNull();
   });
 
   it("sets Content-Type for requests with body", async () => {
-    mockFetch({});
+    const m = mockFetch({});
     const executor = createFetchExecutor("https://api.example.com");
-    await executor.execute({
-      method: "POST",
-      url: "/todos",
-      body: { title: "test" },
-    });
-    const opts = (globalThis.fetch as unknown as AnyMock).mock
-      .calls[0][1] as RequestInit;
-    expect((opts.headers as Record<string, string>)["Content-Type"]).toBe(
-      "application/json",
-    );
+    await executor.execute({ method: "POST", url: "/todos", body: { title: "test" } });
+    const headers = new Headers(m.mock.calls[0][1]?.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
   });
 });
