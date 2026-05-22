@@ -4,8 +4,29 @@ import axios from 'axios';
 
 const BASE_URL = 'https://jsonplaceholder.typicode.com';
 
+const axiosClient = axios.create({ baseURL: BASE_URL });
+
+// Request interceptor — attach auth token from localStorage
+axiosClient.interceptors.request.use((config) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Response interceptor — handle 401 globally
+axiosClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // e.g. redirect to login or refresh token
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  },
+);
+
 // CSR executor — reuses the same axios instance (fast, interceptor-friendly)
-export const clientExecutor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }));
+export const clientExecutor = createAxiosExecutor(axiosClient);
 
 // SSR executor — fetch with per-request dynamic auth headers
 export const fetchExecutor = createFetchExecutor(BASE_URL, {
