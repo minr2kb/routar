@@ -26,4 +26,13 @@ describe('serializeParams', () => {
     const result = serializeParams({ ids: [1, null, 3] });
     expect(result.getAll('ids')).toEqual(['1', '3']);
   });
+  it('serializes numbers as strings', () => {
+    const result = serializeParams({ page: 2 });
+    expect(result.get('page')).toBe('2');
+  });
+  it('serializes booleans as strings', () => {
+    const result = serializeParams({ active: true, deleted: false });
+    expect(result.get('active')).toBe('true');
+    expect(result.get('deleted')).toBe('false');
+  });
 });
