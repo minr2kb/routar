@@ -1,18 +1,16 @@
 import { createApi, endpoint, defineRouter } from '@routar/core';
 import type { ApiTypes } from '@routar/core';
 import { z } from 'zod';
-import { clientExecutor, fetchExecutor } from '../../lib/executor';
+import { localClientExecutor, localFetchExecutor } from '../../lib/executor';
 
-const TodoRawSchema = z.object({
+export const TodoRawSchema = z.object({
   id: z.number(),
   userId: z.number(),
   title: z.string(),
   completed: z.boolean(),
 });
 
-const TodoListRawSchema = z.array(TodoRawSchema);
-
-const toTodoItem = (raw: z.infer<typeof TodoRawSchema>) => ({
+export const toTodoItem = (raw: z.infer<typeof TodoRawSchema>) => ({
   ...raw,
   label: raw.completed ? `✓ ${raw.title}` : raw.title,
 });
@@ -29,7 +27,7 @@ export const TodoRouter = defineRouter('/todos', {
         _page: z.number().optional(),
       }).optional(),
     }),
-    response: TodoListRawSchema,
+    response: z.array(TodoRawSchema),
     adapter: (raw) => raw.map(toTodoItem),
   }),
   getDetail: endpoint({
@@ -77,8 +75,8 @@ export const TodoRouter = defineRouter('/todos', {
   }),
 });
 
-export const todoApi = createApi(clientExecutor, TodoRouter);
-export const todoServerApi = createApi(fetchExecutor, TodoRouter);
+export const todoApi = createApi(localClientExecutor, TodoRouter);
+export const todoServerApi = createApi(localFetchExecutor, TodoRouter);
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>;
 export type TodoItem = TodoApiTypes['getDetail']['response'];

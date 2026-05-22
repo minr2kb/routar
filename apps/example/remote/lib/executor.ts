@@ -3,6 +3,7 @@ import { createFetchExecutor } from '@routar/fetch';
 import axios from 'axios';
 
 const BASE_URL = 'https://jsonplaceholder.typicode.com';
+const LOCAL_BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 const axiosClient = axios.create({ baseURL: BASE_URL });
 
@@ -27,6 +28,10 @@ axiosClient.interceptors.response.use(
 
 // CSR executor — reuses the same axios instance (fast, interceptor-friendly)
 export const clientExecutor = createAxiosExecutor(axiosClient);
+
+// Local CSR/SSR executors — point to this app's own API routes
+export const localClientExecutor = createAxiosExecutor(axios.create({ baseURL: LOCAL_BASE }));
+export const localFetchExecutor = createFetchExecutor(LOCAL_BASE);
 
 // SSR executor — fetch with per-request dynamic auth headers
 export const fetchExecutor = createFetchExecutor(BASE_URL, {
