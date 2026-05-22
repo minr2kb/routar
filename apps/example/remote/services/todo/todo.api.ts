@@ -1,7 +1,7 @@
-import { createApi, endpoint, defineRouter } from '@routar/core';
-import type { ApiTypes } from '@routar/core';
-import { z } from 'zod';
-import { localClientExecutor, localFetchExecutor } from '../../lib/executor';
+import { createApi, endpoint, defineRouter } from "@routar/core";
+import type { ApiTypes } from "@routar/core";
+import { z } from "zod";
+import { localClientExecutor, localFetchExecutor } from "../../lib/executor";
 
 export const TodoRawSchema = z.object({
   id: z.number(),
@@ -15,24 +15,26 @@ export const toTodoItem = (raw: z.infer<typeof TodoRawSchema>) => ({
   label: raw.completed ? `✓ ${raw.title}` : raw.title,
 });
 
-export const TodoRouter = defineRouter('/todos', {
+export const TodoRouter = defineRouter("/todos", {
   getList: endpoint({
-    method: 'GET' as const,
-    path: '/',
+    method: "GET" as const,
+    path: "/",
     request: z.object({
-      query: z.object({
-        userId: z.number().optional(),
-        completed: z.boolean().optional(),
-        _limit: z.number().optional(),
-        _page: z.number().optional(),
-      }).optional(),
+      query: z
+        .object({
+          userId: z.number().optional(),
+          completed: z.boolean().optional(),
+          _limit: z.number().optional(),
+          _page: z.number().optional(),
+        })
+        .optional(),
     }),
     response: z.array(TodoRawSchema),
     adapter: (raw) => raw.map(toTodoItem),
   }),
   getDetail: endpoint({
-    method: 'GET' as const,
-    path: '/:id',
+    method: "GET" as const,
+    path: "/:id",
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
@@ -40,8 +42,8 @@ export const TodoRouter = defineRouter('/todos', {
     adapter: toTodoItem,
   }),
   create: endpoint({
-    method: 'POST' as const,
-    path: '/',
+    method: "POST" as const,
+    path: "/",
     request: z.object({
       body: z.object({
         title: z.string().min(1),
@@ -53,8 +55,8 @@ export const TodoRouter = defineRouter('/todos', {
     adapter: toTodoItem,
   }),
   update: endpoint({
-    method: 'PATCH' as const,
-    path: '/:id',
+    method: "PATCH" as const,
+    path: "/:id",
     request: z.object({
       path: z.object({ id: z.number() }),
       body: z.object({
@@ -66,8 +68,8 @@ export const TodoRouter = defineRouter('/todos', {
     adapter: toTodoItem,
   }),
   remove: endpoint({
-    method: 'DELETE' as const,
-    path: '/:id',
+    method: "DELETE" as const,
+    path: "/:id",
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
@@ -79,5 +81,5 @@ export const todoApi = createApi(localClientExecutor, TodoRouter);
 export const todoServerApi = createApi(localFetchExecutor, TodoRouter);
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>;
-export type TodoItem = TodoApiTypes['getDetail']['response'];
-export type TodoList = TodoApiTypes['getList']['response'];
+export type TodoItem = TodoApiTypes["getDetail"]["response"];
+export type TodoList = TodoApiTypes["getList"]["response"];

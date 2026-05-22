@@ -1,5 +1,5 @@
-import type { Executor, ExecutorMiddleware } from '@routar/core';
-import { createExecutor, serializeParams } from '@routar/core';
+import type { Executor, ExecutorMiddleware } from "@routar/core";
+import { createExecutor, serializeParams } from "@routar/core";
 
 /**
  * Creates an {@link Executor} backed by the browser / Node.js `fetch` API.
@@ -31,37 +31,44 @@ import { createExecutor, serializeParams } from '@routar/core';
 export function createFetchExecutor(
   baseURL: string,
   options?: {
-    defaultHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
+    defaultHeaders?: () =>
+      | Record<string, string>
+      | Promise<Record<string, string>>;
     middlewares?: ExecutorMiddleware[];
   },
 ): Executor {
-  return createExecutor(async ({ method, url, params, body, headers, signal }) => {
-    const fullURL = new URL(url, baseURL);
-    if (params) {
-      serializeParams(params).forEach((v, k) => fullURL.searchParams.set(k, v));
-    }
+  return createExecutor(
+    async ({ method, url, params, body, headers, signal }) => {
+      const fullURL = new URL(baseURL.replace(/\/$/, '') + url);
+      if (params) {
+        serializeParams(params).forEach((v, k) =>
+          fullURL.searchParams.set(k, v),
+        );
+      }
 
-    const defaultHeaders = (await options?.defaultHeaders?.()) ?? {};
+      const defaultHeaders = (await options?.defaultHeaders?.()) ?? {};
 
-    const res = await fetch(fullURL.toString(), {
-      method,
-      headers: {
-        ...(body != null ? { 'Content-Type': 'application/json' } : {}),
-        ...defaultHeaders,
-        ...headers,
-      },
-      body: body != null ? JSON.stringify(body) : undefined,
-      signal,
-    });
+      const res = await fetch(fullURL.toString(), {
+        method,
+        headers: {
+          ...(body != null ? { "Content-Type": "application/json" } : {}),
+          ...defaultHeaders,
+          ...headers,
+        },
+        body: body != null ? JSON.stringify(body) : undefined,
+        signal,
+      });
 
-    if (!res.ok) {
-      throw new HttpError(res.status, res.statusText);
-    }
-    if (res.status === 204 || res.headers.get('content-length') === '0') {
-      return null;
-    }
-    return res.json();
-  }, options?.middlewares);
+      if (!res.ok) {
+        throw new HttpError(res.status, res.statusText);
+      }
+      if (res.status === 204 || res.headers.get("content-length") === "0") {
+        return null;
+      }
+      return res.json();
+    },
+    options?.middlewares,
+  );
 }
 
 /**
@@ -87,6 +94,6 @@ export class HttpError extends Error {
     public readonly statusText: string,
   ) {
     super(`HTTP ${status}: ${statusText}`);
-    this.name = 'HttpError';
+    this.name = "HttpError";
   }
 }
