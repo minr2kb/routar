@@ -82,9 +82,9 @@ export function createApi<TEndpoints extends RouterEndpoints>(
 
 export function createApi(
   executor: Executor,
-  routerOrPrefixOrEndpoints: RouterDef<any> | RouterEndpoints | string,
+  routerOrPrefixOrEndpoints: RouterDef<RouterEndpoints> | RouterEndpoints | string,
   endpointsArg?: RouterEndpoints,
-): Record<string, any> {
+): Record<string, unknown> {
   let prefix: string;
   let endpoints: RouterEndpoints;
 
@@ -97,8 +97,8 @@ export function createApi(
     "prefix" in routerOrPrefixOrEndpoints &&
     "endpoints" in routerOrPrefixOrEndpoints
   ) {
-    prefix = (routerOrPrefixOrEndpoints as RouterDef<any>).prefix;
-    endpoints = (routerOrPrefixOrEndpoints as RouterDef<any>).endpoints;
+    prefix = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).prefix;
+    endpoints = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).endpoints;
   } else {
     prefix = "";
     endpoints = routerOrPrefixOrEndpoints as RouterEndpoints;
@@ -111,13 +111,13 @@ function buildClient(
   executor: Executor,
   prefix: string,
   endpoints: RouterEndpoints,
-): Record<string, any> {
-  const client: Record<string, any> = {};
+): Record<string, unknown> {
+  const client: Record<string, unknown> = {};
 
   for (const [key, entry] of Object.entries(endpoints)) {
     if ("prefix" in entry && "endpoints" in entry) {
       // Nested RouterDef — recurse with merged prefix
-      const nested = entry as RouterDef<any>;
+      const nested = entry as RouterDef<RouterEndpoints>;
       client[key] = buildClient(
         executor,
         joinPaths(prefix, nested.prefix),
@@ -157,7 +157,7 @@ function buildClient(
         }
 
         if (spec.adapter) {
-          return spec.adapter(validated as any);
+          return spec.adapter(validated);
         }
         return validated;
       };
