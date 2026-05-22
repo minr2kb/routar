@@ -9,7 +9,5 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": [
-    "packages/*/src/**/*.test.ts"
-  ]
+  "include": ["packages/*/src/**/*.test.ts"]
 }

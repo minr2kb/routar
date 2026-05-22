@@ -1,17 +1,25 @@
 {
   "name": "@routar/root",
   "private": true,
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "build": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build && bun run --filter '@routar/example' build && bun run --filter '@routar/docs' build",
     "build:packages": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build",
     "test": "bun test",
-    "typecheck": "tsc --build"
+    "typecheck": "tsc --build",
+    "lint": "biome check",
+    "format": "biome format --write",
+    "dev:example": "bun run --filter '@routar/example' dev",
+    "dev:docs": "bun run --filter '@routar/docs' dev"
   },
   "dependencies": {
     "typescript": "^6.0.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
     "@changesets/cli": "^2.31.0",
     "@types/bun": "^1.3.14"
   }
