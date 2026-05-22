@@ -10,7 +10,7 @@ const failValidator = {
     throw new Error("parse failed");
   },
 };
-const mockExecutor = (response: unknown) => ({
+const mockExecutor = <T>(response: T) => ({
   execute: mock(async () => response),
 });
 
