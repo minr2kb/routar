@@ -1,10 +1,12 @@
-import { NextRequest } from 'next/server';
-import { z } from 'zod';
-import { TodoRawSchema } from '@/remote/services/todo/todo.api';
-import { ok, noContent, notFound, parseBody } from '../../_lib/http';
-import { getTodoById, updateTodo, deleteTodo } from '../_store';
+import type { NextRequest } from "next/server";
+import { TodoRawSchema } from "@/remote/services/todo/todo.api";
+import { noContent, notFound, ok, parseBody } from "../../_lib/http";
+import { deleteTodo, getTodoById, updateTodo } from "../_store";
 
-const PatchBodySchema = TodoRawSchema.pick({ title: true, completed: true }).partial();
+const PatchBodySchema = TodoRawSchema.pick({
+  title: true,
+  completed: true,
+}).partial();
 
 type Params = Promise<{ id: string }>;
 
@@ -22,7 +24,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Params }) {
   return todo ? ok(todo) : notFound();
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Params }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Params },
+) {
   const { id } = await params;
   return deleteTodo(Number(id)) ? noContent() : notFound();
 }

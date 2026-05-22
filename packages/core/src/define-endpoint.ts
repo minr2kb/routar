@@ -3,7 +3,7 @@ import type {
   RequestShape,
   Validator,
   ValidatorOutput,
-} from './types.js';
+} from "./types.js";
 
 /**
  * Extracts `:param` segment names from a path template string as a union of
@@ -25,10 +25,9 @@ export type PathParams<TPath extends string> =
  * When `TPath` contains dynamic segments (`:param`), requires `request.path`
  * to include all extracted param names. No constraint for static paths.
  */
-type PathConstraint<TPath extends string> =
-  [PathParams<TPath>] extends [never]
-    ? {}
-    : { path: Record<PathParams<TPath>, unknown> };
+type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
+  ? {}
+  : { path: Record<PathParams<TPath>, unknown> };
 
 /**
  * Type-safe endpoint definition helper.
@@ -101,10 +100,7 @@ export function endpoint<
 };
 
 // request X + adapter O
-export function endpoint<
-  TResponse extends Validator<unknown>,
-  TOut,
->(spec: {
+export function endpoint<TResponse extends Validator<unknown>, TOut>(spec: {
   method: HttpMethod;
   path: string;
   response: TResponse;
@@ -117,9 +113,7 @@ export function endpoint<
 };
 
 // request X + adapter X
-export function endpoint<
-  TResponse extends Validator<unknown>,
->(spec: {
+export function endpoint<TResponse extends Validator<unknown>>(spec: {
   method: HttpMethod;
   path: string;
   response: TResponse;

@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { ValidationError } from '@routar/core';
-import { HttpError } from '@routar/fetch';
+import { ValidationError } from "@routar/core";
+import { HttpError } from "@routar/fetch";
+import { useEffect } from "react";
 
-export default function ErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+export default function ErrorBoundary({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -17,10 +23,12 @@ export default function ErrorBoundary({ error, reset }: { error: Error; reset: (
         : error.message;
 
   return (
-    <div style={{ padding: 24, color: 'red' }}>
+    <div style={{ padding: 24, color: "red" }}>
       <h2>Something went wrong</h2>
       <pre>{message}</pre>
-      <button onClick={reset}>Retry</button>
+      <button type="button" onClick={reset}>
+        Retry
+      </button>
     </div>
   );
 }

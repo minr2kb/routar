@@ -1,4 +1,6 @@
-export function serializeParams(params: Record<string, unknown>): URLSearchParams {
+export function serializeParams(
+  params: Record<string, unknown>,
+): URLSearchParams {
   const result = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value == null) continue;

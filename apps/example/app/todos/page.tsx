@@ -1,13 +1,19 @@
-import { Suspense } from 'react';
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { getQueryClient } from '../../utils/get-query-client';
-import { todoListQueryOptions } from '@/remote/services/todo/todo.queries';
-import { TodoListClient } from '@/components/TodoListClient';
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { TodoListClient } from "@/components/TodoListClient";
+import { todoServerApi } from "@/remote/services";
+import { todoListQueryOptions } from "@/remote/services/todo/todo.queries";
+import { getQueryClient } from "@/utils/get-query-client";
 
 export default async function TodosPage() {
   const queryClient = getQueryClient();
 
-  await queryClient.prefetchQuery(todoListQueryOptions({ query: { _limit: 20 } }));
+  const params = { query: { _limit: 20 } };
+
+  await queryClient.prefetchQuery({
+    ...todoListQueryOptions(params),
+    queryFn: () => todoServerApi.getList(params),
+  });
 
   return (
     <div>

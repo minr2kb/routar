@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
+import { type NextRequest, NextResponse } from "next/server";
+import type { z } from "zod";
 
 export const ok = (data: unknown) => NextResponse.json(data);
-export const created = (data: unknown) => NextResponse.json(data, { status: 201 });
+export const created = (data: unknown) =>
+  NextResponse.json(data, { status: 201 });
 export const noContent = () => new NextResponse(null, { status: 204 });
-export const notFound = (msg = 'Not found') =>
+export const notFound = (msg = "Not found") =>
   NextResponse.json({ error: msg }, { status: 404 });
 export const badRequest = (err: z.ZodError) =>
   NextResponse.json({ error: err.flatten() }, { status: 400 });

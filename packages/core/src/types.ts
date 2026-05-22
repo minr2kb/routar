@@ -1,4 +1,4 @@
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+export type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 /** Options passed to {@link Executor.execute} on every HTTP call. */
 export interface ExecuteOptions {
@@ -59,9 +59,9 @@ export type ValidatorOutput<T extends Validator<unknown>> =
  * it actually uses via its `request` validator.
  */
 export interface RequestShape {
-  path?:  Record<string, unknown>;
+  path?: Record<string, unknown>;
   query?: Record<string, unknown>;
-  body?:  unknown;
+  body?: unknown;
 }
 
 /**
@@ -75,14 +75,14 @@ export interface RequestShape {
  * @template TAdapter  Optional adapter function type.
  */
 export interface EndpointSpec<
-  TRequest extends RequestShape        = RequestShape,
+  TRequest extends RequestShape = RequestShape,
   TResponse extends Validator<unknown> = Validator<unknown>,
   TAdapter extends
     | ((raw: ValidatorOutput<TResponse>) => unknown)
-    | undefined                        = undefined,
+    | undefined = undefined,
 > {
-  method:   HttpMethod;
-  path:     string;
+  method: HttpMethod;
+  path: string;
   /** Validates and narrows request parameters before the HTTP call. */
   request?: Validator<TRequest>;
   /** Validates the raw server response. */
@@ -101,9 +101,9 @@ export interface EndpointSpec<
  * - Without `adapter`: returns `ValidatorOutput<TResponse>`.
  */
 export type InferResponse<TSpec extends EndpointSpec<any, any, any>> =
-  TSpec['adapter'] extends (raw: any) => infer R
+  TSpec["adapter"] extends (raw: any) => infer R
     ? R
-    : ValidatorOutput<TSpec['response']>;
+    : ValidatorOutput<TSpec["response"]>;
 
 /**
  * A single entry inside a {@link RouterEndpoints} map.
@@ -115,8 +115,10 @@ export type RouterEntry = EndpointSpec<any, any, any> | RouterDef<any>;
 export type RouterEndpoints = Record<string, RouterEntry>;
 
 /** The return type of {@link defineRouter}. Passed directly to {@link createApi}. */
-export interface RouterDef<TEndpoints extends RouterEndpoints = RouterEndpoints> {
-  prefix:    string;
+export interface RouterDef<
+  TEndpoints extends RouterEndpoints = RouterEndpoints,
+> {
+  prefix: string;
   endpoints: TEndpoints;
 }
 
@@ -134,7 +136,7 @@ export interface RouterDef<TEndpoints extends RouterEndpoints = RouterEndpoints>
 export type ApiTypes<TApi> = {
   [K in keyof TApi]: TApi[K] extends (...args: any[]) => Promise<infer R>
     ? {
-        request:  Parameters<TApi[K]>[0];
+        request: Parameters<TApi[K]>[0];
         response: R;
       }
     : never;

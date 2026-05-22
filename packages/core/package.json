@@ -2,7 +2,18 @@
   "name": "@routar/core",
   "version": "0.1.0",
   "description": "Schema-first HTTP API client — endpoint definitions, typed router, API client factory, and middleware system",
-  "keywords": ["api", "http", "typescript", "zod", "schema", "type-safe", "fetch", "axios", "middleware", "rest"],
+  "keywords": [
+    "api",
+    "http",
+    "typescript",
+    "zod",
+    "schema",
+    "type-safe",
+    "fetch",
+    "axios",
+    "middleware",
+    "rest"
+  ],
   "author": "Kyungbae Min",
   "license": "MIT",
   "repository": {
@@ -22,10 +33,16 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch"
   },
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

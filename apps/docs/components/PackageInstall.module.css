@@ -31,7 +31,9 @@
   font-size: 0.8rem;
   font-weight: 600;
   font-family: inherit;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
   background: transparent;
   color: #374151;
   border-bottom: 2px solid transparent;

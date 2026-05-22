@@ -68,11 +68,11 @@ export function createAxiosExecutor(
   return createExecutor(
     async ({ method, url, params, body, headers, signal }) => {
       const instance = await resolveInstance(instanceOrFactory);
-      const base = (instance.defaults.baseURL ?? '').replace(/\/$/, '');
+      const base = (instance.defaults.baseURL ?? "").replace(/\/$/, "");
       const { data } = await instance.request({
         method,
         url: base + url,
-        baseURL: '',
+        baseURL: "",
         params,
         data: body,
         headers,

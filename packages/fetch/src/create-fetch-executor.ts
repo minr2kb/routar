@@ -39,11 +39,11 @@ export function createFetchExecutor(
 ): Executor {
   return createExecutor(
     async ({ method, url, params, body, headers, signal }) => {
-      const fullURL = new URL(baseURL.replace(/\/$/, '') + url);
+      const fullURL = new URL(baseURL.replace(/\/$/, "") + url);
       if (params) {
-        serializeParams(params).forEach((v, k) =>
-          fullURL.searchParams.set(k, v),
-        );
+        serializeParams(params).forEach((v, k) => {
+          fullURL.searchParams.set(k, v);
+        });
       }
 
       const defaultHeaders = (await options?.defaultHeaders?.()) ?? {};

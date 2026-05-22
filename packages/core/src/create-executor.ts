@@ -1,4 +1,4 @@
-import type { Executor, ExecuteOptions, ExecutorMiddleware } from './types.js';
+import type { ExecuteOptions, Executor, ExecutorMiddleware } from "./types.js";
 
 /**
  * Creates an {@link Executor} by wrapping a transport function with an
@@ -25,9 +25,8 @@ export function createExecutor(
   execute: (options: ExecuteOptions) => Promise<unknown>,
   middlewares: ExecutorMiddleware[] = [],
 ): Executor {
-  const chain = middlewares.reduceRight<(options: ExecuteOptions) => Promise<unknown>>(
-    (next, mw) => (opts) => mw(opts, next),
-    execute,
-  );
+  const chain = middlewares.reduceRight<
+    (options: ExecuteOptions) => Promise<unknown>
+  >((next, mw) => (opts) => mw(opts, next), execute);
   return { execute: chain };
 }

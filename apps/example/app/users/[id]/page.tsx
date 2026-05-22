@@ -1,18 +1,24 @@
-import { Suspense } from 'react';
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { getQueryClient } from '../../../utils/get-query-client';
-import { userDetailQueryOptions } from '../../../remote/services/user/user.queries';
-import { postListQueryOptions } from '../../../remote/services/post/post.queries';
-import { UserDetailClient } from '../../../components/UserDetailClient';
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { UserDetailClient } from "@/components/UserDetailClient";
+import { postListQueryOptions } from "@/remote/services/post/post.queries";
+import { userDetailQueryOptions } from "@/remote/services/user/user.queries";
+import { getQueryClient } from "@/utils/get-query-client";
 
-export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function UserDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const userId = Number(id);
   const queryClient = getQueryClient();
 
   await Promise.all([
     queryClient.prefetchQuery(userDetailQueryOptions(userId)),
-    queryClient.prefetchQuery(postListQueryOptions({ query: { userId, _limit: 5 } })),
+    queryClient.prefetchQuery(
+      postListQueryOptions({ query: { userId, _limit: 5 } }),
+    ),
   ]);
 
   return (

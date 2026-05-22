@@ -1,13 +1,15 @@
-import { Suspense } from 'react';
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { getQueryClient } from '../../utils/get-query-client';
-import { postListQueryOptions } from '../../remote/services/post/post.queries';
-import { PostListClient } from '../../components/PostListClient';
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { PostListClient } from "@/components/PostListClient";
+import { postListQueryOptions } from "@/remote/services/post/post.queries";
+import { getQueryClient } from "@/utils/get-query-client";
 
 export default async function PostsPage() {
   const queryClient = getQueryClient();
 
-  await queryClient.prefetchQuery(postListQueryOptions({ query: { _limit: 10 } }));
+  await queryClient.prefetchQuery(
+    postListQueryOptions({ query: { _limit: 10 } }),
+  );
 
   return (
     <div>

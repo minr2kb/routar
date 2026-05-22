@@ -4,9 +4,9 @@ export class ValidationError extends Error {
     public readonly cause?: unknown,
   ) {
     super(message);
-    this.name = 'ValidationError';
+    this.name = "ValidationError";
     if (cause !== undefined) {
-      Object.defineProperty(this, 'cause', {
+      Object.defineProperty(this, "cause", {
         value: cause,
         writable: true,
         enumerable: true,

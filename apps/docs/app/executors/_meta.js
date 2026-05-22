@@ -1,4 +1,4 @@
 export default {
-  fetch: 'createFetchExecutor',
-  axios: 'createAxiosExecutor',
-}
+  fetch: "createFetchExecutor",
+  axios: "createAxiosExecutor",
+};

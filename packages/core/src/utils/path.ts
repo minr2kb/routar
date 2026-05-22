@@ -1,11 +1,11 @@
 export function joinPaths(...segments: string[]): string {
   const joined = segments
-    .filter(s => s !== '')
-    .join('/')
-    .replace(/\/+/g, '/');
-  return joined.endsWith('/') && joined.length > 1
+    .filter((s) => s !== "")
+    .join("/")
+    .replace(/\/+/g, "/");
+  return joined.endsWith("/") && joined.length > 1
     ? joined.slice(0, -1)
-    : joined || '/';
+    : joined || "/";
 }
 
 export function resolvePath(

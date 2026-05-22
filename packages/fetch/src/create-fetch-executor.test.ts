@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, afterEach } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { createFetchExecutor, HttpError } from "./create-fetch-executor.js";
 
 // Mock global fetch

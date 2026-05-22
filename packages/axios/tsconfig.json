@@ -8,7 +8,7 @@
     "declarationMap": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-
+    "types": ["bun-types"],
     "rootDir": "./src",
     "outDir": "./dist"
   },

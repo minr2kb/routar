@@ -1,7 +1,7 @@
-import { createApi, defineRouter, endpoint } from '@routar/core';
-import type { ApiTypes } from '@routar/core';
-import { z } from 'zod';
-import { clientExecutor, fetchExecutor } from '../../lib/executor';
+import { createApi, defineRouter, endpoint } from "@routar/core";
+import type { ApiTypes } from "@routar/core";
+import { z } from "zod";
+import { clientExecutor, fetchExecutor } from "../../lib/executor";
 
 const PostRawSchema = z.object({
   id: z.number(),
@@ -18,38 +18,40 @@ const CommentRawSchema = z.object({
   body: z.string(),
 });
 
-export const PostRouter = defineRouter('/posts', {
+export const PostRouter = defineRouter("/posts", {
   getList: endpoint({
-    method: 'GET' as const,
-    path: '/',
+    method: "GET" as const,
+    path: "/",
     request: z.object({
-      query: z.object({
-        userId: z.number().optional(),
-        _limit: z.number().optional(),
-        _page: z.number().optional(),
-      }).optional(),
+      query: z
+        .object({
+          userId: z.number().optional(),
+          _limit: z.number().optional(),
+          _page: z.number().optional(),
+        })
+        .optional(),
     }),
     response: z.array(PostRawSchema),
   }),
   getDetail: endpoint({
-    method: 'GET' as const,
-    path: '/:id',
+    method: "GET" as const,
+    path: "/:id",
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: PostRawSchema,
   }),
   getComments: endpoint({
-    method: 'GET' as const,
-    path: '/:id/comments',
+    method: "GET" as const,
+    path: "/:id/comments",
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
     response: z.array(CommentRawSchema),
   }),
   create: endpoint({
-    method: 'POST' as const,
-    path: '/',
+    method: "POST" as const,
+    path: "/",
     request: z.object({
       body: z.object({
         title: z.string().min(1),
@@ -65,5 +67,5 @@ export const postApi = createApi(clientExecutor, PostRouter);
 export const postServerApi = createApi(fetchExecutor, PostRouter);
 
 export type PostApiTypes = ApiTypes<typeof postApi>;
-export type Post = PostApiTypes['getDetail']['response'];
-export type Comment = PostApiTypes['getComments']['response'][number];
+export type Post = PostApiTypes["getDetail"]["response"];
+export type Comment = PostApiTypes["getComments"]["response"][number];

@@ -1,7 +1,7 @@
-import { createApi, defineRouter, endpoint } from '@routar/core';
-import type { ApiTypes } from '@routar/core';
-import { z } from 'zod';
-import { clientExecutor, fetchExecutor } from '../../lib/executor';
+import type { ApiTypes } from "@routar/core";
+import { createApi, defineRouter, endpoint } from "@routar/core";
+import { z } from "zod";
+import { clientExecutor, fetchExecutor } from "../../lib/executor";
 
 const UserRawSchema = z.object({
   id: z.number(),
@@ -25,16 +25,16 @@ const toUser = (raw: z.infer<typeof UserRawSchema>) => ({
   city: raw.address.city,
 });
 
-export const UserRouter = defineRouter('/users', {
+export const UserRouter = defineRouter("/users", {
   getList: endpoint({
-    method: 'GET' as const,
-    path: '/',
+    method: "GET" as const,
+    path: "/",
     response: z.array(UserRawSchema),
     adapter: (raw) => raw.map(toUser),
   }),
   getDetail: endpoint({
-    method: 'GET' as const,
-    path: '/:id',
+    method: "GET" as const,
+    path: "/:id",
     request: z.object({
       path: z.object({ id: z.number() }),
     }),
@@ -47,4 +47,4 @@ export const userApi = createApi(clientExecutor, UserRouter);
 export const userServerApi = createApi(fetchExecutor, UserRouter);
 
 export type UserApiTypes = ApiTypes<typeof userApi>;
-export type User = UserApiTypes['getDetail']['response'];
+export type User = UserApiTypes["getDetail"]["response"];

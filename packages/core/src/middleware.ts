@@ -1,4 +1,4 @@
-import type { ExecutorMiddleware } from './types.js';
+import type { ExecutorMiddleware } from "./types.js";
 
 /**
  * Identity helper that returns the middleware as-is.
@@ -93,13 +93,19 @@ export function withLogger(options?: {
   const log = options?.log ?? ((msg, data) => console.log(msg, data));
   return defineMiddleware(async (opts, next) => {
     const start = Date.now();
-    log(`[routar] ${opts.method} ${opts.url}`, { params: opts.params, body: opts.body });
+    log(`[routar] ${opts.method} ${opts.url}`, {
+      params: opts.params,
+      body: opts.body,
+    });
     try {
       const result = await next(opts);
       log(`[routar] ${opts.method} ${opts.url} — ${Date.now() - start}ms`);
       return result;
     } catch (err) {
-      log(`[routar] ${opts.method} ${opts.url} — error after ${Date.now() - start}ms`, err);
+      log(
+        `[routar] ${opts.method} ${opts.url} — error after ${Date.now() - start}ms`,
+        err,
+      );
       throw err;
     }
   });
@@ -113,7 +119,7 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
       controller.abort();
       return controller.signal;
     }
-    signal.addEventListener('abort', () => controller.abort(), { once: true });
+    signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
   return controller.signal;
 }

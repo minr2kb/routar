@@ -1,12 +1,15 @@
-import { NextRequest } from 'next/server';
-import { z } from 'zod';
-import { TodoRawSchema } from '@/remote/services/todo/todo.api';
-import { ok, created, parseBody, parseQuery } from '../_lib/http';
-import { getAllTodos, createTodo } from './_store';
+import type { NextRequest } from "next/server";
+import { z } from "zod";
+import { TodoRawSchema } from "@/remote/services/todo/todo.api";
+import { created, ok, parseBody, parseQuery } from "../_lib/http";
+import { createTodo, getAllTodos } from "./_store";
 
 const ListQuerySchema = z.object({
   userId: z.coerce.number().optional(),
-  completed: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  completed: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
   _limit: z.coerce.number().optional(),
   _page: z.coerce.number().optional(),
 });

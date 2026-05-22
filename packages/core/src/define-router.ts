@@ -1,4 +1,4 @@
-import type { RouterDef, RouterEndpoints } from './types.js';
+import type { RouterDef, RouterEndpoints } from "./types.js";
 
 /**
  * Groups a set of endpoint specs (and optional nested routers) under a shared

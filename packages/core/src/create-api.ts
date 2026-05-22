@@ -1,17 +1,19 @@
 import type {
-  Executor,
-  RouterDef,
-  RouterEndpoints,
   EndpointSpec,
+  Executor,
   InferResponse,
   RequestShape,
-} from './types.js';
-import { joinPaths, resolvePath } from './utils/path.js';
-import { ValidationError } from './utils/validate.js';
+  RouterDef,
+  RouterEndpoints,
+} from "./types.js";
+import { joinPaths, resolvePath } from "./utils/path.js";
+import { ValidationError } from "./utils/validate.js";
 
 /** Callable type for a single endpoint on the generated API client. */
 type EndpointFn<TSpec extends EndpointSpec<any, any, any>> = (
-  params: TSpec['request'] extends { parse: (data: unknown) => infer R } ? R : RequestShape,
+  params: TSpec["request"] extends { parse: (data: unknown) => infer R }
+    ? R
+    : RequestShape,
   signal?: AbortSignal,
 ) => Promise<InferResponse<TSpec>>;
 
@@ -20,7 +22,9 @@ type EndpointFn<TSpec extends EndpointSpec<any, any, any>> = (
  * Nested {@link RouterDef} entries become nested sub-client objects.
  */
 type ApiClient<TEndpoints extends RouterEndpoints> = {
-  [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<infer TNestedEndpoints>
+  [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<
+    infer TNestedEndpoints
+  >
     ? ApiClient<TNestedEndpoints>
     : TEndpoints[K] extends EndpointSpec<any, any, any>
       ? EndpointFn<TEndpoints[K]>
@@ -84,18 +88,19 @@ export function createApi(
   let prefix: string;
   let endpoints: RouterEndpoints;
 
-  if (typeof routerOrPrefixOrEndpoints === 'string') {
+  if (typeof routerOrPrefixOrEndpoints === "string") {
     prefix = routerOrPrefixOrEndpoints;
-    if (!endpointsArg) throw new Error('endpoints is required when prefix is provided');
+    if (!endpointsArg)
+      throw new Error("endpoints is required when prefix is provided");
     endpoints = endpointsArg;
   } else if (
-    'prefix' in routerOrPrefixOrEndpoints &&
-    'endpoints' in routerOrPrefixOrEndpoints
+    "prefix" in routerOrPrefixOrEndpoints &&
+    "endpoints" in routerOrPrefixOrEndpoints
   ) {
     prefix = (routerOrPrefixOrEndpoints as RouterDef<any>).prefix;
     endpoints = (routerOrPrefixOrEndpoints as RouterDef<any>).endpoints;
   } else {
-    prefix = '';
+    prefix = "";
     endpoints = routerOrPrefixOrEndpoints as RouterEndpoints;
   }
 
@@ -110,10 +115,14 @@ function buildClient(
   const client: Record<string, any> = {};
 
   for (const [key, entry] of Object.entries(endpoints)) {
-    if ('prefix' in entry && 'endpoints' in entry) {
+    if ("prefix" in entry && "endpoints" in entry) {
       // Nested RouterDef — recurse with merged prefix
       const nested = entry as RouterDef<any>;
-      client[key] = buildClient(executor, joinPaths(prefix, nested.prefix), nested.endpoints);
+      client[key] = buildClient(
+        executor,
+        joinPaths(prefix, nested.prefix),
+        nested.endpoints,
+      );
     } else {
       // Leaf EndpointSpec
       const spec = entry as EndpointSpec<any, any, any>;
@@ -123,7 +132,7 @@ function buildClient(
           try {
             validatedParams = spec.request.parse(params);
           } catch (err) {
-            throw new ValidationError('Request validation failed', err);
+            throw new ValidationError("Request validation failed", err);
           }
         }
 
@@ -144,7 +153,7 @@ function buildClient(
         try {
           validated = spec.response.parse(raw);
         } catch (err) {
-          throw new ValidationError('Response validation failed', err);
+          throw new ValidationError("Response validation failed", err);
         }
 
         if (spec.adapter) {
