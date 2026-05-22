@@ -54,35 +54,66 @@ export type TodoApiTypes = ApiTypes<typeof todoApi>
 ## With TanStack Query
 
 Components only import from `*.queries.ts`, never from executors or api files directly.
+`queryOptions` is the single source of truth for both the key and the queryFn — no separate KEYS object.
 
 ```ts
 // remote/services/todo/todo.queries.ts
-import { queryOptions, useMutation } from '@tanstack/react-query'
-import { todoApi, todoServerApi } from './todo.api'
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
+import { todoApi } from './todo.api'
 
-export const todoKeys = {
-  all:    () => ['todos'],
-  detail: (id: number) => ['todos', id],
-}
-
-export const todoListOptions = () =>
+export const todoListQueryOptions = () =>
   queryOptions({
-    queryKey: todoKeys.all(),
+    queryKey: ['todos', 'list'] as const,
     queryFn:  () => todoApi.getList({}),
   })
 
-export const todoDetailOptions = (id: number) =>
+export const todoDetailQueryOptions = (id: number) =>
   queryOptions({
-    queryKey: todoKeys.detail(id),
+    queryKey: ['todos', 'detail', id] as const,
     queryFn:  () => todoApi.getDetail({ path: { id } }),
   })
+```
 
-// SSR prefetch
-export const prefetchTodoList = (queryClient: QueryClient) =>
-  queryClient.prefetchQuery({
-    queryKey: todoKeys.all(),
-    queryFn:  () => todoServerApi.getList({}),
+### SSR prefetch — server page
+
+Pass `queryOptions(params)` directly to `prefetchQuery`; the key is already embedded.
+
+```tsx
+// app/todos/page.tsx
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import { getQueryClient } from '@/utils/get-query-client'
+import { todoServerApi } from '@/remote/services'
+import { todoListQueryOptions } from '@/remote/services/todo/todo.queries'
+import { Suspense } from 'react'
+
+export default async function TodosPage() {
+  const queryClient = getQueryClient()
+  await queryClient.prefetchQuery({
+    ...todoListQueryOptions(),
+    queryFn: () => todoServerApi.getList({}), // swap to server executor
   })
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<p>Loading…</p>}>
+        <TodoListClient />
+      </Suspense>
+    </HydrationBoundary>
+  )
+}
+```
+
+### Client component — useSuspenseQuery
+
+```tsx
+'use client'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { todoListQueryOptions } from '@/remote/services/todo/todo.queries'
+
+export function TodoListClient() {
+  const { data } = useSuspenseQuery(todoListQueryOptions()) // data is always non-nullable
+  return <ul>{data.map(t => <li key={t.id}>{t.label}</li>)}</ul>
+}
 ```
 
 ## Dependency direction

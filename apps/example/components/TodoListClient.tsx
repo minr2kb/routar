@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { useTodoList } from '../remote/services/todo/todo.queries';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { todoListQueryOptions } from '../remote/services/todo/todo.queries';
 import { CreateTodoForm, TodoRow } from './TodoMutations';
 
 export function TodoListClient() {
   const [showCompleted, setShowCompleted] = useState<boolean | undefined>(undefined);
-  const { data, isLoading, isError } = useTodoList(
-    showCompleted !== undefined ? { query: { completed: showCompleted, _limit: 20 } } : { query: { _limit: 20 } },
-  );
+  const params = showCompleted !== undefined
+    ? { query: { completed: showCompleted, _limit: 20 } }
+    : { query: { _limit: 20 } };
+  const { data } = useSuspenseQuery(todoListQueryOptions(params));
 
   return (
     <section>
@@ -19,15 +21,11 @@ export function TodoListClient() {
         <button onClick={() => setShowCompleted(false)} style={{ fontWeight: showCompleted === false ? 'bold' : 'normal' }}>Active</button>
         <button onClick={() => setShowCompleted(true)} style={{ fontWeight: showCompleted === true ? 'bold' : 'normal' }}>Completed</button>
       </div>
-      {isLoading && <p>Loading…</p>}
-      {isError && <p style={{ color: 'red' }}>Error loading todos</p>}
-      {data && (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {data.map((todo) => (
-            <TodoRow key={todo.id} todo={todo} />
-          ))}
-        </ul>
-      )}
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {data.map((todo) => (
+          <TodoRow key={todo.id} todo={todo} />
+        ))}
+      </ul>
     </section>
   );
 }
