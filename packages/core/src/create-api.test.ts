@@ -166,6 +166,86 @@ describe("createApi", () => {
     });
   });
 
+  describe("validate option", () => {
+    it("skips request.parse when validate: false", async () => {
+      const requestValidator = { parse: mock((data: unknown) => data) };
+      const executor = mockExecutor({});
+      const api = createApi(
+        executor,
+        "/items",
+        { get: { method: "GET" as const, path: "/", request: requestValidator, response: makeValidator({}) } },
+        { validate: false },
+      );
+      await api.get({});
+      expect(requestValidator.parse).not.toHaveBeenCalled();
+    });
+
+    it("skips response.parse when validate: false", async () => {
+      const responseValidator = { parse: mock((data: unknown) => data) };
+      const executor = mockExecutor({ raw: true });
+      const api = createApi(
+        executor,
+        "/items",
+        { get: { method: "GET" as const, path: "/", response: responseValidator } },
+        { validate: false },
+      );
+      await api.get({});
+      expect(responseValidator.parse).not.toHaveBeenCalled();
+    });
+
+    it("skips only response.parse when validate: { response: false }", async () => {
+      const requestValidator = { parse: mock((data: unknown) => data) };
+      const responseValidator = { parse: mock((data: unknown) => data) };
+      const executor = mockExecutor({});
+      const api = createApi(
+        executor,
+        "/items",
+        { get: { method: "GET" as const, path: "/", request: requestValidator, response: responseValidator } },
+        { validate: { request: true, response: false } },
+      );
+      await api.get({});
+      expect(requestValidator.parse).toHaveBeenCalled();
+      expect(responseValidator.parse).not.toHaveBeenCalled();
+    });
+
+    it("does not throw on failing response validator when validate: false", async () => {
+      const executor = mockExecutor({ bad: "data" });
+      const api = createApi(
+        executor,
+        "/todos",
+        { get: { method: "GET" as const, path: "/", response: failValidator } },
+        { validate: false },
+      );
+      const result = await api.get({});
+      expect(result).toBeDefined();
+    });
+
+    it("still validates by default (validate option absent)", async () => {
+      const executor = mockExecutor({ bad: "data" });
+      const api = createApi(executor, "/todos", {
+        get: { method: "GET" as const, path: "/", response: failValidator },
+      });
+      let error: unknown;
+      try {
+        await api.get({});
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ValidationError);
+    });
+
+    it("propagates validate option to nested router", async () => {
+      const responseValidator = { parse: mock((data: unknown) => data) };
+      const executor = mockExecutor([]);
+      const inner = defineRouter("/todos", {
+        list: { method: "GET" as const, path: "/", response: responseValidator },
+      });
+      const api = createApi(executor, { users: inner }, { validate: false });
+      await api.users.list({});
+      expect(responseValidator.parse).not.toHaveBeenCalled();
+    });
+  });
+
   describe("nested router", () => {
     const UserSchema = z.object({ id: z.number(), name: z.string() });
     const TodoSchema = z.object({ id: z.number(), title: z.string() });

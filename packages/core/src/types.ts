@@ -124,13 +124,17 @@ export interface RouterDef<
 
 /**
  * Extracts request/response types from a typed API client for use in query
- * hooks or mutation handlers.
+ * hooks or mutation handlers. Supports nested router clients recursively.
  *
  * @example
  * ```ts
  * export type TodoApiTypes = ApiTypes<typeof todoApi>;
  * type CreateRequest = TodoApiTypes['create']['request'];
  * type CreateResponse = TodoApiTypes['create']['response'];
+ *
+ * // Nested router: api.users.todos.getList
+ * type NestedTypes = ApiTypes<typeof api>;
+ * type ListReq = NestedTypes['users']['todos']['getList']['request'];
  * ```
  */
 export type ApiTypes<TApi> = {
@@ -139,5 +143,30 @@ export type ApiTypes<TApi> = {
         request: Parameters<TApi[K]>[0];
         response: R;
       }
-    : never;
+    : TApi[K] extends object
+      ? ApiTypes<TApi[K]>
+      : never;
 };
+
+/**
+ * Options for {@link createApi}.
+ *
+ * @example
+ * ```ts
+ * // Disable all validation in production
+ * createApi(executor, router, { validate: process.env.NODE_ENV !== 'production' });
+ *
+ * // Keep request validation (catch call-site bugs), skip response in prod
+ * createApi(executor, router, { validate: { request: true, response: false } });
+ * ```
+ */
+export interface CreateApiOptions {
+  /**
+   * Controls whether request and response schemas are run at call time.
+   *
+   * - `true` (default) — validate both request and response.
+   * - `false` — skip both; raw params and raw response pass through.
+   * - `{ request?, response? }` — enable/disable each independently.
+   */
+  validate?: boolean | { request?: boolean; response?: boolean };
+}

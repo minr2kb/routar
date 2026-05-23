@@ -1,4 +1,5 @@
 import type {
+  CreateApiOptions,
   EndpointSpec,
   Executor,
   InferResponse,
@@ -47,70 +48,97 @@ type ApiClient<TEndpoints extends RouterEndpoints> = {
  *
  * @param executor - Transport to use for every HTTP call.
  * @param router - A {@link RouterDef} produced by {@link defineRouter}.
+ * @param options - Optional settings (e.g. `validate` to skip schema parsing in production).
  *
  * @example
  * ```ts
  * const todoApi = createApi(executor, todoRouter);
  * const todos = await todoApi.getList({});
  * const todo  = await todoApi.getDetail({ path: { id: 1 } });
+ *
+ * // Skip response validation in production
+ * const prodApi = createApi(executor, todoRouter, {
+ *   validate: { request: true, response: process.env.NODE_ENV !== 'production' },
+ * });
  * ```
  */
 export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   router: RouterDef<TEndpoints>,
+  options?: CreateApiOptions,
 ): ApiClient<TEndpoints>;
 
 /**
  * @param executor - Transport to use for every HTTP call.
  * @param prefix - URL prefix prepended to every endpoint path.
  * @param endpoints - Record of named endpoint specs.
+ * @param options - Optional settings.
  */
 export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   prefix: string,
   endpoints: TEndpoints,
+  options?: CreateApiOptions,
 ): ApiClient<TEndpoints>;
 
 /**
  * @param executor - Transport to use for every HTTP call.
  * @param endpoints - Record of named endpoint specs (no URL prefix).
+ * @param options - Optional settings.
  */
 export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   endpoints: TEndpoints,
+  options?: CreateApiOptions,
 ): ApiClient<TEndpoints>;
 
 export function createApi(
   executor: Executor,
   routerOrPrefixOrEndpoints: RouterDef<RouterEndpoints> | RouterEndpoints | string,
-  endpointsArg?: RouterEndpoints,
+  endpointsArgOrOptions?: RouterEndpoints | CreateApiOptions,
+  optionsArg?: CreateApiOptions,
 ): Record<string, unknown> {
   let prefix: string;
   let endpoints: RouterEndpoints;
+  let options: CreateApiOptions | undefined;
 
   if (typeof routerOrPrefixOrEndpoints === "string") {
     prefix = routerOrPrefixOrEndpoints;
-    if (!endpointsArg)
+    if (!endpointsArgOrOptions)
       throw new Error("endpoints is required when prefix is provided");
-    endpoints = endpointsArg;
+    endpoints = endpointsArgOrOptions as RouterEndpoints;
+    options = optionsArg;
   } else if (
     "prefix" in routerOrPrefixOrEndpoints &&
     "endpoints" in routerOrPrefixOrEndpoints
   ) {
     prefix = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).prefix;
     endpoints = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).endpoints;
+    options = endpointsArgOrOptions as CreateApiOptions | undefined;
   } else {
     prefix = "";
     endpoints = routerOrPrefixOrEndpoints as RouterEndpoints;
+    options = endpointsArgOrOptions as CreateApiOptions | undefined;
   }
 
-  return buildClient(executor, prefix, endpoints);
+  return buildClient(executor, prefix, endpoints, options);
+}
+
+function shouldValidate(
+  options: CreateApiOptions | undefined,
+  kind: "request" | "response",
+): boolean {
+  const v = options?.validate;
+  if (v === undefined || v === true) return true;
+  if (v === false) return false;
+  return v[kind] ?? true;
 }
 
 function buildClient(
   executor: Executor,
   prefix: string,
   endpoints: RouterEndpoints,
+  options?: CreateApiOptions,
 ): Record<string, unknown> {
   const client: Record<string, unknown> = {};
 
@@ -122,13 +150,14 @@ function buildClient(
         executor,
         joinPaths(prefix, nested.prefix),
         nested.endpoints,
+        options,
       );
     } else {
       // Leaf EndpointSpec
       const spec = entry as EndpointSpec<any, any, any>;
       client[key] = async (params: RequestShape = {}, signal?: AbortSignal) => {
         let validatedParams: RequestShape = params;
-        if (spec.request) {
+        if (spec.request && shouldValidate(options, "request")) {
           try {
             validatedParams = spec.request.parse(params);
           } catch (err) {
@@ -149,17 +178,21 @@ function buildClient(
           signal,
         });
 
-        let validated: unknown;
-        try {
-          validated = spec.response.parse(raw);
-        } catch (err) {
-          throw new ValidationError("Response validation failed", err);
+        let result: unknown;
+        if (shouldValidate(options, "response")) {
+          try {
+            result = spec.response.parse(raw);
+          } catch (err) {
+            throw new ValidationError("Response validation failed", err);
+          }
+        } else {
+          result = raw;
         }
 
         if (spec.adapter) {
-          return spec.adapter(validated);
+          return spec.adapter(result);
         }
-        return validated;
+        return result;
       };
     }
   }

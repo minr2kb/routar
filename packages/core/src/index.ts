@@ -1,7 +1,7 @@
 // types
 
 export { createApi } from "./create-api.js";
-export { createExecutor } from "./create-executor.js";
+export { createExecutor, dispatchExecutor } from "./create-executor.js";
 export type { PathParams } from "./define-endpoint.js";
 export { endpoint } from "./define-endpoint.js";
 // core functions
@@ -15,6 +15,7 @@ export {
 } from "./middleware.js";
 export type {
   ApiTypes,
+  CreateApiOptions,
   EndpointSpec,
   ExecuteOptions,
   Executor,
