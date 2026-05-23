@@ -36,6 +36,8 @@ export function defineMiddleware(fn: ExecutorMiddleware): ExecutorMiddleware {
  *
  * @param count - Number of retries (not counting the initial attempt).
  * @param options.shouldRetry - Return `false` to stop retrying early.
+ *   Receives the error and a zero-based `attempt` index (0 = first failure,
+ *   1 = second failure, …) so you can limit retries by count or error type.
  *
  * @example
  * ```ts
