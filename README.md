@@ -368,7 +368,7 @@ import { HttpError } from '@routar/fetch';
 try {
   await todoApi.create({ body: { title: '' } });
 } catch (err) {
-  if (err instanceof ValidationError) console.log(err.message, err.cause);
+  if (err instanceof ValidationError) console.log(err.message); // cause is non-enumerable
   if (err instanceof HttpError)       console.log(err.status, err.statusText, err.body);
   if (err instanceof TimeoutError)    console.log(`timed out after ${err.ms}ms`);
 }
