@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { createExecutor } from "./create-executor.js";
+import { createExecutor, dispatchExecutor } from "./create-executor.js";
 import { defineMiddleware } from "./middleware.js";
 
 const opts = { method: "GET" as const, url: "/test" };
@@ -49,5 +49,36 @@ describe("createExecutor", () => {
     expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({ url: "/modified" }),
     );
+  });
+});
+
+describe("dispatchExecutor", () => {
+  it("delegates to the executor returned by resolver", async () => {
+    const execute = mock(async () => "dispatched");
+    const inner = createExecutor(execute);
+    const executor = dispatchExecutor(() => inner);
+    const result = await executor.execute(opts);
+    expect(result).toBe("dispatched");
+    expect(execute).toHaveBeenCalledWith(opts);
+  });
+
+  it("passes opts to resolver so it can branch", async () => {
+    const aExecute = mock(async () => "a");
+    const bExecute = mock(async () => "b");
+    const executor = dispatchExecutor((o) =>
+      o.url.startsWith("/a") ? createExecutor(aExecute) : createExecutor(bExecute),
+    );
+    await executor.execute({ method: "GET", url: "/a/resource" });
+    await executor.execute({ method: "GET", url: "/b/resource" });
+    expect(aExecute).toHaveBeenCalledTimes(1);
+    expect(bExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls resolver on every request", async () => {
+    const resolver = mock(() => createExecutor(async () => "ok"));
+    const executor = dispatchExecutor(resolver);
+    await executor.execute(opts);
+    await executor.execute(opts);
+    expect(resolver).toHaveBeenCalledTimes(2);
   });
 });
