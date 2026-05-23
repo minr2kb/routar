@@ -6,17 +6,16 @@ import type {
   RequestShape,
   RouterDef,
   RouterEndpoints,
+  ValidatorOutput,
 } from "./types.js";
 import { joinPaths, resolvePath } from "./utils/path.js";
 import { ValidationError } from "./utils/validate.js";
 
 /** Callable type for a single endpoint on the generated API client. */
-type EndpointFn<TSpec extends EndpointSpec<any, any, any>> = (
-  params: TSpec["request"] extends { parse: (data: unknown) => infer R }
-    ? R
-    : RequestShape,
-  signal?: AbortSignal,
-) => Promise<InferResponse<TSpec>>;
+type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
+  TSpec["request"] extends { parse: (data: unknown) => infer R }
+    ? (params: R, signal?: AbortSignal) => Promise<InferResponse<TSpec>>
+    : (params?: RequestShape, signal?: AbortSignal) => Promise<InferResponse<TSpec>>;
 
 /**
  * Fully-typed API client produced by {@link createApi}.
@@ -94,7 +93,10 @@ export function createApi<TEndpoints extends RouterEndpoints>(
 
 export function createApi(
   executor: Executor,
-  routerOrPrefixOrEndpoints: RouterDef<RouterEndpoints> | RouterEndpoints | string,
+  routerOrPrefixOrEndpoints:
+    | RouterDef<RouterEndpoints>
+    | RouterEndpoints
+    | string,
   endpointsArgOrOptions?: RouterEndpoints | CreateApiOptions,
   optionsArg?: CreateApiOptions,
 ): Record<string, unknown> {
@@ -110,10 +112,12 @@ export function createApi(
     options = optionsArg;
   } else if (
     "prefix" in routerOrPrefixOrEndpoints &&
-    "endpoints" in routerOrPrefixOrEndpoints
+    "endpoints" in routerOrPrefixOrEndpoints &&
+    !("method" in routerOrPrefixOrEndpoints)
   ) {
     prefix = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).prefix;
-    endpoints = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).endpoints;
+    endpoints = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>)
+      .endpoints;
     options = endpointsArgOrOptions as CreateApiOptions | undefined;
   } else {
     prefix = "";
@@ -143,7 +147,7 @@ function buildClient(
   const client: Record<string, unknown> = {};
 
   for (const [key, entry] of Object.entries(endpoints)) {
-    if ("prefix" in entry && "endpoints" in entry) {
+    if ("prefix" in entry && "endpoints" in entry && !("method" in entry)) {
       // Nested RouterDef — recurse with merged prefix
       const nested = entry as RouterDef<RouterEndpoints>;
       client[key] = buildClient(
@@ -178,7 +182,7 @@ function buildClient(
           signal,
         });
 
-        let result: unknown;
+        let result: ValidatorOutput<typeof spec.response>;
         if (shouldValidate(options, "response")) {
           try {
             result = spec.response.parse(raw);

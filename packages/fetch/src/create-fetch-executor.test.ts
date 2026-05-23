@@ -12,6 +12,7 @@ function mockFetch(response: Partial<Response>) {
         statusText: "OK",
         headers: new Headers({ "content-type": "application/json" }),
         json: async () => ({ mocked: true }),
+        text: async () => JSON.stringify({ mocked: true }),
         ...response,
       }) as Response,
   );
@@ -90,5 +91,44 @@ describe("createFetchExecutor", () => {
     await executor.execute({ method: "POST", url: "/todos", body: { title: "test" } });
     const headers = new Headers(m.mock.calls[0][1]?.headers);
     expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("Content-Type is not overridden by defaultHeaders when body is present", async () => {
+    const m = mockFetch({});
+    const executor = createFetchExecutor("https://api.example.com", {
+      defaultHeaders: async () => ({ "Content-Type": "text/plain" }),
+    });
+    await executor.execute({ method: "POST", url: "/todos", body: { title: "test" } });
+    const headers = new Headers(m.mock.calls[0][1]?.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("HttpError includes parsed response body", async () => {
+    mockFetch({
+      ok: false,
+      status: 422,
+      statusText: "Unprocessable Entity",
+      json: async () => ({ message: "validation failed" }),
+    });
+    const executor = createFetchExecutor("https://api.example.com");
+    try {
+      await executor.execute({ method: "POST", url: "/todos" });
+      expect(true).toBe(false); // should not reach
+    } catch (err) {
+      expect(err).toBeInstanceOf(HttpError);
+      expect((err as HttpError).body).toEqual({ message: "validation failed" });
+    }
+  });
+
+  it("returns null for empty text body on 200", async () => {
+    mockFetch({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      text: async () => "",
+    } as Partial<Response>);
+    const executor = createFetchExecutor("https://api.example.com");
+    const result = await executor.execute({ method: "GET", url: "/empty" });
+    expect(result).toBeNull();
   });
 });

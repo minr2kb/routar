@@ -9,6 +9,7 @@ export { defineRouter } from "./define-router.js";
 // middleware
 export {
   defineMiddleware,
+  TimeoutError,
   withLogger,
   withRetry,
   withTimeout,

@@ -338,4 +338,36 @@ describe("createApi", () => {
       );
     });
   });
+
+  describe("edge cases", () => {
+    it("does not misclassify endpoint spec that has prefix/endpoints-like keys", async () => {
+      const executor = mockExecutor({ id: 1 });
+      const api = createApi(executor, {
+        get: {
+          method: "GET" as const,
+          path: "/items/:id",
+          response: makeValidator({ id: 1 }),
+        },
+      });
+      await api.get({ path: { id: 1 } });
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ url: "/items/1" }),
+      );
+    });
+
+    it("allows calling argless endpoint without params", async () => {
+      const executor = mockExecutor({});
+      const api = createApi(executor, {
+        ping: {
+          method: "GET" as const,
+          path: "/ping",
+          response: makeValidator({}),
+        },
+      });
+      await api.ping();
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ url: "/ping" }),
+      );
+    });
+  });
 });

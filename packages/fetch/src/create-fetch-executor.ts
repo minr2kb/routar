@@ -51,21 +51,23 @@ export function createFetchExecutor(
       const res = await fetch(fullURL.toString(), {
         method,
         headers: {
-          ...(body != null ? { "Content-Type": "application/json" } : {}),
           ...defaultHeaders,
           ...headers,
+          ...(body != null ? { "Content-Type": "application/json" } : {}),
         },
         body: body != null ? JSON.stringify(body) : undefined,
         signal,
       });
 
       if (!res.ok) {
-        throw new HttpError(res.status, res.statusText);
+        const errorBody = await res.json().catch(() => null);
+        throw new HttpError(res.status, res.statusText, errorBody);
       }
-      if (res.status === 204 || res.headers.get("content-length") === "0") {
+      if (res.status === 204 || res.status === 205 || res.status === 304) {
         return null;
       }
-      return res.json();
+      const text = await res.text();
+      return text === "" ? null : JSON.parse(text);
     },
     options?.middlewares,
   );
@@ -92,6 +94,8 @@ export class HttpError extends Error {
     public readonly status: number,
     /** HTTP status text (e.g. "Not Found"). */
     public readonly statusText: string,
+    /** Parsed response body, or `null` if the body was empty or not JSON. */
+    public readonly body: unknown = null,
   ) {
     super(`HTTP ${status}: ${statusText}`);
     this.name = "HttpError";

@@ -1,6 +1,6 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
 import { createExecutor } from "./create-executor.js";
-import { withLogger, withRetry, withTimeout } from "./middleware.js";
+import { TimeoutError, withLogger, withRetry, withTimeout } from "./middleware.js";
 import type { ExecuteOptions } from "./types.js";
 
 const opts: ExecuteOptions = { method: "GET", url: "/test" };
@@ -89,6 +89,19 @@ describe("withTimeout", () => {
     const signal = AbortSignal.abort();
     await executor.execute({ ...opts, signal });
     expect(execute.mock.calls[0][0].signal?.aborted).toBe(true);
+  });
+
+  it("throws TimeoutError (not generic AbortError) when timeout fires", async () => {
+    const execute = (o: ExecuteOptions) =>
+      new Promise((_, reject) => {
+        const t = setTimeout(() => reject(new Error("should not reach")), 500);
+        o.signal?.addEventListener("abort", () => {
+          clearTimeout(t);
+          reject(o.signal!.reason);
+        });
+      });
+    const executor = createExecutor(execute, [withTimeout(10)]);
+    await expect(executor.execute(opts)).rejects.toBeInstanceOf(TimeoutError);
   });
 });
 

@@ -1,6 +1,17 @@
 import type { ExecutorMiddleware } from "./types.js";
 
 /**
+ * Thrown by {@link withTimeout} when a request exceeds the configured duration.
+ * Distinguishable from a user-initiated {@link AbortSignal} cancellation.
+ */
+export class TimeoutError extends Error {
+  constructor(public readonly ms: number) {
+    super(`Request timed out after ${ms}ms`);
+    this.name = "TimeoutError";
+  }
+}
+
+/**
  * Identity helper that returns the middleware as-is.
  *
  * Wrap your middleware function with this to get full type inference on `opts`
@@ -63,16 +74,17 @@ export function withRetry(
 export function withTimeout(ms: number): ExecutorMiddleware {
   return defineMiddleware(async (opts, next) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ms);
+    const timer = setTimeout(() => controller.abort(new TimeoutError(ms)), ms);
 
-    const signal = opts.signal
+    const { signal, cleanup } = opts.signal
       ? anySignal([opts.signal, controller.signal])
-      : controller.signal;
+      : { signal: controller.signal, cleanup: () => {} };
 
     try {
       return await next({ ...opts, signal });
     } finally {
       clearTimeout(timer);
+      cleanup();
     }
   });
 }
@@ -112,14 +124,17 @@ export function withLogger(options?: {
 }
 
 /** Combines multiple AbortSignals into one that aborts when any of them fire. */
-function anySignal(signals: AbortSignal[]): AbortSignal {
+function anySignal(signals: AbortSignal[]): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
-  for (const signal of signals) {
-    if (signal.aborted) {
-      controller.abort();
-      return controller.signal;
-    }
-    signal.addEventListener("abort", () => controller.abort(), { once: true });
+  const onAbort = () => controller.abort();
+  const attached: AbortSignal[] = [];
+  for (const s of signals) {
+    if (s.aborted) { controller.abort(); break; }
+    s.addEventListener("abort", onAbort, { once: true });
+    attached.push(s);
   }
-  return controller.signal;
+  return {
+    signal: controller.signal,
+    cleanup: () => attached.forEach(s => s.removeEventListener("abort", onAbort)),
+  };
 }

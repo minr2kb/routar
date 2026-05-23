@@ -6,6 +6,11 @@ export interface ExecuteOptions {
   url: string;
   params?: Record<string, unknown>;
   body?: unknown;
+  /**
+   * Per-request headers injected by middleware (e.g. `defineMiddleware`).
+   * Headers cannot be set from `createApi` call sites directly — use middleware
+   * to add dynamic headers such as `Authorization` or `X-Request-Id`.
+   */
   headers?: Record<string, string>;
   signal?: AbortSignal;
 }
