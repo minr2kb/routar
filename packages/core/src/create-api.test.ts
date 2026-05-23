@@ -369,5 +369,24 @@ describe("createApi", () => {
         expect.objectContaining({ url: "/ping" }),
       );
     });
+
+    it("applies adapter even when validate is false", async () => {
+      const executor = mockExecutor({ raw: true });
+      const api = createApi(
+        executor,
+        "/items",
+        {
+          get: {
+            method: "GET" as const,
+            path: "/",
+            response: makeValidator({ raw: true }),
+            adapter: (data: { raw: boolean }) => ({ transformed: true, original: data }),
+          },
+        },
+        { validate: false },
+      );
+      const result = await api.get({});
+      expect(result).toEqual({ transformed: true, original: { raw: true } });
+    });
   });
 });

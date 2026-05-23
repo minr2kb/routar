@@ -17,6 +17,10 @@ describe("joinPaths", () => {
   it("handles single segment", () => {
     expect(joinPaths("/todos")).toBe("/todos");
   });
+  it("collapses :// in absolute URLs — relative paths only", () => {
+    // joinPaths is for relative API paths; absolute URLs will have :// collapsed
+    expect(joinPaths("https://api.example.com", "/v1")).toBe("https:/api.example.com/v1");
+  });
 });
 
 describe("resolvePath", () => {
@@ -39,6 +43,11 @@ describe("resolvePath", () => {
   it("encodes special characters", () => {
     expect(resolvePath("/search/:q", { q: "hello world" })).toBe(
       "/search/hello%20world",
+    );
+  });
+  it("throws for empty string param", () => {
+    expect(() => resolvePath("/users/:id", { id: "" })).toThrow(
+      "Missing path parameter: id",
     );
   });
 });

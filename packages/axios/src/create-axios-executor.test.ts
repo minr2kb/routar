@@ -52,4 +52,23 @@ describe("createAxiosExecutor", () => {
     await executor.execute({ method: "GET", url: "/todos" });
     expect(requestMock.mock.calls[0][0]).toMatchObject({ url: "/todos" });
   });
+
+  it("resolves instance from async factory function (SSR path)", async () => {
+    const requestMock = makeRequestMock();
+    const factory = mock(async () => makeInstance("https://api.example.com", requestMock));
+    const executor = createAxiosExecutor(factory);
+    await executor.execute({ method: "GET", url: "/todos" });
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(requestMock.mock.calls[0][0]).toMatchObject({
+      url: "https://api.example.com/todos",
+    });
+  });
+
+  it("treats a function with interceptors + request as AxiosInstance, not factory", async () => {
+    const requestMock = makeRequestMock();
+    const instance = makeInstance("https://api.example.com", requestMock);
+    const executor = createAxiosExecutor(instance);
+    await executor.execute({ method: "GET", url: "/items" });
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
 });

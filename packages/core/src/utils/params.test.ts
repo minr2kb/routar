@@ -35,4 +35,7 @@ describe("serializeParams", () => {
     expect(result.get("active")).toBe("true");
     expect(result.get("deleted")).toBe("false");
   });
+  it("throws for plain object values", () => {
+    expect(() => serializeParams({ filter: { active: true } })).toThrow(TypeError);
+  });
 });

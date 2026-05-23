@@ -25,8 +25,9 @@ export type InstanceOrFactory = AxiosInstance | InstanceFactory;
 function resolveInstance(
   input: InstanceOrFactory,
 ): AxiosInstance | Promise<AxiosInstance> {
-  // AxiosInstance is callable but always has `interceptors`; plain factory functions do not.
-  if ("interceptors" in (input as object)) {
+  // AxiosInstance is callable but always has `interceptors` and a `request` method;
+  // plain factory functions have neither.
+  if ("interceptors" in (input as object) && typeof (input as any).request === "function") {
     return input as AxiosInstance;
   }
   return (input as InstanceFactory)();

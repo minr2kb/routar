@@ -17,4 +17,9 @@ describe("ValidationError", () => {
   it("has correct message", () => {
     expect(new ValidationError("test message").message).toBe("test message");
   });
+  it("cause is non-enumerable", () => {
+    const err = new ValidationError("bad", new Error("root"));
+    expect(Object.keys(err)).not.toContain("cause");
+    expect(err.cause).toBeInstanceOf(Error);
+  });
 });

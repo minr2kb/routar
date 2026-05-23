@@ -131,4 +131,24 @@ describe("createFetchExecutor", () => {
     const result = await executor.execute({ method: "GET", url: "/empty" });
     expect(result).toBeNull();
   });
+
+  it("calls defaultHeaders on every request and applies them", async () => {
+    const m = mockFetch({});
+    const defaultHeaders = mock(async () => ({ "X-Auth": "token-123" }));
+    const executor = createFetchExecutor("https://api.example.com", { defaultHeaders });
+    await executor.execute({ method: "GET", url: "/todos" });
+    expect(defaultHeaders).toHaveBeenCalledTimes(1);
+    const headers = new Headers(m.mock.calls[0][1]?.headers);
+    expect(headers.get("X-Auth")).toBe("token-123");
+  });
+
+  it("propagates network errors (non-HTTP) unchanged", async () => {
+    globalThis.fetch = mock(async () => {
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    const executor = createFetchExecutor("https://api.example.com");
+    await expect(
+      executor.execute({ method: "GET", url: "/todos" }),
+    ).rejects.toThrow("Failed to fetch");
+  });
 });
