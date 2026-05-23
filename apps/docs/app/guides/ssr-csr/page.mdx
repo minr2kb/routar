@@ -9,46 +9,68 @@ routar's core insight: define the endpoint spec once, swap the executor per envi
 
 ## The pattern
 
+Use `dispatchExecutor` to pick the right transport at request time — one API client works in both SSR and CSR without duplicate `*ServerApi` instances.
+
 ```ts
 // remote/lib/executor.ts
 import axios from 'axios'
 import { createAxiosExecutor } from '@routar/axios'
+import { dispatchExecutor } from '@routar/core'
 import { createFetchExecutor } from '@routar/fetch'
-import { withTimeout } from '@routar/core'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
 
-// CSR — shared axios instance, browser cookies sent automatically
-export const clientExecutor = createAxiosExecutor(
-  axios.create({ baseURL: BASE_URL, withCredentials: true })
+// CSR — shared axios instance with interceptors (localStorage, redirects)
+const _clientExecutor = createAxiosExecutor(
+  axios.create({ baseURL: BASE_URL })
 )
 
 // SSR — fetch factory, injects httpOnly cookie per-request
-export const serverExecutor = createFetchExecutor(BASE_URL, {
+const _fetchExecutor = createFetchExecutor(BASE_URL, {
   defaultHeaders: async () => {
     const { cookies } = await import('next/headers')
     const token = (await cookies()).get('access_token')?.value
     return token ? { Authorization: `Bearer ${token}` } : {}
   },
-  middlewares: [withTimeout(10_000)],
 })
+
+// Single executor — picks transport at request time
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? _fetchExecutor : _clientExecutor
+)
 ```
 
 ```ts
 // remote/services/todo/todo.api.ts
 import { defineRouter, createApi, endpoint } from '@routar/core'
-import { clientExecutor, serverExecutor } from '../../lib/executor'
+import { apiExecutor } from '../../lib/executor'
 
 const todoRouter = defineRouter('/todos', {
-  getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
-  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+  getList:   endpoint({ method: 'GET', path: '/',    response: TodoListSchema }),
+  getDetail: endpoint({ method: 'GET', path: '/:id', response: TodoSchema,
                         request: z.object({ path: z.object({ id: z.number() }) }) }),
 })
 
-export const todoApi       = createApi(clientExecutor, todoRouter) // CSR
-export const todoServerApi = createApi(serverExecutor, todoRouter) // SSR
+// One API client — works in both SSR and CSR
+export const todoApi = createApi(apiExecutor, todoRouter)
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>
+```
+
+## Own API routes (no auth difference)
+
+If your endpoint hits your own Next.js Route Handlers and doesn't need environment-specific auth, a single `createFetchExecutor` with an absolute URL works in both environments — no `dispatchExecutor` needed.
+
+```ts
+// remote/lib/executor.ts
+const LOCAL_API_BASE = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api`
+
+export const localExecutor = createFetchExecutor(LOCAL_API_BASE)
+```
+
+```ts
+// remote/services/todo/todo.api.ts
+export const todoApi = createApi(localExecutor, todoRouter)
 ```
 
 ## With TanStack Query
@@ -76,22 +98,18 @@ export const todoDetailQueryOptions = (id: number) =>
 
 ### SSR prefetch — server page
 
-Pass `queryOptions(params)` directly to `prefetchQuery`; the key is already embedded.
+Pass `queryOptions(params)` directly to `prefetchQuery`. Because `dispatchExecutor` picks the fetch transport on the server automatically, no queryFn override is needed.
 
 ```tsx
 // app/todos/page.tsx
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import { getQueryClient } from '@/utils/get-query-client'
-import { todoServerApi } from '@/remote/services'
 import { todoListQueryOptions } from '@/remote/services/todo/todo.queries'
 import { Suspense } from 'react'
 
 export default async function TodosPage() {
   const queryClient = getQueryClient()
-  await queryClient.prefetchQuery({
-    ...todoListQueryOptions(),
-    queryFn: () => todoServerApi.getList({}), // swap to server executor
-  })
+  await queryClient.prefetchQuery(todoListQueryOptions())
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
