@@ -1,5 +1,11 @@
 # @routar/axios
 
+## 1.1.0
+
+### Minor Changes
+
+- Add TimeoutError class, fix AbortSignal listener leak in withTimeout, improve HttpError with body field, fix RouterDef discriminator, make endpoint params optional when no request schema, strengthen duck-typing for AxiosInstance detection, make ValidationError.cause non-enumerable, add TypeError for object query params, and fix header priority in fetch executor.
+
 ## 1.0.0
 
 ### Patch Changes
