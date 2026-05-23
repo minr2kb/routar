@@ -4,6 +4,8 @@ import { TodoListClient } from "@/components/TodoListClient";
 import { todoListQueryOptions } from "@/remote/services/todo/todo.queries";
 import { getQueryClient } from "@/utils/get-query-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function TodosPage() {
   const queryClient = getQueryClient();
 

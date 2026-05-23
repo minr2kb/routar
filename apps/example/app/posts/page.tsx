@@ -4,6 +4,8 @@ import { PostListClient } from "@/components/PostListClient";
 import { postListQueryOptions } from "@/remote/services/post/post.queries";
 import { getQueryClient } from "@/utils/get-query-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function PostsPage() {
   const queryClient = getQueryClient();
 
