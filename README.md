@@ -193,6 +193,28 @@ const executor = createExecutor(
 
 ---
 
+### `dispatchExecutor(resolver)`
+
+Creates an executor that selects the underlying transport at request time. Use this to unify SSR and CSR behind a single API client — no duplicate `*ServerApi` instances needed.
+
+The `resolver` receives the full request options, so it can branch on environment, URL prefix, auth context, or any runtime condition.
+
+```ts
+import { dispatchExecutor } from '@routar/core';
+
+// Pick transport based on environment (SSR vs CSR)
+const executor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor,
+);
+
+// Or route by request path
+const executor = dispatchExecutor((opts) =>
+  opts.url.startsWith('/internal') ? internalExecutor : publicExecutor,
+);
+```
+
+---
+
 ## Middleware
 
 Middlewares are `(opts, next) => Promise<unknown>` functions applied in declaration order.
@@ -274,12 +296,14 @@ Axios errors propagate as `AxiosError` — all Axios-specific fields (`err.respo
 
 ## SSR / CSR Pattern
 
-Share the router definition; swap the executor per environment.
+Use `dispatchExecutor` to select the right transport at request time — one API client works in both environments without duplicate `*ServerApi` instances.
 
 ```ts
+import { dispatchExecutor } from '@routar/core';
+
 // executor.ts
-export const clientExecutor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }));
-export const serverExecutor = createFetchExecutor(BASE_URL, {
+const clientExecutor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }));
+const serverExecutor = createFetchExecutor(BASE_URL, {
   defaultHeaders: async () => {
     const { cookies } = await import('next/headers');
     const token = (await cookies()).get('access_token')?.value;
@@ -287,9 +311,19 @@ export const serverExecutor = createFetchExecutor(BASE_URL, {
   },
 });
 
-// todo.api.ts
-export const todoApi       = createApi(clientExecutor, todoRouter); // CSR
-export const todoServerApi = createApi(serverExecutor, todoRouter); // SSR
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor,
+);
+
+// todo.api.ts — one client for both SSR and CSR
+export const todoApi = createApi(apiExecutor, todoRouter);
+```
+
+For routes with no environment-specific auth (e.g. your own API with an absolute base URL), a single fetch executor works without `dispatchExecutor`:
+
+```ts
+export const localExecutor = createFetchExecutor('http://localhost:3000/api');
+export const todoApi = createApi(localExecutor, todoRouter);
 ```
 
 ---

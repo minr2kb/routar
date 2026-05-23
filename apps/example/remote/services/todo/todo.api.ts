@@ -1,7 +1,7 @@
 import { createApi, endpoint, defineRouter } from "@routar/core";
 import type { ApiTypes } from "@routar/core";
 import { z } from "zod";
-import { localClientExecutor, localFetchExecutor } from "../../lib/executor";
+import { localExecutor } from "../../lib/executor";
 
 export const TodoRawSchema = z.object({
   id: z.number(),
@@ -77,8 +77,7 @@ export const TodoRouter = defineRouter("/todos", {
   }),
 });
 
-export const todoApi = createApi(localClientExecutor, TodoRouter);
-export const todoServerApi = createApi(localFetchExecutor, TodoRouter);
+export const todoApi = createApi(localExecutor, TodoRouter);
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>;
 export type TodoItem = TodoApiTypes["getDetail"]["response"];

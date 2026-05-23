@@ -1,7 +1,7 @@
 import type { ApiTypes } from "@routar/core";
 import { createApi, defineRouter, endpoint } from "@routar/core";
 import { z } from "zod";
-import { clientExecutor, fetchExecutor } from "../../lib/executor";
+import { apiExecutor } from "../../lib/executor";
 
 const UserRawSchema = z.object({
   id: z.number(),
@@ -43,8 +43,7 @@ export const UserRouter = defineRouter("/users", {
   }),
 });
 
-export const userApi = createApi(clientExecutor, UserRouter);
-export const userServerApi = createApi(fetchExecutor, UserRouter);
+export const userApi = createApi(apiExecutor, UserRouter);
 
 export type UserApiTypes = ApiTypes<typeof userApi>;
 export type User = UserApiTypes["getDetail"]["response"];
