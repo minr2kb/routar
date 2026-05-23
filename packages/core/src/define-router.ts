@@ -30,6 +30,11 @@ import type { RouterDef, RouterEndpoints } from "./types.js";
  * });
  * ```
  */
+/** Type guard — distinguishes a {@link RouterDef} from a leaf {@link EndpointSpec} at runtime. */
+export function isRouterDef(entry: object): entry is RouterDef<RouterEndpoints> {
+  return "prefix" in entry && "endpoints" in entry;
+}
+
 export function defineRouter<TEndpoints extends RouterEndpoints>(
   prefix: string,
   endpoints: TEndpoints,

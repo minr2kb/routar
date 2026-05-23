@@ -57,6 +57,10 @@ try {
 }
 ```
 
+## Query parameter serialization
+
+Axios serializes array params using its own default (`ids[]=1&ids[]=2`), while `@routar/fetch` uses repeated keys (`ids=1&ids=2`). If your server is sensitive to array format and you switch executors, update your server-side parsing accordingly.
+
 ## Instance detection
 
-`createAxiosExecutor` distinguishes an `AxiosInstance` from a factory function via duck-typing on the `interceptors` property. `AxiosInstance` objects always have `interceptors`; plain factory functions do not.
+`createAxiosExecutor` distinguishes an `AxiosInstance` from a factory function via duck-typing: it checks for both the `interceptors` property and a `request` method. `AxiosInstance` objects always have both; plain factory functions do not.

@@ -1,3 +1,4 @@
+import { isRouterDef } from "./define-router.js";
 import type {
   CreateApiOptions,
   EndpointSpec,
@@ -15,7 +16,10 @@ import { ValidationError } from "./utils/validate.js";
 type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
   TSpec["request"] extends { parse: (data: unknown) => infer R }
     ? (params: R, signal?: AbortSignal) => Promise<InferResponse<TSpec>>
-    : (params?: RequestShape, signal?: AbortSignal) => Promise<InferResponse<TSpec>>;
+    : (
+        params?: RequestShape,
+        signal?: AbortSignal,
+      ) => Promise<InferResponse<TSpec>>;
 
 /**
  * Fully-typed API client produced by {@link createApi}.
@@ -100,32 +104,44 @@ export function createApi(
   endpointsArgOrOptions?: RouterEndpoints | CreateApiOptions,
   optionsArg?: CreateApiOptions,
 ): Record<string, unknown> {
-  let prefix: string;
-  let endpoints: RouterEndpoints;
-  let options: CreateApiOptions | undefined;
-
-  if (typeof routerOrPrefixOrEndpoints === "string") {
-    prefix = routerOrPrefixOrEndpoints;
-    if (!endpointsArgOrOptions)
-      throw new Error("endpoints is required when prefix is provided");
-    endpoints = endpointsArgOrOptions as RouterEndpoints;
-    options = optionsArg;
-  } else if (
-    "prefix" in routerOrPrefixOrEndpoints &&
-    "endpoints" in routerOrPrefixOrEndpoints &&
-    !("method" in routerOrPrefixOrEndpoints)
-  ) {
-    prefix = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>).prefix;
-    endpoints = (routerOrPrefixOrEndpoints as RouterDef<RouterEndpoints>)
-      .endpoints;
-    options = endpointsArgOrOptions as CreateApiOptions | undefined;
-  } else {
-    prefix = "";
-    endpoints = routerOrPrefixOrEndpoints as RouterEndpoints;
-    options = endpointsArgOrOptions as CreateApiOptions | undefined;
-  }
-
+  const { prefix, endpoints, options } = resolveArgs(
+    routerOrPrefixOrEndpoints,
+    endpointsArgOrOptions,
+    optionsArg,
+  );
   return buildClient(executor, prefix, endpoints, options);
+}
+
+function resolveArgs(
+  second: RouterDef<RouterEndpoints> | RouterEndpoints | string,
+  third: RouterEndpoints | CreateApiOptions | undefined,
+  fourth: CreateApiOptions | undefined,
+): {
+  prefix: string;
+  endpoints: RouterEndpoints;
+  options: CreateApiOptions | undefined;
+} {
+  if (typeof second === "string") {
+    if (!third)
+      throw new Error("endpoints is required when prefix is provided");
+    return {
+      prefix: second,
+      endpoints: third as RouterEndpoints,
+      options: fourth,
+    };
+  }
+  if (isRouterDef(second)) {
+    return {
+      prefix: second.prefix,
+      endpoints: second.endpoints,
+      options: third as CreateApiOptions | undefined,
+    };
+  }
+  return {
+    prefix: "",
+    endpoints: second as RouterEndpoints,
+    options: third as CreateApiOptions | undefined,
+  };
 }
 
 function shouldValidate(
@@ -147,59 +163,51 @@ function buildClient(
   const client: Record<string, unknown> = {};
 
   for (const [key, entry] of Object.entries(endpoints)) {
-    if ("prefix" in entry && "endpoints" in entry && !("method" in entry)) {
-      // Nested RouterDef — recurse with merged prefix
-      const nested = entry as RouterDef<RouterEndpoints>;
-      client[key] = buildClient(
-        executor,
-        joinPaths(prefix, nested.prefix),
-        nested.endpoints,
-        options,
-      );
-    } else {
-      // Leaf EndpointSpec
-      const spec = entry as EndpointSpec<any, any, any>;
-      client[key] = async (params: RequestShape = {}, signal?: AbortSignal) => {
-        let validatedParams: RequestShape = params;
-        if (spec.request && shouldValidate(options, "request")) {
-          try {
-            validatedParams = spec.request.parse(params);
-          } catch (err) {
-            throw new ValidationError("Request validation failed", err);
-          }
-        }
-
-        const url = resolvePath(
-          joinPaths(prefix, spec.path),
-          validatedParams?.path,
-        );
-
-        const raw = await executor.execute({
-          method: spec.method,
-          url,
-          params: validatedParams?.query as Record<string, unknown> | undefined,
-          body: validatedParams?.body,
-          signal,
-        });
-
-        let result: ValidatorOutput<typeof spec.response>;
-        if (shouldValidate(options, "response")) {
-          try {
-            result = spec.response.parse(raw);
-          } catch (err) {
-            throw new ValidationError("Response validation failed", err);
-          }
-        } else {
-          result = raw;
-        }
-
-        if (spec.adapter) {
-          return spec.adapter(result);
-        }
-        return result;
-      };
-    }
+    client[key] = isRouterDef(entry)
+      ? buildClient(executor, joinPaths(prefix, entry.prefix), entry.endpoints, options)
+      : buildEndpointFn(executor, prefix, entry as EndpointSpec<any, any, any>, options);
   }
 
   return client;
+}
+
+function buildEndpointFn(
+  executor: Executor,
+  prefix: string,
+  spec: EndpointSpec<any, any, any>,
+  options: CreateApiOptions | undefined,
+) {
+  return async (params: RequestShape = {}, signal?: AbortSignal) => {
+    let validatedParams: RequestShape = params;
+    if (spec.request && shouldValidate(options, "request")) {
+      try {
+        validatedParams = spec.request.parse(params);
+      } catch (err) {
+        throw new ValidationError("Request validation failed", err);
+      }
+    }
+
+    const url = resolvePath(joinPaths(prefix, spec.path), validatedParams?.path);
+
+    const raw = await executor.execute({
+      method: spec.method,
+      url,
+      params: validatedParams?.query as Record<string, unknown> | undefined,
+      body: validatedParams?.body,
+      signal,
+    });
+
+    let result: ValidatorOutput<typeof spec.response>;
+    if (shouldValidate(options, "response")) {
+      try {
+        result = spec.response.parse(raw);
+      } catch (err) {
+        throw new ValidationError("Response validation failed", err);
+      }
+    } else {
+      result = raw;
+    }
+
+    return spec.adapter ? spec.adapter(result) : result;
+  };
 }

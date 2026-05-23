@@ -52,6 +52,10 @@ try {
 }
 ```
 
+## Query parameter serialization
+
+Arrays are serialized as repeated keys: `ids=1&ids=2`. This differs from Axios's default (`ids[]=1&ids[]=2`). If you switch executors and use array query params, verify your server-side parsing is compatible.
+
 ## SSR usage (Next.js)
 
 ```ts
