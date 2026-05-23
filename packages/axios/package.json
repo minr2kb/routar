@@ -1,6 +1,6 @@
 {
   "name": "@routar/axios",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Axios-based executor for routar — transport adapter using Axios",
   "keywords": [
     "api",
@@ -40,7 +40,7 @@
   },
   "peerDependencies": {
     "axios": ">=1.0.0",
-    "@routar/core": "^0.1.0"
+    "@routar/core": "^1.0.0"
   },
   "devDependencies": {
     "@routar/core": "workspace:*",

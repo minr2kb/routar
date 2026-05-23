@@ -1,6 +1,6 @@
 {
   "name": "@routar/fetch",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Fetch-based executor for routar — transport adapter using the native fetch API",
   "keywords": [
     "api",
@@ -39,7 +39,7 @@
     "dev": "tsup --watch"
   },
   "peerDependencies": {
-    "@routar/core": "^0.1.0"
+    "@routar/core": "^1.0.0"
   },
   "devDependencies": {
     "@routar/core": "workspace:*",
