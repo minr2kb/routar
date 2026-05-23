@@ -1,3 +1,4 @@
+import { codeToHtml } from "shiki";
 import { PackageInstall } from "../components/PackageInstall";
 
 const FEATURES = [
@@ -69,7 +70,12 @@ const todos = await api.list({})                              // Todo[]
 const todo  = await api.detail({ path: { id: 1 } })          // Todo
 const next  = await api.create({ body: { title: 'buy milk' } }) // Todo`;
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const highlighted = await codeToHtml(CODE, {
+    lang: "typescript",
+    theme: "github-dark",
+  });
+
   return (
     <div style={{ minHeight: "100vh", padding: "0 0 96px" }}>
       {/* ── Hero ─────────────────────────────────────────── */}
@@ -189,21 +195,16 @@ export default function LandingPage() {
       <div
         style={{ maxWidth: "780px", margin: "0 auto 80px", padding: "0 24px" }}
       >
-        <pre
+        <div
+          className="landing-code"
           style={{
-            background: "#0f1117",
             borderRadius: "14px",
-            padding: "28px 32px",
-            overflowX: "auto",
-            fontSize: "0.82rem",
-            lineHeight: 1.7,
-            color: "#e2e8f0",
+            overflow: "hidden",
             boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-            margin: 0,
           }}
-        >
-          <code>{CODE}</code>
-        </pre>
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: highlighted }}
+        />
       </div>
 
       {/* ── Features ─────────────────────────────────────── */}
@@ -275,18 +276,7 @@ export default function LandingPage() {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {PACKAGES.map((p) => (
-            <div
-              key={p.name}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "180px 1fr",
-                alignItems: "center",
-                gap: "24px",
-                padding: "18px 22px",
-                borderRadius: "12px",
-                border: "1px solid rgba(0,0,0,0.08)",
-              }}
-            >
+            <div key={p.name} className="pkg-row">
               <div>
                 <code
                   style={{

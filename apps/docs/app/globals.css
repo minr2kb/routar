@@ -4,3 +4,29 @@
   --nextra-primary-saturation: 84%;
   --nextra-primary-lightness: 67%;
 }
+
+.landing-code .shiki {
+  margin: 0;
+  padding: 28px 32px;
+  border-radius: 14px;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.pkg-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 22px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 540px) {
+  .pkg-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
