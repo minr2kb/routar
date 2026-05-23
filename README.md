@@ -268,7 +268,7 @@ Non-2xx responses throw `HttpError`:
 ```ts
 import { HttpError } from '@routar/fetch';
 
-if (err instanceof HttpError) console.log(err.status, err.statusText);
+if (err instanceof HttpError) console.log(err.status, err.statusText, err.body);
 ```
 
 ---
@@ -357,17 +357,19 @@ type P = PathParams<'/:userId/posts/:postId'>; // 'userId' | 'postId'
 | Error | Package | Thrown when |
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
+| `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
 | `HttpError` | `@routar/fetch` | Server returns a non-2xx status |
 | `AxiosError` | axios | Network or HTTP error from the Axios transport |
 
 ```ts
-import { ValidationError } from '@routar/core';
+import { TimeoutError, ValidationError } from '@routar/core';
 import { HttpError } from '@routar/fetch';
 
 try {
   await todoApi.create({ body: { title: '' } });
 } catch (err) {
   if (err instanceof ValidationError) console.log(err.message, err.cause);
-  if (err instanceof HttpError)       console.log(err.status, err.statusText);
+  if (err instanceof HttpError)       console.log(err.status, err.statusText, err.body);
+  if (err instanceof TimeoutError)    console.log(`timed out after ${err.ms}ms`);
 }
 ```

@@ -49,6 +49,20 @@ Aborts the request if no response arrives within `ms` milliseconds. Uses `AbortS
 withTimeout(5_000)  // 5 seconds
 ```
 
+When the timeout fires, the rejection reason is a `TimeoutError` (exported from `@routar/core`), so you can distinguish a timeout from a user-initiated `AbortSignal` cancellation:
+
+```ts
+import { TimeoutError } from '@routar/core'
+
+try {
+  await api.getList()
+} catch (err) {
+  if (err instanceof TimeoutError) {
+    console.log(`Timed out after ${err.ms}ms`)
+  }
+}
+```
+
 ### `withLogger`
 
 ```ts

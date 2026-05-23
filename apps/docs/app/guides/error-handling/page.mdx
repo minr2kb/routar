@@ -11,12 +11,13 @@ description: Handle ValidationError, HttpError, and AxiosError — and normalize
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | Request or response validation fails |
 | `HttpError` | `@routar/fetch` | Server returns a non-2xx status |
+| `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
 | `AxiosError` | `axios` | Network or HTTP error via Axios |
 
 ## Handling errors
 
 ```ts
-import { ValidationError } from '@routar/core'
+import { TimeoutError, ValidationError } from '@routar/core'
 import { HttpError } from '@routar/fetch'
 
 try {
@@ -31,6 +32,10 @@ try {
     // fetch returned non-2xx
     console.log(err.status)     // e.g. 422
     console.log(err.statusText) // e.g. 'Unprocessable Entity'
+    console.log(err.body)       // parsed JSON payload, or null
+  }
+  if (err instanceof TimeoutError) {
+    console.log(err.ms) // configured timeout in ms
   }
 }
 ```
