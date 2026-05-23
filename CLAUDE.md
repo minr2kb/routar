@@ -125,7 +125,7 @@ This uses the `PathParams<TPath>` template literal type and `PathConstraint<TPat
 
 ### Executor pattern
 
-Both `@routar/fetch` and `@routar/axios` call `createExecutor(transportFn, middlewares?)` internally. `createAxiosExecutor` accepts `AxiosInstance | (() => AxiosInstance | Promise<AxiosInstance>)` — discrimination uses `'interceptors' in input` duck-typing because `AxiosInstance` is callable and `typeof` cannot distinguish it from a factory.
+Both `@routar/fetch` and `@routar/axios` call `createExecutor(transportFn, middlewares?)` internally. `createAxiosExecutor` accepts `AxiosInstance | (() => AxiosInstance | Promise<AxiosInstance>)` — discrimination uses `'interceptors' in input && typeof input.request === 'function'` duck-typing because `AxiosInstance` is callable and `typeof` cannot distinguish it from a factory.
 
 ### Validator compatibility
 
