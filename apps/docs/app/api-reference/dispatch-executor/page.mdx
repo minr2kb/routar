@@ -1,0 +1,82 @@
+---
+title: dispatchExecutor()
+description: Creates an executor that selects the underlying transport at request time — the key to unified SSR/CSR API clients.
+---
+
+# `dispatchExecutor(resolver)`
+
+Creates an `Executor` that selects the underlying transport at request time based on the result of `resolver`.
+
+Use this to unify SSR and CSR behind a single API client — the resolver picks the right executor per request, so `createApi` is called once and works in both environments without duplicate `*ServerApi` instances.
+
+```ts
+import { dispatchExecutor } from '@routar/core'
+
+const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor
+)
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `resolver` | `(opts: ExecuteOptions) => Executor` | Called on every request; returns the executor to delegate to |
+
+The resolver receives the full [`ExecuteOptions`](/api-reference/create-executor#executeoptions) object so it can branch on environment, URL prefix, auth context, or any runtime condition.
+
+## Examples
+
+### SSR vs CSR — pick transport based on environment
+
+The most common use case. On the server, use a per-request fetch executor that injects auth cookies. On the client, use a shared axios instance.
+
+```ts
+// remote/lib/executor.ts
+import axios from 'axios'
+import { createAxiosExecutor } from '@routar/axios'
+import { createFetchExecutor } from '@routar/fetch'
+import { dispatchExecutor } from '@routar/core'
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
+
+const clientExecutor = createAxiosExecutor(
+  axios.create({ baseURL: BASE_URL })
+)
+
+const serverExecutor = createFetchExecutor(BASE_URL, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('access_token')?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+})
+
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor
+)
+```
+
+```ts
+// remote/services/todo/todo.api.ts — one client for both environments
+export const todoApi = createApi(apiExecutor, todoRouter)
+```
+
+### Route by URL prefix
+
+```ts
+const apiExecutor = dispatchExecutor((opts) =>
+  opts.url.startsWith('/internal') ? internalExecutor : publicExecutor
+)
+```
+
+## When you don't need it
+
+If your endpoints hit your own Next.js Route Handlers and don't need environment-specific auth, a single `createFetchExecutor` with an absolute base URL works in both SSR and CSR — no `dispatchExecutor` needed.
+
+```ts
+const LOCAL_API_BASE = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api`
+export const localExecutor = createFetchExecutor(LOCAL_API_BASE)
+```
+
+See [SSR / CSR Pattern](/guides/ssr-csr) for a complete walkthrough including TanStack Query integration.

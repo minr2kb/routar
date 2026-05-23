@@ -53,3 +53,5 @@ createExecutor(transport, [withTimeout(8_000), withRetry(3), withLogger()])
 ```
 
 See [Middleware](/api-reference/middleware) for built-in options and custom middleware.
+
+To select the transport dynamically at request time (e.g. SSR vs CSR), see [`dispatchExecutor()`](/api-reference/dispatch-executor).
