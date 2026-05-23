@@ -126,17 +126,26 @@ export function withLogger(options?: {
 }
 
 /** Combines multiple AbortSignals into one that aborts when any of them fire. */
-function anySignal(signals: AbortSignal[]): { signal: AbortSignal; cleanup: () => void } {
+function anySignal(signals: AbortSignal[]): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   const attached: AbortSignal[] = [];
   for (const s of signals) {
-    if (s.aborted) { controller.abort(); break; }
+    if (s.aborted) {
+      controller.abort();
+      break;
+    }
     s.addEventListener("abort", onAbort, { once: true });
     attached.push(s);
   }
   return {
     signal: controller.signal,
-    cleanup: () => attached.forEach(s => s.removeEventListener("abort", onAbort)),
+    cleanup: () =>
+      attached.forEach((s) => {
+        s.removeEventListener("abort", onAbort);
+      }),
   };
 }
