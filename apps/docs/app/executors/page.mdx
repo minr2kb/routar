@@ -1,18 +1,19 @@
 ---
 title: Executors
-description: Choose between the native fetch executor or Axios executor, or build your own with createExecutor.
+description: Choose between the native fetch executor, Axios executor, ky executor, or build your own with createExecutor.
 ---
 
 # Executors
 
-An executor is the transport layer — it handles the actual HTTP call. routar ships with two built-in executors:
+An executor is the transport layer — it handles the actual HTTP call. routar ships with three built-in executors:
 
 | Package | Executor | Best for |
 |---------|----------|----------|
 | `@routar/fetch` | [`createFetchExecutor`](/executors/fetch) | SSR, Node.js 18+, zero dependencies |
 | `@routar/axios` | [`createAxiosExecutor`](/executors/axios) | CSR, existing Axios instances, interceptors |
+| `@routar/ky` | [`createKyExecutor`](/executors/ky) | CSR/SSR, ky hooks, modern fetch-based clients |
 
-Both implement the same `Executor` interface and are interchangeable — you can use `@routar/fetch` on the server and `@routar/axios` in the browser with the exact same router definition.
+All implement the same `Executor` interface and are interchangeable — you can use `@routar/fetch` on the server and `@routar/axios` or `@routar/ky` in the browser with the exact same router definition.
 
 ## Choosing an executor
 
@@ -24,6 +25,10 @@ Both implement the same `Executor` interface and are interchangeable — you can
 **Use `@routar/axios` when:**
 - You already have an Axios instance with interceptors configured
 - You're building a CSR-only app and Axios is already a dependency
+
+**Use `@routar/ky` when:**
+- You prefer ky's hook system for request/response lifecycle
+- You want a modern fetch-based client with a clean API
 
 ## Custom executors
 

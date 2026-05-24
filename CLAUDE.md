@@ -42,6 +42,7 @@ packages/
   core/     @routar/core     — endpoint definitions, router, API client factory, middleware system
   fetch/    @routar/fetch    — fetch-based Executor
   axios/    @routar/axios    — Axios-based Executor
+  ky/       @routar/ky       — ky-based Executor
 apps/
   web/      @routar/web      — Next.js 15 demo app consuming all three packages
 ```
@@ -125,7 +126,7 @@ This uses the `PathParams<TPath>` template literal type and `PathConstraint<TPat
 
 ### Executor pattern
 
-Both `@routar/fetch` and `@routar/axios` call `createExecutor(transportFn, middlewares?)` internally. `createAxiosExecutor` accepts `AxiosInstance | (() => AxiosInstance | Promise<AxiosInstance>)` — discrimination uses `'interceptors' in input && typeof input.request === 'function'` duck-typing because `AxiosInstance` is callable and `typeof` cannot distinguish it from a factory.
+`@routar/fetch`, `@routar/axios`, and `@routar/ky` all call `createExecutor(transportFn, middlewares?)` internally. `createAxiosExecutor` accepts `AxiosInstance | (() => AxiosInstance | Promise<AxiosInstance>)` — discrimination uses `'interceptors' in input && typeof input.request === 'function'` duck-typing because `AxiosInstance` is callable and `typeof` cannot distinguish it from a factory. `createKyExecutor` uses the same `InstanceOrFactory` pattern — discrimination uses `'extend' in input` duck-typing because `KyInstance` always has `.extend()` while plain factory functions do not. ky route URLs have their leading `/` stripped before being passed to ky (ky's `prefixUrl` requires relative paths).
 
 ### Validator compatibility
 
