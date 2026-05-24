@@ -6,8 +6,8 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build && bun run --filter '@routar/example' build && bun run --filter '@routar/docs' build",
-    "build:packages": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build",
+    "build": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build && bun run --filter '@routar/ky' build && bun run --filter '@routar/example' build && bun run --filter '@routar/docs' build",
+    "build:packages": "bun run --filter '@routar/core' build && bun run --filter '@routar/fetch' build && bun run --filter '@routar/axios' build && bun run --filter '@routar/ky' build",
     "test": "bun test",
     "typecheck": "tsc --build",
     "lint": "biome check",
