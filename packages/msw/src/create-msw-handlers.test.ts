@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { HttpResponse } from "msw";
+import { HttpResponse, type HttpHandler, type StrictRequest } from "msw";
 import { z } from "zod";
 import { defineRouter, endpoint } from "@routar/core";
 import { createMswHandlers } from "./create-msw-handlers.js";
@@ -44,11 +44,11 @@ const todoRouter = defineRouter("/todos", {
   }),
 });
 
-async function run(
-  handler: Awaited<ReturnType<typeof createMswHandlers>>[number],
-  request: Request,
-) {
-  const result = await handler.run({ request });
+async function runHandler(handler: HttpHandler, request: Request) {
+  const result = await handler.run({
+    request: request as StrictRequest<any>,
+    requestId: "test",
+  });
   return result?.response ?? null;
 }
 
@@ -73,7 +73,7 @@ describe("createMswHandlers — flat router", () => {
     expect(handlers).toHaveLength(3);
   });
 
-  it("handler matches correct method and URL in info", () => {
+  it("handler carries correct method and URL pattern in info", () => {
     const [handler] = createMswHandlers(todoRouter, BASE_URL, {
       getDetail: () => HttpResponse.json({ id: 1, title: "x" }),
     });
@@ -85,7 +85,7 @@ describe("createMswHandlers — flat router", () => {
     const [handler] = createMswHandlers(todoRouter, BASE_URL, {
       getList: () => HttpResponse.json([{ id: 1, title: "Todo 1" }]),
     });
-    const res = await run(handler, new Request(`${BASE_URL}/todos`));
+    const res = await runHandler(handler, new Request(`${BASE_URL}/todos`));
     expect(await res!.json()).toEqual([{ id: 1, title: "Todo 1" }]);
   });
 
@@ -93,7 +93,7 @@ describe("createMswHandlers — flat router", () => {
     const [handler] = createMswHandlers(todoRouter, BASE_URL, {
       getList: () => HttpResponse.json([]),
     });
-    const res = await run(handler, new Request(`${BASE_URL}/other`));
+    const res = await runHandler(handler, new Request(`${BASE_URL}/other`));
     expect(res).toBeNull();
   });
 
@@ -104,7 +104,7 @@ describe("createMswHandlers — flat router", () => {
         return HttpResponse.json({ id: params.id, title: "Todo" });
       },
     });
-    const res = await run(handler, new Request(`${BASE_URL}/todos/42`));
+    const res = await runHandler(handler, new Request(`${BASE_URL}/todos/42`));
     expect(await res!.json()).toEqual({ id: 42, title: "Todo" });
   });
 
@@ -117,7 +117,7 @@ describe("createMswHandlers — flat router", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "New Todo" }),
     });
-    const res = await run(handler, req);
+    const res = await runHandler(handler, req);
     expect(await res!.json()).toEqual({ id: 1, title: "New Todo" });
   });
 
@@ -131,7 +131,7 @@ describe("createMswHandlers — flat router", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "Updated" }),
     });
-    const res = await run(handler, req);
+    const res = await runHandler(handler, req);
     expect(await res!.json()).toEqual({ id: 7, title: "Updated" });
   });
 
@@ -139,7 +139,7 @@ describe("createMswHandlers — flat router", () => {
     const [handler] = createMswHandlers(todoRouter, BASE_URL, {
       remove: () => new Response(null, { status: 204 }),
     });
-    const res = await run(
+    const res = await runHandler(
       handler,
       new Request(`${BASE_URL}/todos/3`, { method: "DELETE" }),
     );
@@ -153,7 +153,7 @@ describe("createMswHandlers — flat router", () => {
     const [handler] = createMswHandlers(searchRouter, BASE_URL, {
       find: ({ query }) => HttpResponse.json([query["q"]]),
     });
-    const res = await run(handler, new Request(`${BASE_URL}/search?q=hello`));
+    const res = await runHandler(handler, new Request(`${BASE_URL}/search?q=hello`));
     expect(await res!.json()).toEqual(["hello"]);
   });
 
@@ -204,10 +204,10 @@ describe("createMswHandlers — nested router", () => {
   });
 
   it("nested handler path is /users/todos/:id", () => {
-    const handlers = createMswHandlers(userRouter, BASE_URL, {
+    const [handler] = createMswHandlers(userRouter, BASE_URL, {
       todos: { getDetail: () => HttpResponse.json({ id: 1, title: "x" }) },
     });
-    expect(String(handlers[0].info.path)).toBe(`${BASE_URL}/users/todos/:id`);
+    expect(String(handler.info.path)).toBe(`${BASE_URL}/users/todos/:id`);
   });
 
   it("nested GET list resolver returns mock response", async () => {
@@ -216,7 +216,7 @@ describe("createMswHandlers — nested router", () => {
         getList: () => HttpResponse.json([{ id: 1, title: "Nested Todo" }]),
       },
     });
-    const res = await run(handler, new Request(`${BASE_URL}/users/todos`));
+    const res = await runHandler(handler, new Request(`${BASE_URL}/users/todos`));
     expect(await res!.json()).toEqual([{ id: 1, title: "Nested Todo" }]);
   });
 
@@ -227,7 +227,10 @@ describe("createMswHandlers — nested router", () => {
           HttpResponse.json({ id: params.id, title: "nested" }),
       },
     });
-    const res = await run(handler, new Request(`${BASE_URL}/users/todos/5`));
+    const res = await runHandler(
+      handler,
+      new Request(`${BASE_URL}/users/todos/5`),
+    );
     expect(await res!.json()).toEqual({ id: 5, title: "nested" });
   });
 });

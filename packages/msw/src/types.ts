@@ -11,15 +11,15 @@ type InferQueryParams<TSpec extends EndpointSpec<any, any, any>> =
   TSpec["request"] extends { parse: (d: unknown) => infer TReq }
     ? TReq extends { query: infer Q }
       ? Q
-      : undefined
-    : undefined;
+      : Record<string, string | string[]>
+    : Record<string, string | string[]>;
 
 type InferBody<TSpec extends EndpointSpec<any, any, any>> =
   TSpec["request"] extends { parse: (d: unknown) => infer TReq }
     ? TReq extends { body: infer B }
       ? B
-      : undefined
-    : undefined;
+      : unknown
+    : unknown;
 
 export interface MswResolverContext<TSpec extends EndpointSpec<any, any, any>> {
   /** Typed path parameters parsed from the endpoint's request schema. */
