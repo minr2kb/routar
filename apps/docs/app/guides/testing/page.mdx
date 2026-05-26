@@ -95,6 +95,46 @@ Both approaches work — they intercept at different layers:
 
 Use a mock executor when the goal is to test how your component or hook handles API responses. Use MSW when you want to verify that the right URL, method, or headers are sent — or when testing the full stack from fetch to UI.
 
+## @routar/msw
+
+`@routar/msw` generates typed MSW v2 handlers directly from a router definition — no manual URL strings or handler registration.
+
+```ts
+import { createMswHandlers } from '@routar/msw'
+import { HttpResponse } from 'msw'
+import { setupServer } from 'msw/node'
+import { TodoRouter } from '@/remote/services/todo/todo.api'
+
+const handlers = createMswHandlers(TodoRouter, 'https://api.example.com', {
+  getList: () => HttpResponse.json([{ id: 1, title: 'buy milk', completed: false }]),
+  getDetail: ({ params }) => HttpResponse.json({ id: params.id, title: 'buy milk', completed: false }),
+})
+
+const server = setupServer(...handlers)
+```
+
+The resolver map mirrors the router's shape — all keys are optional, so you only register the endpoints you need. Path params, query params, and the request body are typed from the endpoint's request schema.
+
+```ts
+// params.id is number (not string) when the schema uses z.coerce.number()
+getDetail: ({ params, body, query, request, cookies }) =>
+  HttpResponse.json({ id: params.id, title: 'Typed!' }),
+```
+
+For nested routers, nest the resolver map to match:
+
+```ts
+const handlers = createMswHandlers(UserRouter, BASE_URL, {
+  getList: () => HttpResponse.json([]),
+  todos: {
+    getList: () => HttpResponse.json([]),
+    getDetail: ({ params }) => HttpResponse.json({ id: params.id, title: 'x' }),
+  },
+})
+```
+
+> **Path param coercion:** MSW extracts path params as strings. Use `z.coerce.number()` instead of `z.number()` for numeric IDs so the schema coerces `"42"` → `42` before the resolver receives it.
+
 ## With dispatchExecutor
 
 If you use `dispatchExecutor` in your production executor, you can extend it to pick a mock executor in test environments without changing any call sites:
