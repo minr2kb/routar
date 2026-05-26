@@ -37,7 +37,7 @@ export const PostRouter = defineRouter("/posts", {
     method: "GET" as const,
     path: "/:id",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: PostRawSchema,
   }),
@@ -45,7 +45,7 @@ export const PostRouter = defineRouter("/posts", {
     method: "GET" as const,
     path: "/:id/comments",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: z.array(CommentRawSchema),
   }),

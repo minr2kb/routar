@@ -36,7 +36,7 @@ export const UserRouter = defineRouter("/users", {
     method: "GET" as const,
     path: "/:id",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: UserRawSchema,
     adapter: toUser,

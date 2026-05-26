@@ -36,7 +36,7 @@ export const TodoRouter = defineRouter("/todos", {
     method: "GET" as const,
     path: "/:id",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: TodoRawSchema,
     adapter: toTodoItem,
@@ -58,7 +58,7 @@ export const TodoRouter = defineRouter("/todos", {
     method: "PATCH" as const,
     path: "/:id",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
       body: z.object({
         title: z.string().optional(),
         completed: z.boolean().optional(),
@@ -71,7 +71,7 @@ export const TodoRouter = defineRouter("/todos", {
     method: "DELETE" as const,
     path: "/:id",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: z.unknown(),
   }),
