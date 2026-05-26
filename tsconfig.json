@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/axios" },
-    { "path": "./packages/fetch" }
+    { "path": "./packages/fetch" },
+    { "path": "./packages/ky" }
   ]
 }

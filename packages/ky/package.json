@@ -1,0 +1,53 @@
+{
+  "name": "@routar/ky",
+  "version": "1.1.0",
+  "description": "ky-based executor for routar — transport adapter using ky",
+  "keywords": [
+    "api",
+    "http",
+    "typescript",
+    "ky",
+    "routar",
+    "executor"
+  ],
+  "author": "Kyungbae Min",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minr2kb/routar.git",
+    "directory": "packages/ky"
+  },
+  "homepage": "https://github.com/minr2kb/routar#readme",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "peerDependencies": {
+    "ky": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@routar/core": "workspace:*",
+    "ky": "^1.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^6.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
