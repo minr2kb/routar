@@ -10,7 +10,6 @@ bun run build
 
 # Build a specific package
 bun run --filter '@routar/core' build
-bun run --filter '@routar/fetch' build
 bun run --filter '@routar/axios' build
 
 # Run all tests
@@ -39,13 +38,12 @@ This is a monorepo (Bun workspaces) with three library packages and one demo app
 
 ```
 packages/
-  core/     @routar/core     — endpoint definitions, router, API client factory, middleware system
-  fetch/    @routar/fetch    — fetch-based Executor
+  core/     @routar/core     — endpoint definitions, router, API client factory, middleware system, fetch-based Executor
   axios/    @routar/axios    — Axios-based Executor
   msw/      @routar/msw      — MSW v2 handler factory (createMswHandlers)
   ky/       @routar/ky       — ky-based Executor
 apps/
-  web/      @routar/web      — Next.js 15 demo app consuming all three packages
+  example/  @routar/example  — Next.js 15 demo app consuming all packages
 ```
 
 ### Core data flow
@@ -75,6 +73,7 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 | `define-endpoint.ts` | `endpoint()` helper with 4 overloads + `PathParams<TPath>` template literal type |
 | `define-router.ts` | `defineRouter(prefix, endpoints)` — groups specs under a prefix |
 | `create-executor.ts` | `createExecutor(execute, middlewares?)` — wraps a transport function with a middleware chain via `reduceRight` |
+| `create-fetch-executor.ts` | `createFetchExecutor(baseURL, options?)` + `HttpError` — native fetch transport |
 | `create-api.ts` | `createApi(executor, router)` — produces a typed client; `buildClient` recurses for nested routers |
 | `middleware.ts` | `defineMiddleware`, `withRetry`, `withTimeout`, `withLogger` |
 | `utils/path.ts` | `joinPaths`, `resolvePath` (`:param` substitution) |
@@ -127,7 +126,7 @@ This uses the `PathParams<TPath>` template literal type and `PathConstraint<TPat
 
 ### Executor pattern
 
-`@routar/fetch`, `@routar/axios`, and `@routar/ky` all call `createExecutor(transportFn, middlewares?)` internally. `createAxiosExecutor` accepts `AxiosInstance | (() => AxiosInstance | Promise<AxiosInstance>)` — discrimination uses `'interceptors' in input && typeof input.request === 'function'` duck-typing because `AxiosInstance` is callable and `typeof` cannot distinguish it from a factory. `createKyExecutor` uses the same `InstanceOrFactory` pattern — discrimination uses `'extend' in input` duck-typing because `KyInstance` always has `.extend()` while plain factory functions do not. ky route URLs have their leading `/` stripped before being passed to ky (ky's `prefixUrl` requires relative paths).
+`@routar/axios` and `@routar/ky` all call `createExecutor(transportFn, middlewares?)` internally. `createFetchExecutor` lives in `@routar/core` and also uses this pattern. `createAxiosExecutor` accepts `AxiosInstance | (() => AxiosInstance | Promise<AxiosInstance>)` — discrimination uses `'interceptors' in input && typeof input.request === 'function'` duck-typing because `AxiosInstance` is callable and `typeof` cannot distinguish it from a factory. `createKyExecutor` uses the same `InstanceOrFactory` pattern — discrimination uses `'extend' in input` duck-typing because `KyInstance` always has `.extend()` while plain factory functions do not. ky route URLs have their leading `/` stripped before being passed to ky (ky's `prefixUrl` requires relative paths).
 
 ### Validator compatibility
 
