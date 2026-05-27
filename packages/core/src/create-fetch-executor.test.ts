@@ -103,6 +103,19 @@ describe("createFetchExecutor", () => {
     expect(headers.get("Content-Type")).toBe("application/json");
   });
 
+  it("Content-Type is forced to application/json even when headers option overrides it", async () => {
+    const m = mockFetch({});
+    const executor = createFetchExecutor("https://api.example.com");
+    await executor.execute({
+      method: "POST",
+      url: "/todos",
+      body: { title: "test" },
+      headers: { "Content-Type": "text/plain" },
+    });
+    const headers = new Headers(m.mock.calls[0][1]?.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
   it("HttpError includes parsed response body", async () => {
     mockFetch({
       ok: false,

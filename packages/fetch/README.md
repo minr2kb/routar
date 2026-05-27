@@ -2,12 +2,13 @@
 
 > **Deprecated.** `createFetchExecutor` and `HttpError` have moved to [`@routar/core`](https://www.npmjs.com/package/@routar/core).
 > This package re-exports them for backward compatibility but will not receive further updates.
->
-> **Migrate:**
-> ```diff
-> - import { createFetchExecutor, HttpError } from '@routar/fetch'
-> + import { createFetchExecutor, HttpError } from '@routar/core'
-> ```
+
+**Migrate:**
+
+```diff
+- import { createFetchExecutor, HttpError } from '@routar/fetch'
++ import { createFetchExecutor, HttpError } from '@routar/core'
+```
 
 Fetch-based executor for [routar](https://github.com/minr2kb/routar) — transport adapter using the native `fetch` API.
 
