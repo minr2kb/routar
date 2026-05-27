@@ -1,5 +1,6 @@
 import { codeToHtml } from "shiki";
 import { PackageInstall } from "../components/PackageInstall";
+import { ComposableDemo } from "../components/ComposableDemo";
 
 const FEATURES = [
   {
@@ -210,6 +211,9 @@ export default async function LandingPage() {
           dangerouslySetInnerHTML={{ __html: highlighted }}
         />
       </div>
+
+      {/* ── Composable Demo ──────────────────────────────── */}
+      <ComposableDemo />
 
       {/* ── Features ─────────────────────────────────────── */}
       <div
