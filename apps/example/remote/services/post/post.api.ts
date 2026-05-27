@@ -25,9 +25,9 @@ export const PostRouter = defineRouter("/posts", {
     request: z.object({
       query: z
         .object({
-          userId: z.number().optional(),
-          _limit: z.number().optional(),
-          _page: z.number().optional(),
+          userId: z.coerce.number().optional(),
+          _limit: z.coerce.number().optional(),
+          _page: z.coerce.number().optional(),
         })
         .optional(),
     }),
@@ -37,7 +37,7 @@ export const PostRouter = defineRouter("/posts", {
     method: "GET" as const,
     path: "/:id",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: PostRawSchema,
   }),
@@ -45,7 +45,7 @@ export const PostRouter = defineRouter("/posts", {
     method: "GET" as const,
     path: "/:id/comments",
     request: z.object({
-      path: z.object({ id: z.number() }),
+      path: z.object({ id: z.coerce.number() }),
     }),
     response: z.array(CommentRawSchema),
   }),

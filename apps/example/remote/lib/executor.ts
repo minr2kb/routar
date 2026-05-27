@@ -3,10 +3,10 @@ import { createExecutor, dispatchExecutor, withLogger } from "@routar/core";
 import { createFetchExecutor } from "@routar/fetch";
 import axios from "axios";
 
-const BASE_URL = "https://jsonplaceholder.typicode.com";
-const LOCAL_API_BASE = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api`;
+export const JSONPLACEHOLDER_URL = "https://jsonplaceholder.typicode.com";
+export const LOCAL_API_URL = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api`;
 
-const axiosClient = axios.create({ baseURL: BASE_URL });
+const axiosClient = axios.create({ baseURL: JSONPLACEHOLDER_URL });
 
 // dispatchExecutor guarantees browser context here — no typeof window guard needed
 axiosClient.interceptors.request.use((config) => {
@@ -32,7 +32,7 @@ const _clientExecutor = createAxiosExecutor(axiosClient, {
     }),
   ],
 });
-const _fetchExecutor = createFetchExecutor(BASE_URL, {
+const _fetchExecutor = createFetchExecutor(JSONPLACEHOLDER_URL, {
   defaultHeaders: async () => {
     try {
       const { cookies } = await import("next/headers");
@@ -58,7 +58,7 @@ export const apiExecutor = dispatchExecutor(() =>
 
 // Local executor — fetch with absolute URL works in both SSR and CSR
 // withLogger lets you verify SSR prefetch via terminal logs
-const _localFetch = createFetchExecutor(LOCAL_API_BASE);
+const _localFetch = createFetchExecutor(LOCAL_API_URL);
 export const localExecutor = createExecutor(
   (opts) => _localFetch.execute(opts),
   [

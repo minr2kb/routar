@@ -42,6 +42,7 @@ packages/
   core/     @routar/core     — endpoint definitions, router, API client factory, middleware system
   fetch/    @routar/fetch    — fetch-based Executor
   axios/    @routar/axios    — Axios-based Executor
+  msw/      @routar/msw      — MSW v2 handler factory (createMswHandlers)
   ky/       @routar/ky       — ky-based Executor
 apps/
   web/      @routar/web      — Next.js 15 demo app consuming all three packages

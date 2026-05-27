@@ -16,7 +16,9 @@
     "zod": "^3.0.0",
     "@routar/core": "workspace:*",
     "@routar/axios": "workspace:*",
-    "@routar/fetch": "workspace:*"
+    "@routar/fetch": "workspace:*",
+    "@routar/msw": "workspace:*",
+    "msw": "^2.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
