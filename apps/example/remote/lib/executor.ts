@@ -1,6 +1,6 @@
 import { createAxiosExecutor } from "@routar/axios";
 import { createExecutor, dispatchExecutor, withLogger } from "@routar/core";
-import { createFetchExecutor } from "@routar/fetch";
+import { createFetchExecutor } from "@routar/core";
 import axios from "axios";
 
 export const JSONPLACEHOLDER_URL = "https://jsonplaceholder.typicode.com";

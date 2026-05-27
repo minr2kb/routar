@@ -1,7 +1,7 @@
 {
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "linked": [["@routar/core", "@routar/fetch", "@routar/axios", "@routar/ky"]],
+  "linked": [["@routar/core", "@routar/fetch", "@routar/axios", "@routar/ky", "@routar/msw"]],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",

@@ -5,7 +5,7 @@ description: Low-level factory for integrating any HTTP client with routar's mid
 
 # `createExecutor(transportFn, middlewares?)`
 
-Low-level factory used internally by `@routar/fetch` and `@routar/axios`. Use this to integrate any HTTP client.
+Low-level factory used internally by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`. Use this to integrate any HTTP client.
 
 ```ts
 import { createExecutor } from '@routar/core'

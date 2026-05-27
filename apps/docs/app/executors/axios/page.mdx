@@ -59,7 +59,7 @@ try {
 
 ## Query parameter serialization
 
-Axios serializes array params using its own default (`ids[]=1&ids[]=2`), while `@routar/fetch` uses repeated keys (`ids=1&ids=2`). If your server is sensitive to array format and you switch executors, update your server-side parsing accordingly.
+Axios serializes array params using its own default (`ids[]=1&ids[]=2`), while `createFetchExecutor` uses repeated keys (`ids=1&ids=2`). If your server is sensitive to array format and you switch executors, update your server-side parsing accordingly.
 
 ## Instance detection
 

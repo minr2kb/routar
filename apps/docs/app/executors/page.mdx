@@ -9,15 +9,15 @@ An executor is the transport layer — it handles the actual HTTP call. routar s
 
 | Package | Executor | Best for |
 |---------|----------|----------|
-| `@routar/fetch` | [`createFetchExecutor`](/executors/fetch) | SSR, Node.js 18+, zero dependencies |
+| `@routar/core` | [`createFetchExecutor`](/executors/fetch) | SSR, Node.js 18+, zero dependencies |
 | `@routar/axios` | [`createAxiosExecutor`](/executors/axios) | CSR, existing Axios instances, interceptors |
 | `@routar/ky` | [`createKyExecutor`](/executors/ky) | CSR/SSR, ky hooks, modern fetch-based clients |
 
-All implement the same `Executor` interface and are interchangeable — you can use `@routar/fetch` on the server and `@routar/axios` or `@routar/ky` in the browser with the exact same router definition.
+All implement the same `Executor` interface and are interchangeable — you can use `createFetchExecutor` on the server and `@routar/axios` or `@routar/ky` in the browser with the exact same router definition.
 
 ## Choosing an executor
 
-**Use `@routar/fetch` when:**
+**Use `createFetchExecutor` (built into `@routar/core`) when:**
 - You need per-request dynamic headers (SSR / Server Components)
 - You want zero extra dependencies beyond routar itself
 - You're targeting Node.js 18+ or any modern browser

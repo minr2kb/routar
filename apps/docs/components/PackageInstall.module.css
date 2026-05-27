@@ -16,6 +16,7 @@
   padding: 6px 8px 0;
   background: rgba(0, 0, 0, 0.03);
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: left;
 }
 
 :global(.dark) .tabBar {
@@ -59,6 +60,7 @@
   justify-content: space-between;
   padding: 12px 16px;
   background: var(--nextra-bg, #fff);
+  text-align: left;
 }
 
 :global(.dark) .commandRow {

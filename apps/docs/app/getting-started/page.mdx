@@ -9,9 +9,9 @@ import { PackageInstall } from '../../components/PackageInstall'
 
 ## Installation
 
-**With fetch** (recommended — zero extra dependencies):
+**With fetch** (built into core — zero extra dependencies):
 
-<PackageInstall packages={['@routar/core', '@routar/fetch']} />
+<PackageInstall packages={['@routar/core']} />
 
 **With Axios:**
 
@@ -61,7 +61,7 @@ const todoRouter = defineRouter('/todos', {
 
 ```ts
 import { createApi } from '@routar/core'
-import { createFetchExecutor } from '@routar/fetch'
+import { createFetchExecutor } from '@routar/core'
 
 const executor = createFetchExecutor('https://api.example.com')
 const todoApi  = createApi(executor, todoRouter)
@@ -91,7 +91,7 @@ controller.abort() // cancels the request
 ## With Middleware
 
 ```ts
-import { createFetchExecutor } from '@routar/fetch'
+import { createFetchExecutor } from '@routar/core'
 import { withTimeout, withRetry, withLogger } from '@routar/core'
 
 const executor = createFetchExecutor('https://api.example.com', {
