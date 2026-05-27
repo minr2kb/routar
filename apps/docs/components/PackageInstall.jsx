@@ -13,9 +13,12 @@ const MANAGERS = [
 const LS_KEY = "routar:pkg-manager";
 const SYNC_EVENT = "routar:pkg-manager-change";
 
+const VALID_IDS = new Set(MANAGERS.map((m) => m.id));
+
 function getStored() {
   try {
-    return localStorage.getItem(LS_KEY) ?? "npm";
+    const val = localStorage.getItem(LS_KEY);
+    return VALID_IDS.has(val) ? val : "npm";
   } catch {
     return "npm";
   }
@@ -37,7 +40,7 @@ export function PackageInstall({ packages }) {
     setActive(getStored());
 
     function onSync(e) {
-      setActive(e.detail);
+      if (VALID_IDS.has(e.detail)) setActive(e.detail);
     }
 
     window.addEventListener(SYNC_EVENT, onSync);
