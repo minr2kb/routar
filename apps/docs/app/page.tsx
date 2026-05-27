@@ -38,23 +38,27 @@ const PACKAGES = [
   {
     name: "@routar/core",
     pkg: "@routar/core",
-    desc: "Endpoint definitions, router, API client factory, middleware.",
-  },
-  {
-    name: "@routar/fetch",
-    pkg: "@routar/fetch",
-    desc: "Native fetch executor. Zero extra dependencies.",
+    desc: "Endpoint definitions, router, API client factory, fetch executor, and middleware.",
   },
   {
     name: "@routar/axios",
     pkg: "@routar/axios",
     desc: "Axios executor. Works with existing instances and interceptors.",
   },
+  {
+    name: "@routar/ky",
+    pkg: "@routar/ky",
+    desc: "ky executor. Lightweight fetch wrapper with hooks support.",
+  },
+  {
+    name: "@routar/msw",
+    pkg: "@routar/msw",
+    desc: "MSW v2 handler factory — generate typed mock handlers from your RouterDef for testing.",
+  },
 ];
 
 const CODE = `import { z } from 'zod'
-import { endpoint, defineRouter, createApi } from '@routar/core'
-import { createFetchExecutor } from '@routar/fetch'
+import { endpoint, defineRouter, createApi, createFetchExecutor } from '@routar/core'
 
 const TodoSchema = z.object({ id: z.number(), title: z.string(), done: z.boolean() })
 
@@ -186,7 +190,7 @@ export default async function LandingPage() {
           </div>
 
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
-            <PackageInstall packages={["@routar/core", "@routar/fetch"]} />
+            <PackageInstall packages={["@routar/core"]} />
           </div>
         </div>
       </div>

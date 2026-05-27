@@ -1,7 +1,7 @@
 "use client";
 
 import { ValidationError } from "@routar/core";
-import { HttpError } from "@routar/fetch";
+import { HttpError } from "@routar/core";
 import { useEffect } from "react";
 
 export default function ErrorBoundary({

@@ -2,6 +2,7 @@
 
 export { createApi } from "./create-api.js";
 export { createExecutor, dispatchExecutor } from "./create-executor.js";
+export { createFetchExecutor, HttpError } from "./create-fetch-executor.js";
 export type { PathParams } from "./define-endpoint.js";
 export { endpoint } from "./define-endpoint.js";
 // core functions
