@@ -39,8 +39,10 @@
     "dev": "tsup --watch"
   },
   "peerDependencies": {},
+  "dependencies": {
+    "@routar/core": "workspace:*"
+  },
   "devDependencies": {
-    "@routar/core": "workspace:*",
     "tsup": "^8.5.1"
   },
   "publishConfig": {

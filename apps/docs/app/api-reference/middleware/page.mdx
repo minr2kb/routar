@@ -105,7 +105,7 @@ routar lets each transport throw its own error type. If you need a unified error
 
 ```ts
 import { isAxiosError } from 'axios'
-import { HttpError } from '@routar/fetch'
+import { HttpError } from '@routar/core'
 
 const withErrorNormalizer = defineMiddleware(async (opts, next) => {
   try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styles from "./PackageInstall.module.css";
 
 const MANAGERS = [
@@ -10,10 +10,47 @@ const MANAGERS = [
   { id: "bun", label: "bun", cmd: (pkgs) => `bun add ${pkgs}` },
 ];
 
+const LS_KEY = "routar:pkg-manager";
+const SYNC_EVENT = "routar:pkg-manager-change";
+
+const VALID_IDS = new Set(MANAGERS.map((m) => m.id));
+
+function getStored() {
+  try {
+    const val = localStorage.getItem(LS_KEY);
+    return VALID_IDS.has(val) ? val : "npm";
+  } catch {
+    return "npm";
+  }
+}
+
+function setStored(id) {
+  try {
+    localStorage.setItem(LS_KEY, id);
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: id }));
+  } catch {}
+}
+
 export function PackageInstall({ packages }) {
   const pkgStr = Array.isArray(packages) ? packages.join(" ") : packages;
   const [active, setActive] = useState("npm");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setActive(getStored());
+
+    function onSync(e) {
+      if (VALID_IDS.has(e.detail)) setActive(e.detail);
+    }
+
+    window.addEventListener(SYNC_EVENT, onSync);
+    return () => window.removeEventListener(SYNC_EVENT, onSync);
+  }, []);
+
+  function select(id) {
+    setActive(id);
+    setStored(id);
+  }
 
   const manager = MANAGERS.find((m) => m.id === active);
   const command = manager.cmd(pkgStr);
@@ -32,7 +69,7 @@ export function PackageInstall({ packages }) {
           <button
             type="button"
             key={m.id}
-            onClick={() => setActive(m.id)}
+            onClick={() => select(m.id)}
             className={`${styles.tab} ${active === m.id ? styles.tabActive : ""}`}
           >
             {m.label}
