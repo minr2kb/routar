@@ -75,7 +75,18 @@ const todo  = await todoApi.getDetail({ path: { id: 1 } })
 const next  = await todoApi.create({ body: { title: 'buy milk' } })
 ```
 
-All return types are fully inferred — no type annotations needed.
+All return types are fully inferred — no type annotations needed. In your IDE, hovering over `todos` shows `Todo[]` and `todo` shows `Todo`.
+
+### AbortSignal
+
+Pass an `AbortSignal` as the second argument to cancel in-flight requests:
+
+```ts
+const controller = new AbortController()
+const todos = await todoApi.getList({}, controller.signal)
+
+controller.abort() // cancels the request
+```
 
 ## With Middleware
 

@@ -182,6 +182,13 @@ Add a new endpoint: update `todo.api.ts`, done. The type flows through automatic
 
 ## The alternative
 
-There are excellent libraries in this space — [ts-rest](https://ts-rest.com/) for full-stack contract sharing, [Zodios](https://www.zodios.org/) for OpenAPI-first workflows. Routar is narrower: it solves the frontend API layer problem specifically, without requiring a shared contract with your backend or generating code from a spec.
+There are excellent libraries in this space — the right choice depends on your situation:
 
-If you own the schema and want end-to-end safety with zero backend coordination, that's where routar fits.
+| Situation | Recommended |
+|-----------|-------------|
+| You already have an OpenAPI / Swagger spec | [orval](https://orval.dev/) or [hey-api](https://heyapi.dev/) — generate a client from the spec automatically |
+| You need a shared contract between backend and frontend | [ts-rest](https://ts-rest.com/) or [oRPC](https://orpc.unnoq.com/) — both sides share the same schema definition |
+| Full-stack type safety with RPC-style APIs | [tRPC](https://trpc.io/) |
+| Frontend owns the schema, no backend coordination | **routar** |
+
+Routar is the right fit when your **frontend team manages the API schema directly** — without waiting for a backend spec or generating code from one. It solves the frontend API layer problem specifically: define your schema once, get runtime validation and end-to-end types with zero backend coordination.
