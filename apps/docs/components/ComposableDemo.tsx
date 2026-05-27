@@ -70,6 +70,7 @@ function codeImports({ factory, executor, middlewares }: DemoState): string {
 
   const core: string[] = ["endpoint", "defineRouter"];
   if (!isMsw) core.push("createApi");
+  if (!isMsw && (executor === "fetch" || isDispatch)) core.push("createFetchExecutor");
   if (isDispatch) core.push("dispatchExecutor");
   if (isCustomExec) core.push("createExecutor");
   if (!isMsw && !isDispatch && hasCustomMw) core.push("type ExecutorMiddleware");
@@ -80,8 +81,6 @@ function codeImports({ factory, executor, middlewares }: DemoState): string {
     `import { ${core.join(", ")} } from '@routar/core'`,
   ];
   if (!isMsw) {
-    if (executor === "fetch" || isDispatch)
-      lines.push(`import { createFetchExecutor } from '@routar/fetch'`);
     if (executor === "axios" || isDispatch)
       lines.push(`import { createAxiosExecutor } from '@routar/axios'`);
     if (executor === "ky")
