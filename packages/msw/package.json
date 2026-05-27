@@ -1,6 +1,6 @@
 {
   "name": "@routar/msw",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MSW v2 handler factory for routar routers — generate typed mock handlers from RouterDef",
   "keywords": [
     "api",
@@ -40,7 +40,7 @@
     "dev": "tsup --watch"
   },
   "peerDependencies": {
-    "@routar/core": ">=1.0.0",
+    "@routar/core": ">=1.2.0",
     "msw": ">=2.0.0"
   },
   "devDependencies": {
