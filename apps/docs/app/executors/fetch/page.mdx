@@ -1,14 +1,14 @@
 ---
 title: createFetchExecutor
-description: Use the native fetch executor (@routar/fetch) — zero extra dependencies, works in browser and Node.js.
+description: Use the native fetch executor built into @routar/core — zero extra dependencies, works in browser and Node.js.
 ---
 
-# `createFetchExecutor(baseURL, options?)` — `@routar/fetch`
+# `createFetchExecutor(baseURL, options?)` — `@routar/core`
 
-Uses the native `fetch` API. Ideal for SSR where per-request dynamic headers are needed.
+Uses the native `fetch` API. Ideal for SSR where per-request dynamic headers are needed. Built into `@routar/core` — no additional package required.
 
 ```ts
-import { createFetchExecutor } from '@routar/fetch'
+import { createFetchExecutor } from '@routar/core'
 
 const executor = createFetchExecutor('https://api.example.com')
 ```
@@ -39,7 +39,7 @@ Responses with status `204`, `205`, or `304` resolve to `null`. A `200` response
 Non-2xx responses throw `HttpError`. The parsed JSON error payload is available on `.body` (or `null` if the body was empty or not JSON):
 
 ```ts
-import { HttpError } from '@routar/fetch'
+import { HttpError } from '@routar/core'
 
 try {
   await todoApi.getDetail({ path: { id: 999 } })
@@ -59,7 +59,7 @@ Arrays are serialized as repeated keys: `ids=1&ids=2`. This differs from Axios's
 ## SSR usage (Next.js)
 
 ```ts
-import { createFetchExecutor } from '@routar/fetch'
+import { createFetchExecutor } from '@routar/core'
 import { withTimeout } from '@routar/core'
 
 export const serverExecutor = createFetchExecutor(process.env.API_BASE_URL!, {

@@ -10,7 +10,7 @@ description: Handle ValidationError, HttpError, and AxiosError — and normalize
 | Error | Package | Thrown when |
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | Request or response validation fails |
-| `HttpError` | `@routar/fetch` | Server returns a non-2xx status |
+| `HttpError` | `@routar/core` | Server returns a non-2xx status (fetch executor only) |
 | `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
 | `AxiosError` | `axios` | Network or HTTP error via Axios |
 
@@ -18,7 +18,7 @@ description: Handle ValidationError, HttpError, and AxiosError — and normalize
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core'
-import { HttpError } from '@routar/fetch'
+import { HttpError } from '@routar/core'
 
 try {
   await todoApi.create({ body: { title: '' } })
@@ -45,7 +45,7 @@ try {
 Each transport throws a different error type on HTTP failures. If you're switching executors or want to handle all HTTP errors in one place:
 
 ```ts
-import { HttpError } from '@routar/fetch'
+import { HttpError } from '@routar/core'
 import { isAxiosError } from 'axios'
 import { HTTPError } from 'ky'
 
@@ -53,7 +53,7 @@ try {
   await todoApi.getDetail({ path: { id: 1 } })
 } catch (err) {
   if (err instanceof HttpError) {
-    // @routar/fetch — non-2xx response
+    // createFetchExecutor — non-2xx response
     console.log(err.status, err.body)
   } else if (isAxiosError(err)) {
     // @routar/axios — Axios network or HTTP error
@@ -71,7 +71,7 @@ Each transport throws its own error type. If you want a single `instanceof` chec
 
 ```ts
 import { defineMiddleware } from '@routar/core'
-import { HttpError } from '@routar/fetch'
+import { HttpError } from '@routar/core'
 import { isAxiosError } from 'axios'
 
 const withErrorNormalizer = defineMiddleware(async (opts, next) => {
@@ -94,7 +94,7 @@ const executor = createAxiosExecutor(instance, {
 
 ```ts
 import { withRetry } from '@routar/core'
-import { HttpError } from '@routar/fetch'
+import { HttpError } from '@routar/core'
 
 withRetry(3, {
   shouldRetry: (err) => {

@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: Complete API reference for @routar/core, @routar/fetch, and @routar/axios.
+description: Complete API reference for @routar/core, @routar/axios, and @routar/ky.
 ---
 
 # API Reference
@@ -13,6 +13,8 @@ description: Complete API reference for @routar/core, @routar/fetch, and @routar
 | [`defineRouter()`](/api-reference/define-router) | Group endpoints under a URL prefix |
 | [`createApi()`](/api-reference/create-api) | Build a typed API client from executor + router |
 | [`createExecutor()`](/api-reference/create-executor) | Wrap a transport function with middleware |
+| [`createFetchExecutor()`](/executors/fetch) | Built-in fetch executor |
+| `HttpError` | Thrown by `createFetchExecutor` on non-2xx responses |
 | [`withRetry`](/api-reference/middleware#withretry) | Retry middleware |
 | [`withTimeout`](/api-reference/middleware#withtimeout) | Timeout middleware |
 | [`withLogger`](/api-reference/middleware#withlogger) | Logger middleware |
