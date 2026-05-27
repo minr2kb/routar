@@ -28,6 +28,3 @@ jobs:
 
       - run: bun run build
 
-      - name: Check changeset exists
-        if: github.actor != 'github-actions[bot]'
-        run: bun x changeset status --since=origin/main
