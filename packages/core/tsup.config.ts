@@ -6,6 +6,5 @@ export default defineConfig({
   dts: { compilerOptions: { ignoreDeprecations: "6.0" } },
   splitting: false,
   sourcemap: true,
-  clean: true,
   treeshake: true,
 });

@@ -5,4 +5,5 @@ export default {
   "create-executor": "createExecutor()",
   "dispatch-executor": "dispatchExecutor()",
   middleware: "Middleware",
+  "api-types": "ApiTypes<T>",
 };
