@@ -1,44 +1,44 @@
 import { createMswHandlers } from "@routar/msw";
 import { HttpResponse } from "msw";
-import { TodoRouter } from "../remote/services/todo/todo.api";
-import { PostRouter } from "../remote/services/post/post.api";
-import { UserRouter } from "../remote/services/user/user.api";
+import { TodoRouter } from "../services/todo/todo.api";
+import { PostRouter } from "../services/post/post.api";
+import { UserRouter } from "../services/user/user.api";
+import {
+  getAllTodos,
+  getTodoById,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+} from "./stores/todo-store";
+import { JSONPLACEHOLDER_URL, LOCAL_API_URL } from "../lib/executor";
 
-const LOCAL_API = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-const JSONPLACEHOLDER = "https://jsonplaceholder.typicode.com";
 
 // --- Todo (local Next.js route handlers) ------------------------------------
-export const todoHandlers = createMswHandlers(TodoRouter, `${LOCAL_API}/api`, {
-  getList: () =>
-    HttpResponse.json([
-      { id: 1, userId: 1, title: "Buy groceries", completed: false },
-      { id: 2, userId: 1, title: "Read a book", completed: true },
-    ]),
+export const todoHandlers = createMswHandlers(TodoRouter, LOCAL_API_URL, {
+  getList: ({ query }) => HttpResponse.json(getAllTodos(query)),
 
-  getDetail: ({ params }) =>
-    HttpResponse.json({ id: params.id, userId: 1, title: `Mock Todo #${params.id}`, completed: false }),
+  getDetail: ({ params }) => {
+    const todo = getTodoById(params.id);
+    if (!todo) return new Response(null, { status: 404 });
+    return HttpResponse.json(todo);
+  },
 
-  create: ({ body }) =>
-    HttpResponse.json({
-      id: Math.floor(Math.random() * 1000) + 100,
-      userId: body.userId,
-      title: body.title,
-      completed: body.completed,
-    }),
+  create: ({ body }) => HttpResponse.json(createTodo(body), { status: 201 }),
 
-  update: ({ params, body }) =>
-    HttpResponse.json({
-      id: params.id,
-      userId: 1,
-      title: body.title ?? `Mock Todo #${params.id}`,
-      completed: body.completed ?? false,
-    }),
+  update: ({ params, body }) => {
+    const todo = updateTodo(params.id, body);
+    if (!todo) return new Response(null, { status: 404 });
+    return HttpResponse.json(todo);
+  },
 
-  remove: () => new Response(null, { status: 200 }),
+  remove: ({ params }) => {
+    deleteTodo(params.id);
+    return new Response(null, { status: 200 });
+  },
 });
 
 // --- Posts (https://jsonplaceholder.typicode.com) ---------------------------
-export const postHandlers = createMswHandlers(PostRouter, JSONPLACEHOLDER, {
+export const postHandlers = createMswHandlers(PostRouter, JSONPLACEHOLDER_URL, {
   getList: () =>
     HttpResponse.json([
       { id: 1, userId: 1, title: "Mock Post", body: "Mock body content." },
@@ -55,7 +55,7 @@ export const postHandlers = createMswHandlers(PostRouter, JSONPLACEHOLDER, {
 });
 
 // --- Users (https://jsonplaceholder.typicode.com) ---------------------------
-export const userHandlers = createMswHandlers(UserRouter, JSONPLACEHOLDER, {
+export const userHandlers = createMswHandlers(UserRouter, JSONPLACEHOLDER_URL, {
   getList: () =>
     HttpResponse.json([
       {

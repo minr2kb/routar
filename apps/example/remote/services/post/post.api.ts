@@ -25,9 +25,9 @@ export const PostRouter = defineRouter("/posts", {
     request: z.object({
       query: z
         .object({
-          userId: z.number().optional(),
-          _limit: z.number().optional(),
-          _page: z.number().optional(),
+          userId: z.coerce.number().optional(),
+          _limit: z.coerce.number().optional(),
+          _page: z.coerce.number().optional(),
         })
         .optional(),
     }),

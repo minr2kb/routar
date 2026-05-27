@@ -22,10 +22,14 @@ export const TodoRouter = defineRouter("/todos", {
     request: z.object({
       query: z
         .object({
-          userId: z.number().optional(),
-          completed: z.boolean().optional(),
-          _limit: z.number().optional(),
-          _page: z.number().optional(),
+          userId: z.coerce.number().optional(),
+          // URL query strings are always strings; preprocess coerces "true"/"false"
+          completed: z.preprocess(
+            (v) => (typeof v === "string" ? v === "true" : v),
+            z.boolean().optional(),
+          ),
+          _limit: z.coerce.number().optional(),
+          _page: z.coerce.number().optional(),
         })
         .optional(),
     }),
