@@ -6,7 +6,7 @@ export { createFetchExecutor, HttpError } from "./create-fetch-executor.js";
 export type { PathParams } from "./define-endpoint.js";
 export { endpoint } from "./define-endpoint.js";
 // core functions
-export { defineRouter } from "./define-router.js";
+export { defineRouter, isRouterDef } from "./define-router.js";
 // middleware
 export {
   defineMiddleware,

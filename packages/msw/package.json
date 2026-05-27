@@ -1,0 +1,55 @@
+{
+  "name": "@routar/msw",
+  "version": "0.1.0",
+  "description": "MSW v2 handler factory for routar routers — generate typed mock handlers from RouterDef",
+  "keywords": [
+    "api",
+    "http",
+    "typescript",
+    "msw",
+    "mock",
+    "routar",
+    "testing"
+  ],
+  "author": "Kyungbae Min",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minr2kb/routar.git",
+    "directory": "packages/msw"
+  },
+  "homepage": "https://github.com/minr2kb/routar#readme",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "peerDependencies": {
+    "@routar/core": ">=1.0.0",
+    "msw": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@routar/core": "workspace:*",
+    "msw": "^2.7.0",
+    "tsup": "^8.5.1",
+    "zod": "^3.25.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
