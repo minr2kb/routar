@@ -40,6 +40,31 @@ try {
 }
 ```
 
+## Branching by executor type
+
+Each transport throws a different error type on HTTP failures. If you're switching executors or want to handle all HTTP errors in one place:
+
+```ts
+import { HttpError } from '@routar/fetch'
+import { isAxiosError } from 'axios'
+import { HTTPError } from 'ky'
+
+try {
+  await todoApi.getDetail({ path: { id: 1 } })
+} catch (err) {
+  if (err instanceof HttpError) {
+    // @routar/fetch — non-2xx response
+    console.log(err.status, err.body)
+  } else if (isAxiosError(err)) {
+    // @routar/axios — Axios network or HTTP error
+    console.log(err.response?.status, err.response?.data)
+  } else if (err instanceof HTTPError) {
+    // @routar/ky — ky HTTP error
+    console.log(err.response.status, await err.response.json())
+  }
+}
+```
+
 ## Normalizing errors across transports
 
 Each transport throws its own error type. If you want a single `instanceof` check across fetch and axios, add a normalizer middleware:

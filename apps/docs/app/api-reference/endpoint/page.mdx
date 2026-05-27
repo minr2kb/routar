@@ -81,13 +81,13 @@ endpoint({
 })
 ```
 
-Never use `.transform()` on a `response` schema — it wraps the schema in `ZodEffects`, breaking `.extend()`, `.merge()`, and other composition operators.
+Never use `.transform()` on a `response` schema. `.transform()` wraps the schema in a `ZodEffects` object, which loses `.extend()`, `.merge()`, and all other composition methods — your schema can no longer be reused or composed. Put data transformations in `adapter` instead; the `response` schema stays a plain `ZodObject`.
 
 ## Type utilities
 
 ### `ApiTypes<TApi>`
 
-Extracts request and response types from an API client.
+Extracts request and response types from an API client. See the [dedicated `ApiTypes<T>` reference](/api-reference/api-types) for full usage and patterns.
 
 ```ts
 import type { ApiTypes } from '@routar/core'

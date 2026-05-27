@@ -7,6 +7,38 @@ description: Integrate any HTTP client — ky, got, or your own — using create
 
 Any HTTP client works with routar. Use `createExecutor` to wrap it.
 
+## Dynamic Authorization header
+
+The most common custom executor use case is injecting auth tokens per request:
+
+```ts
+import { createExecutor, serializeParams } from '@routar/core'
+
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  const token = await getAccessToken() // your auth logic here
+
+  const fullURL = new URL(url)
+  if (params) {
+    serializeParams(params).forEach((v, k) => fullURL.searchParams.set(k, v))
+  }
+
+  const res = await fetch(fullURL.toString(), {
+    method,
+    body: body != null ? JSON.stringify(body) : undefined,
+    headers: {
+      ...(body != null ? { 'Content-Type': 'application/json' } : {}),
+      Authorization: `Bearer ${token}`,
+      ...headers,
+    },
+    signal,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+})
+```
+
+For per-request auth headers in SSR, prefer the `defaultHeaders` option on `createFetchExecutor` or the factory form of `createAxiosExecutor` — both are called on every request.
+
 ## Basic example
 
 ```ts

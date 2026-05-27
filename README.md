@@ -1,10 +1,17 @@
 # routar
 <img width="1200" height="630" alt="routar" src="https://github.com/user-attachments/assets/a2462cf7-d072-48fe-975f-d8e569af9171" />
 
+[![CI](https://github.com/minr2kb/routar/actions/workflows/ci.yml/badge.svg)](https://github.com/minr2kb/routar/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@routar/core)](https://www.npmjs.com/package/@routar/core)
+[![Bundle Size](https://img.shields.io/bundlejs/size/@routar/core)](https://www.npmjs.com/package/@routar/core)
+[![Coverage](https://codecov.io/gh/minr2kb/routar/branch/main/graph/badge.svg)](https://codecov.io/gh/minr2kb/routar)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Schema-first HTTP API client with end-to-end type safety and runtime validation.**
 
 Define your API once — reuse it across any transport, environment, or HTTP client.
+
+> Built for frontend teams that manage their own API schema — without waiting for backend coordination or OpenAPI specs.
 
 ```ts
 import { z } from 'zod';
@@ -49,6 +56,21 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 | `@routar/core` | Endpoint definitions, router, API client, middleware system |
 | `@routar/fetch` | Executor backed by the native `fetch` API |
 | `@routar/axios` | Executor backed by Axios |
+| `@routar/ky` | Executor backed by [ky](https://github.com/sindresorhus/ky) |
+
+---
+
+## When NOT to use routar
+
+routar is the right fit when your **frontend team owns and manages the API schema** — no backend coordination needed.
+
+Consider alternatives when:
+
+| Situation | Better fit |
+|-----------|-----------|
+| You already have an OpenAPI / Swagger spec | [orval](https://orval.dev/) or [hey-api](https://heyapi.dev/) — generate the client from the spec |
+| You need a shared contract between backend and frontend | [ts-rest](https://ts-rest.com/) or [oRPC](https://orpc.unnoq.com/) — both sides share the same schema |
+| Full-stack type safety with RPC-style APIs | [tRPC](https://trpc.io/) |
 
 ---
 
@@ -60,6 +82,9 @@ npm install @routar/core @routar/fetch
 
 # with axios
 npm install @routar/core @routar/axios axios
+
+# with ky
+npm install @routar/core @routar/ky ky
 ```
 
 ---
@@ -69,6 +94,7 @@ npm install @routar/core @routar/axios axios
 ```ts
 import { z } from 'zod';
 import { endpoint, defineRouter, createApi } from '@routar/core';
+import type { ApiTypes } from '@routar/core';
 import { createFetchExecutor } from '@routar/fetch';
 
 const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.boolean() });
@@ -95,6 +121,11 @@ const todoRouter = defineRouter('/todos', {
 
 const executor = createFetchExecutor('https://api.example.com');
 const todoApi  = createApi(executor, todoRouter);
+
+// Extract types from the client — no duplication
+type TodoApiTypes   = ApiTypes<typeof todoApi>;
+type Todo           = TodoApiTypes['getDetail']['response']; // { id: number; title: string; completed: boolean }
+type CreateRequest  = TodoApiTypes['create']['request'];     // { body: { title: string } }
 ```
 
 ---
@@ -319,6 +350,8 @@ export const apiExecutor = dispatchExecutor(() =>
 export const todoApi = createApi(apiExecutor, todoRouter);
 ```
 
+> **Next.js App Router note:** `typeof window === 'undefined'` always returns `true` inside Server Components — they always run on the server. If you use App Router Server Components, pass the correct executor directly rather than relying on this check.
+
 For routes with no environment-specific auth (e.g. your own API with an absolute base URL), a single fetch executor works without `dispatchExecutor`:
 
 ```ts
@@ -348,6 +381,25 @@ Extracts `:param` names from a path string as a union.
 
 ```ts
 type P = PathParams<'/:userId/posts/:postId'>; // 'userId' | 'postId'
+```
+
+---
+
+## Vanilla Usage
+
+routar works without any framework — endpoints are plain async functions:
+
+```ts
+const todoApi = createApi(createFetchExecutor('https://api.example.com'), todoRouter);
+
+// call directly
+const todos = await todoApi.getList({});
+renderTodoList(todos); // todos is typed as Todo[]
+
+// cancel in-flight requests with AbortSignal
+const controller = new AbortController();
+const todo = await todoApi.getDetail({ path: { id: 1 } }, controller.signal);
+controller.abort();
 ```
 
 ---

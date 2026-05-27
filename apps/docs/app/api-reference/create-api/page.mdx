@@ -20,6 +20,12 @@ await todoApi.update({ path: { id: 1 }, body: { completed: true }, query: { vers
 
 ## Overloads
 
+| Form | Usage |
+|------|-------|
+| `createApi(executor, router)` | Pre-built router via `defineRouter` — preferred for multi-environment setups |
+| `createApi(executor, prefix, endpoints)` | Inline endpoints with a URL prefix |
+| `createApi(executor, endpoints)` | Inline endpoints without a prefix — simplest form for small APIs |
+
 ```ts
 // with a pre-built router
 createApi(executor, todoRouter)
