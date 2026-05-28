@@ -61,6 +61,20 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 
 ---
 
+## AI Integration
+
+routar ships with resources for AI coding assistants:
+
+| Resource | Location | Purpose |
+|----------|----------|---------|
+| `llms.txt` | [`/llms.txt`](https://routar.vercel.app/llms.txt) | Concise API index for LLM tools (Context7, etc.) |
+| `llms-full.txt` | [`/llms-full.txt`](https://routar.vercel.app/llms-full.txt) | Full API reference with examples |
+| `AGENTS.md` | [AGENTS.md](./AGENTS.md) | Guide for AI agents in routar-consumer projects |
+
+JSDoc `@example` blocks are included in every published `.d.ts` file, so Copilot and Cursor give routar-specific suggestions out of the box.
+
+---
+
 ## When NOT to use routar
 
 routar is the right fit when your **frontend team owns and manages the API schema** — no backend coordination needed.

@@ -1,0 +1,52 @@
+# routar
+
+> Schema-first HTTP API client with end-to-end type safety and runtime validation.
+
+Define your API once — reuse it across any transport (fetch, axios, ky), environment (SSR/CSR), and framework. Each endpoint is a Zod-validated async function with fully-inferred types.
+
+## Packages
+
+- `@routar/core` — endpoint definitions, router, API client, middleware, native fetch executor
+- `@routar/axios` — Axios-based executor
+- `@routar/ky` — ky-based executor
+- `@routar/msw` — MSW v2 mock handler factory (for testing)
+
+## Core API
+
+[endpoint(spec)](https://routar.vercel.app/api-reference): Define a single typed endpoint. Enforces path params at compile time.
+[defineRouter(prefix, endpoints)](https://routar.vercel.app/api-reference): Group endpoints under a shared URL prefix. Supports arbitrary nesting.
+[createApi(executor, router)](https://routar.vercel.app/api-reference): Build a fully-typed API client. Each endpoint becomes an async function `(params, signal?) => Promise<Response>`.
+[createExecutor(transportFn, middlewares?)](https://routar.vercel.app/api-reference): Wrap any HTTP client with a middleware chain.
+[dispatchExecutor(resolver)](https://routar.vercel.app/api-reference): Pick executor at request time — use for SSR/CSR routing without duplicate API instances.
+
+## Executors
+
+[createFetchExecutor(baseURL, options?)](https://routar.vercel.app/executors): Native fetch — ideal for SSR with per-request dynamic headers. Built into `@routar/core`.
+[createAxiosExecutor(instanceOrFactory, options?)](https://routar.vercel.app/executors): Axios instance or async factory — great for CSR with interceptors. From `@routar/axios`.
+[createKyExecutor(instanceOrFactory, options?)](https://routar.vercel.app/executors): ky instance or factory. From `@routar/ky`.
+
+## Middleware
+
+[withRetry(count, options?)](https://routar.vercel.app/api-reference): Retry on failure up to count times. Accepts custom `shouldRetry` predicate.
+[withTimeout(ms)](https://routar.vercel.app/api-reference): Abort if no response within ms milliseconds. Throws `TimeoutError`.
+[withLogger(options?)](https://routar.vercel.app/api-reference): Log each request with method, URL, and duration.
+[defineMiddleware(fn)](https://routar.vercel.app/api-reference): Create a custom middleware with full type inference on `opts` and `next`.
+
+## Testing
+
+[createMswHandlers(router, baseURL, resolvers)](https://routar.vercel.app): Generate MSW v2 `HttpHandler[]` from a `RouterDef`. Partial mocking supported — only listed endpoints are intercepted.
+
+## Type Utilities
+
+[ApiTypes<TApi>](https://routar.vercel.app/api-reference): Extract `{ request, response }` types from an API client.
+[PathParams<TPath>](https://routar.vercel.app/api-reference): Extract `:param` names from a path string as a union type.
+
+## Errors
+
+- `ValidationError` — request/response schema mismatch (`@routar/core`)
+- `HttpError` — non-2xx response from `createFetchExecutor` (has `.status`, `.statusText`, `.body`)
+- `TimeoutError` — request exceeded `withTimeout` duration (has `.ms`)
+
+## Full Reference
+
+[llms-full.txt](https://routar.vercel.app/llms-full.txt)

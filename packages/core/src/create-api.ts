@@ -53,13 +53,38 @@ type ApiClient<TEndpoints extends RouterEndpoints> = {
  * @param router - A {@link RouterDef} produced by {@link defineRouter}.
  * @param options - Optional settings (e.g. `validate` to skip schema parsing in production).
  *
- * @example
+ * @example Basic usage
  * ```ts
  * const todoApi = createApi(executor, todoRouter);
  * const todos = await todoApi.getList({});
  * const todo  = await todoApi.getDetail({ path: { id: 1 } });
+ * const next  = await todoApi.create({ body: { title: 'buy milk' } });
+ * ```
  *
- * // Skip response validation in production
+ * @example Nested router — access via dot notation
+ * ```ts
+ * const api = createApi(executor, apiRouter); // apiRouter has users → todos nesting
+ * await api.users.getList({});
+ * await api.users.todos.getList({});
+ * ```
+ *
+ * @example Cancel in-flight requests with AbortSignal
+ * ```ts
+ * const controller = new AbortController();
+ * const todos = await todoApi.getList({}, controller.signal);
+ * controller.abort();
+ * ```
+ *
+ * @example Extract types from the client — no duplication
+ * ```ts
+ * import type { ApiTypes } from '@routar/core';
+ * type TodoApiTypes  = ApiTypes<typeof todoApi>;
+ * type Todo          = TodoApiTypes['getDetail']['response'];
+ * type CreateRequest = TodoApiTypes['create']['request'];
+ * ```
+ *
+ * @example Skip response validation in production
+ * ```ts
  * const prodApi = createApi(executor, todoRouter, {
  *   validate: { request: true, response: process.env.NODE_ENV !== 'production' },
  * });

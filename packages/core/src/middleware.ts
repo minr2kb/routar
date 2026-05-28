@@ -72,6 +72,20 @@ export function withRetry(
  * so whichever fires first wins.
  *
  * @param ms - Timeout in milliseconds.
+ *
+ * @example
+ * ```ts
+ * const executor = createFetchExecutor('https://api.example.com', {
+ *   middlewares: [withTimeout(5_000)],
+ * });
+ *
+ * // Combine with retry — timeout applies per attempt
+ * const executor = createExecutor(transport, [
+ *   withTimeout(5_000),
+ *   withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }),
+ *   withLogger(),
+ * ]);
+ * ```
  */
 export function withTimeout(ms: number): ExecutorMiddleware {
   return defineMiddleware(async (opts, next) => {

@@ -19,13 +19,30 @@ import { serializeParams } from "./utils/params.js";
  *   produce headers (e.g. reading cookies in a Next.js server component).
  * @param options.middlewares - Middleware chain applied before the fetch call.
  *
- * @example
+ * @example Minimal — no options needed
+ * ```ts
+ * const executor = createFetchExecutor('https://api.example.com');
+ * ```
+ *
+ * @example SSR with bearer token
  * ```ts
  * const executor = createFetchExecutor('https://api.example.com', {
  *   defaultHeaders: async () => {
  *     const token = await getServerToken();
  *     return token ? { Authorization: `Bearer ${token}` } : {};
  *   },
+ * });
+ * ```
+ *
+ * @example Next.js App Router — forward cookies from the incoming request
+ * ```ts
+ * const executor = createFetchExecutor('https://api.example.com', {
+ *   defaultHeaders: async () => {
+ *     const { cookies } = await import('next/headers');
+ *     const token = (await cookies()).get('access_token')?.value;
+ *     return token ? { Authorization: `Bearer ${token}` } : {};
+ *   },
+ *   middlewares: [withTimeout(8_000), withRetry(2)],
  * });
  * ```
  */

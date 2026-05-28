@@ -42,7 +42,43 @@ type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
  * that `request` includes a matching `path` field with those param names.
  * A mismatch or missing key is a compile-time error.
  *
- * @example
+ * @example Basic GET with no params
+ * ```ts
+ * const getList = endpoint({ method: 'GET', path: '/', response: z.array(TodoSchema) });
+ * ```
+ *
+ * @example GET with query params
+ * ```ts
+ * const search = endpoint({
+ *   method: 'GET',
+ *   path: '/search',
+ *   request: z.object({ query: z.object({ q: z.string(), limit: z.number().optional() }) }),
+ *   response: z.array(TodoSchema),
+ * });
+ * ```
+ *
+ * @example POST with body
+ * ```ts
+ * const create = endpoint({
+ *   method: 'POST',
+ *   path: '/',
+ *   request: z.object({ body: z.object({ title: z.string() }) }),
+ *   response: TodoSchema,
+ * });
+ * ```
+ *
+ * @example Adapter — raw is inferred from the response schema, no cast needed
+ * ```ts
+ * const getDetail = endpoint({
+ *   method: 'GET',
+ *   path: '/:id',
+ *   request: z.object({ path: z.object({ id: z.number() }) }),
+ *   response: TodoRawSchema,
+ *   adapter: (raw) => ({ ...raw, label: `#${raw.id} ${raw.title}` }),
+ * });
+ * ```
+ *
+ * @example Path param enforcement
  * ```ts
  * // ✅ path has ':id' → request.path.id is required
  * const getDetail = endpoint({
@@ -50,7 +86,6 @@ type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
  *   path: '/:id',
  *   request: z.object({ path: z.object({ id: z.number() }) }),
  *   response: TodoSchema,
- *   adapter: toTodoItem,
  * });
  *
  * // ❌ compile error — 'id' is missing from request.path

@@ -1,0 +1,590 @@
+# routar — Full API Reference
+
+> Schema-first HTTP API client with end-to-end type safety and runtime validation.
+
+Define your API once — reuse it across any transport, environment, or HTTP client.
+Built for frontend teams that manage their own API schema.
+
+## Installation
+
+```bash
+# with fetch (built into core — zero extra dependencies)
+npm install @routar/core
+
+# with axios
+npm install @routar/core @routar/axios axios
+
+# with ky
+npm install @routar/core @routar/ky ky
+
+# for testing with MSW
+npm install @routar/core msw
+npm install --save-dev @routar/msw
+```
+
+---
+
+## Core Pattern
+
+```ts
+import { z } from 'zod';
+import { endpoint, defineRouter, createApi, createFetchExecutor } from '@routar/core';
+
+const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.boolean() });
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+  create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
+                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+  update:    endpoint({ method: 'PATCH', path: '/:id', response: TodoSchema,
+                        request: z.object({
+                          path: z.object({ id: z.number() }),
+                          body: z.object({ completed: z.boolean() }),
+                        }) }),
+  remove:    endpoint({ method: 'DELETE', path: '/:id',
+                        request: z.object({ path: z.object({ id: z.number() }) }),
+                        response: z.object({}) }),
+});
+
+const executor = createFetchExecutor('https://api.example.com');
+const todoApi  = createApi(executor, todoRouter);
+
+// Fully-typed calls — no type annotations needed
+const todos = await todoApi.getList({});                             // Todo[]
+const todo  = await todoApi.getDetail({ path: { id: 1 } });         // Todo
+const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
+await todoApi.update({ path: { id: 1 }, body: { completed: true } });
+await todoApi.remove({ path: { id: 1 } });
+```
+
+---
+
+## endpoint(spec)
+
+Defines a single endpoint. Use instead of a plain object to get full type inference on `adapter`.
+
+**Signature:**
+```ts
+endpoint(spec: {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  request?: Validator<RequestShape>; // optional — for endpoints with no params
+  response: Validator<unknown>;
+  adapter?: (raw: ValidatorOutput<typeof response>) => unknown;
+}): EndpointSpec
+```
+
+**Path param enforcement** — if `path` contains `:param` segments, `request.path` must include matching keys. This is a compile-time error:
+
+```ts
+// ✅ correct
+endpoint({
+  method: 'GET', path: '/:id',
+  request: z.object({ path: z.object({ id: z.number() }) }),
+  response: TodoSchema,
+});
+
+// ❌ compile error — ':id' declared but request.path.id missing
+endpoint({
+  method: 'GET', path: '/:id',
+  request: z.object({ query: z.object({ q: z.string() }) }),
+  response: TodoSchema,
+});
+```
+
+**With adapter** — raw is inferred from the response schema, no cast needed:
+
+```ts
+const TodoRawSchema = z.object({ id: z.number(), title: z.string(), is_done: z.boolean() });
+
+endpoint({
+  method: 'GET', path: '/:id',
+  request: z.object({ path: z.object({ id: z.number() }) }),
+  response: TodoRawSchema,
+  adapter: (raw) => ({        // raw: { id: number; title: string; is_done: boolean }
+    id: raw.id,
+    title: raw.title,
+    completed: raw.is_done,   // rename field
+  }),
+});
+```
+
+**Request shape** — `request` schema validates `{ path?, query?, body? }`:
+
+```ts
+// query params
+endpoint({
+  method: 'GET', path: '/search',
+  request: z.object({ query: z.object({ q: z.string(), limit: z.number().optional() }) }),
+  response: z.array(TodoSchema),
+});
+
+// path + body
+endpoint({
+  method: 'PUT', path: '/:id',
+  request: z.object({
+    path: z.object({ id: z.number() }),
+    body: z.object({ title: z.string(), completed: z.boolean() }),
+  }),
+  response: TodoSchema,
+});
+```
+
+---
+
+## defineRouter(prefix, endpoints)
+
+Groups endpoints under a shared URL prefix. Supports arbitrary nesting.
+
+```ts
+import { defineRouter } from '@routar/core';
+
+// Flat router
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/', response: z.array(TodoSchema) }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+});
+
+// Nested routers — mirror your URL structure
+const apiRouter = defineRouter('/api', {
+  todos: todoRouter,             // → /api/todos, /api/todos/:id
+  users: defineRouter('/users', {
+    getList:   endpoint({ method: 'GET', path: '/', response: z.array(UserSchema) }),
+    getDetail: endpoint({ method: 'GET', path: '/:id', response: UserSchema,
+                          request: z.object({ path: z.object({ id: z.number() }) }) }),
+  }),
+});
+```
+
+---
+
+## createApi(executor, router)
+
+Builds a fully-typed API client. Each endpoint becomes an async function: `(params, signal?) => Promise<Response>`.
+
+**Three call signatures:**
+
+```ts
+// preferred — pass the result of defineRouter
+const api = createApi(executor, todoRouter);
+
+// inline router with prefix
+const api = createApi(executor, '/todos', { getList: endpoint({ ... }) });
+
+// no prefix — flat endpoint map
+const api = createApi(executor, { getList: endpoint({ ... }) });
+```
+
+**Usage:**
+
+```ts
+// basic calls
+const todos = await todoApi.getList({});
+const todo  = await todoApi.getDetail({ path: { id: 1 } });
+const next  = await todoApi.create({ body: { title: 'buy milk' } });
+
+// nested router access via dot notation
+const api = createApi(executor, apiRouter);
+await api.todos.getList({});
+await api.users.getDetail({ path: { id: 1 } });
+await api.users.todos.getList({});  // deeply nested
+
+// cancel in-flight requests with AbortSignal
+const controller = new AbortController();
+const todos = await todoApi.getList({}, controller.signal);
+controller.abort();
+
+// skip response validation in production
+const prodApi = createApi(executor, todoRouter, {
+  validate: { request: true, response: process.env.NODE_ENV !== 'production' },
+});
+
+// extract types from the client — no duplication
+import type { ApiTypes } from '@routar/core';
+type TodoApiTypes    = ApiTypes<typeof todoApi>;
+type Todo            = TodoApiTypes['getDetail']['response']; // { id: number; title: string; completed: boolean }
+type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title: string } }
+```
+
+---
+
+## createExecutor(transportFn, middlewares?)
+
+Low-level factory used internally by all executor packages. Use to integrate any HTTP client.
+
+```ts
+import { createExecutor, withTimeout, withRetry, withLogger } from '@routar/core';
+
+const executor = createExecutor(
+  async ({ method, url, body, headers, signal }) => {
+    const res = await myHttpClient.request({ method, url, body, headers, signal });
+    return res.data;
+  },
+  [withTimeout(8_000), withRetry(3), withLogger()],
+);
+```
+
+---
+
+## dispatchExecutor(resolver)
+
+Creates an executor that selects the underlying transport at request time. Use to unify SSR and CSR behind a single API client.
+
+```ts
+import { dispatchExecutor, createFetchExecutor, createAxiosExecutor } from '@routar/core';
+import axios from 'axios';
+
+const serverExecutor = createFetchExecutor('https://api.example.com', {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers');
+    const token = (await cookies()).get('access_token')?.value;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+});
+
+const clientExecutor = createAxiosExecutor(
+  axios.create({ baseURL: 'https://api.example.com' }),
+);
+
+// Pick transport based on environment (SSR vs CSR)
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor,
+);
+
+// Or route by URL prefix
+const executor = dispatchExecutor((opts) =>
+  opts.url.startsWith('/internal') ? internalExecutor : publicExecutor,
+);
+
+// One API client works in both SSR and CSR
+export const todoApi = createApi(apiExecutor, todoRouter);
+```
+
+---
+
+## createFetchExecutor(baseURL, options?) — @routar/core
+
+Uses the native `fetch` API. Ideal for SSR with per-request dynamic headers.
+
+```ts
+import { createFetchExecutor } from '@routar/core';
+
+// Minimal
+const executor = createFetchExecutor('https://api.example.com');
+
+// With SSR dynamic headers
+const executor = createFetchExecutor('https://api.example.com', {
+  defaultHeaders: async () => {
+    const token = await getServerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+});
+
+// Next.js App Router — forward cookies from the incoming request
+const executor = createFetchExecutor('https://api.example.com', {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers');
+    const token = (await cookies()).get('access_token')?.value;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+  middlewares: [withTimeout(8_000), withRetry(2)],
+});
+```
+
+Non-2xx responses throw `HttpError`:
+
+```ts
+import { HttpError } from '@routar/core';
+
+try {
+  await todoApi.getDetail({ path: { id: 999 } });
+} catch (err) {
+  if (err instanceof HttpError) {
+    console.log(err.status, err.statusText, err.body); // 404, 'Not Found', { message: '...' }
+  }
+}
+```
+
+---
+
+## createAxiosExecutor(instanceOrFactory, options?) — @routar/axios
+
+Accepts an `AxiosInstance` (CSR) or an async factory (SSR).
+
+```ts
+import axios from 'axios';
+import { createAxiosExecutor } from '@routar/axios';
+
+// CSR — shared instance with interceptors
+const instance = axios.create({ baseURL: 'https://api.example.com' });
+instance.interceptors.request.use((config) => {
+  config.headers.Authorization = `Bearer ${getClientToken()}`;
+  return config;
+});
+const executor = createAxiosExecutor(instance);
+
+// SSR — factory, fresh instance per request
+const executor = createAxiosExecutor(async () => {
+  const token = await getServerToken();
+  return axios.create({
+    baseURL: 'https://api.example.com',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+});
+```
+
+---
+
+## createKyExecutor(instanceOrFactory, options?) — @routar/ky
+
+Accepts a `KyInstance` or an async factory.
+
+```ts
+import ky from 'ky';
+import { createKyExecutor } from '@routar/ky';
+
+// CSR — shared instance with hooks
+const instance = ky.create({
+  prefixUrl: 'https://api.example.com',
+  hooks: {
+    beforeRequest: [(req) => { req.headers.set('Authorization', `Bearer ${getToken()}`); }],
+  },
+});
+const executor = createKyExecutor(instance);
+```
+
+---
+
+## Middleware
+
+Middlewares are `(opts, next) => Promise<unknown>` functions applied in declaration order.
+
+```ts
+import { createExecutor, withTimeout, withRetry, withLogger, defineMiddleware } from '@routar/core';
+import { HttpError } from '@routar/core';
+
+const executor = createExecutor(transport, [
+  withTimeout(8_000),           // abort after 8s
+  withRetry(3, {                // retry up to 3 times
+    shouldRetry: (err) => !(err instanceof HttpError && err.status < 500),
+  }),
+  withLogger({ log: (msg, data) => logger.debug(msg, data) }),
+]);
+```
+
+### withRetry(count, options?)
+
+```ts
+// Retry all errors up to 3 times
+withRetry(3)
+
+// Retry only server errors (5xx), not client errors (4xx)
+withRetry(3, {
+  shouldRetry: (err, attempt) => err instanceof HttpError && err.status >= 500,
+})
+```
+
+### withTimeout(ms)
+
+```ts
+withTimeout(5_000) // abort after 5 seconds, throws TimeoutError
+```
+
+### withLogger(options?)
+
+```ts
+withLogger()  // defaults to console.log
+
+withLogger({ log: (msg, data) => myLogger.debug(msg, data) })
+```
+
+### defineMiddleware(fn)
+
+```ts
+// Add a correlation ID header to every request
+const withCorrelationId = defineMiddleware((opts, next) =>
+  next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
+);
+
+// Add auth header from a token store
+const withAuth = defineMiddleware(async (opts, next) => {
+  const token = await tokenStore.get();
+  return next({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${token}` } });
+});
+```
+
+---
+
+## createMswHandlers(router, baseURL, resolvers) — @routar/msw
+
+Generates MSW v2 `HttpHandler[]` from a `RouterDef` for use in tests.
+
+- Only endpoints with a resolver get a handler — the rest pass through naturally.
+- Resolver context (`params`, `query`, `body`) is typed and validated through the endpoint's `request` schema.
+- Nested routers are supported — the resolver map mirrors the router shape.
+- **Path param coercion:** Use `z.coerce.number()` not `z.number()` for numeric IDs (MSW params are always strings).
+
+```ts
+import { createMswHandlers } from '@routar/msw';
+import { HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { todoRouter } from './todo.api';
+
+// Basic setup
+const server = setupServer(
+  ...createMswHandlers(todoRouter, 'https://api.example.com', {
+    getList: () =>
+      HttpResponse.json([{ id: 1, title: 'Buy milk', completed: false }]),
+    getDetail: ({ params }) =>
+      HttpResponse.json({ id: params.id, title: 'Buy milk', completed: false }),
+    create: ({ body }) =>
+      HttpResponse.json({ id: 2, title: body.title, completed: false }),
+  }),
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+**Partial mocking** — only listed endpoints are intercepted:
+
+```ts
+createMswHandlers(todoRouter, 'https://api.example.com', {
+  getList: () => HttpResponse.json([]),
+  // getDetail, create, update, remove → not registered, requests reach the real server
+});
+```
+
+**Nested routers:**
+
+```ts
+const apiRouter = defineRouter('/api', { todos: todoRouter, users: userRouter });
+
+createMswHandlers(apiRouter, 'https://api.example.com', {
+  todos: {
+    getList: () => HttpResponse.json([]),
+    getDetail: ({ params }) => HttpResponse.json({ id: Number(params.id) }),
+  },
+  users: {
+    getList: () => HttpResponse.json([]),
+  },
+});
+```
+
+---
+
+## Type Utilities
+
+### ApiTypes<TApi>
+
+Extracts `{ request, response }` types for every endpoint from an API client.
+
+```ts
+import type { ApiTypes } from '@routar/core';
+
+type TodoApiTypes    = ApiTypes<typeof todoApi>;
+type Todo            = TodoApiTypes['getDetail']['response']; // { id: number; title: string; completed: boolean }
+type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title: string } }
+type GetListResponse = TodoApiTypes['getList']['response'];   // Todo[]
+```
+
+### PathParams<TPath>
+
+Extracts `:param` names from a path string as a union of string literals.
+
+```ts
+import type { PathParams } from '@routar/core';
+
+type P = PathParams<'/:userId/posts/:postId'>; // 'userId' | 'postId'
+type Q = PathParams<'/todos'>;                 // never (no dynamic segments)
+```
+
+---
+
+## SSR/CSR Pattern (Next.js)
+
+```ts
+// remote/lib/executor.ts
+import { dispatchExecutor, createFetchExecutor } from '@routar/core';
+import { createAxiosExecutor } from '@routar/axios';
+import axios from 'axios';
+
+const serverExecutor = createFetchExecutor(process.env.API_URL!, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers');
+    const token = (await cookies()).get('access_token')?.value;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+});
+
+const clientExecutor = createAxiosExecutor(
+  axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL }),
+);
+
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor,
+);
+
+// remote/services/todo/todo.api.ts
+import { createApi } from '@routar/core';
+import { apiExecutor } from '../lib/executor';
+
+export const todoApi = createApi(apiExecutor, todoRouter); // one client, works everywhere
+```
+
+---
+
+## Anti-Patterns
+
+```ts
+// ❌ Don't put .transform() on response — it breaks composition
+response: z.array(TodoRawSchema).transform(items => items.map(toTodoItem))
+
+// ✅ Use adapter instead
+endpoint({
+  response: z.array(TodoRawSchema),
+  adapter: (raw) => raw.map(toTodoItem),
+})
+
+// ❌ Don't use z.number() for path params in MSW (params are always strings)
+request: z.object({ path: z.object({ id: z.number() }) })  // ← in MSW context
+
+// ✅ Use z.coerce.number() in MSW resolvers
+request: z.object({ path: z.object({ id: z.coerce.number() }) })
+
+// ❌ Don't create separate server/client API instances
+const todoServerApi = createApi(serverExecutor, todoRouter);
+const todoClientApi = createApi(clientExecutor, todoRouter);
+
+// ✅ Use dispatchExecutor for one unified client
+export const todoApi = createApi(dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor,
+), todoRouter);
+```
+
+---
+
+## Error Handling
+
+| Error | Package | Thrown when |
+|-------|---------|-------------|
+| `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
+| `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
+| `HttpError` | `@routar/core` | `createFetchExecutor` gets a non-2xx response |
+| `AxiosError` | axios | Network or HTTP error from `@routar/axios` |
+
+```ts
+import { TimeoutError, ValidationError, HttpError } from '@routar/core';
+
+try {
+  await todoApi.create({ body: { title: '' } });
+} catch (err) {
+  if (err instanceof ValidationError) console.log(err.message);
+  if (err instanceof HttpError)       console.log(err.status, err.body);
+  if (err instanceof TimeoutError)    console.log(`timed out after ${err.ms}ms`);
+}
+```

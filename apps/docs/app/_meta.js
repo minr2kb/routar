@@ -5,4 +5,5 @@ export default {
   "api-reference": "API Reference",
   executors: "Executors",
   guides: "Guides",
+  "ai-integration": "AI Integration",
 };
