@@ -1,5 +1,14 @@
 # @routar/example
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [8aa150a]
+  - @routar/core@1.2.1
+  - @routar/msw@1.2.1
+  - @routar/axios@1.2.0
+
 ## 0.0.5
 
 ### Patch Changes
