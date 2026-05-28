@@ -1,5 +1,11 @@
 # @routar/core
 
+## 1.2.1
+
+### Patch Changes
+
+- 8aa150a: Expand JSDoc `@example` blocks for `endpoint()`, `createApi()`, `createFetchExecutor()`, `withTimeout()`, and `createMswHandlers()` to improve IDE suggestions in Copilot and Cursor.
+
 ## 1.2.0
 
 ### Minor Changes

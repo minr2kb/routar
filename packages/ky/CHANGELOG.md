@@ -1,5 +1,11 @@
 # @routar/ky
 
+## 1.2.1
+
+### Patch Changes
+
+- d38492d: Sync version with @routar/core 1.2.1
+
 ## 1.2.0
 
 ### Minor Changes
