@@ -1,6 +1,6 @@
 {
   "name": "@routar/ky",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "ky-based executor for routar — transport adapter using ky",
   "keywords": [
     "api",
