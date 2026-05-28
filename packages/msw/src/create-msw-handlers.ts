@@ -32,14 +32,47 @@ type RequestParts = { path?: unknown; query?: unknown; body?: unknown };
  * `z.coerce.number()` (not `z.number()`) for numeric IDs so the schema
  * coerces `"42"` → `42` before the resolver receives it.
  *
- * @example
+ * @example Basic vitest/jest setup
  * ```ts
- * const handlers = createMswHandlers(todoRouter, 'https://api.example.com', {
- *   getList: () => HttpResponse.json([{ id: 1, title: 'Todo' }]),
- *   getDetail: ({ params }) => HttpResponse.json({ id: params.id, title: 'Todo' }),
- * });
+ * import { createMswHandlers } from '@routar/msw';
+ * import { HttpResponse } from 'msw';
+ * import { setupServer } from 'msw/node';
  *
- * const server = setupServer(...handlers);
+ * const server = setupServer(
+ *   ...createMswHandlers(todoRouter, 'https://api.example.com', {
+ *     getList: () =>
+ *       HttpResponse.json([{ id: 1, title: 'Buy milk', completed: false }]),
+ *     getDetail: ({ params }) =>
+ *       HttpResponse.json({ id: params.id, title: 'Buy milk', completed: false }),
+ *     create: ({ body }) =>
+ *       HttpResponse.json({ id: 2, title: body.title, completed: false }),
+ *   }),
+ * );
+ *
+ * beforeAll(() => server.listen());
+ * afterEach(() => server.resetHandlers());
+ * afterAll(() => server.close());
+ * ```
+ *
+ * @example Partial mocking — only listed endpoints are intercepted; the rest pass through
+ * ```ts
+ * createMswHandlers(todoRouter, 'https://api.example.com', {
+ *   getList: () => HttpResponse.json([]),
+ *   // getDetail, create → not registered, requests reach the real server
+ * });
+ * ```
+ *
+ * @example Nested routers — resolver map mirrors the router shape
+ * ```ts
+ * const apiRouter = defineRouter('/api', { todos: todoRouter, users: userRouter });
+ *
+ * createMswHandlers(apiRouter, 'https://api.example.com', {
+ *   todos: {
+ *     getList: () => HttpResponse.json([]),
+ *     getDetail: ({ params }) => HttpResponse.json({ id: Number(params.id) }),
+ *   },
+ *   users: { getList: () => HttpResponse.json([]) },
+ * });
  * ```
  */
 export function createMswHandlers<TEndpoints extends RouterEndpoints>(
