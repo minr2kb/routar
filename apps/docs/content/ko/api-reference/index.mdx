@@ -1,3 +1,24 @@
+---
+title: API 레퍼런스
+description: @routar/core, @routar/axios, @routar/ky의 완전한 API 레퍼런스.
+---
+
 # API 레퍼런스
 
-번역 준비 중입니다.
+## `@routar/core`
+
+| 내보내기 | 설명 |
+|--------|-------------|
+| [`endpoint()`](/ko/api-reference/endpoint) | 단일 타입 엔드포인트 정의 |
+| [`defineRouter()`](/ko/api-reference/define-router) | URL 접두사 아래 엔드포인트 그룹화 |
+| [`createApi()`](/ko/api-reference/create-api) | executor + 라우터에서 타입 API 클라이언트 빌드 |
+| [`createExecutor()`](/ko/api-reference/create-executor) | 미들웨어 체인으로 트랜스포트 함수 래핑 |
+| [`createFetchExecutor()`](/ko/executors/fetch) | 내장 fetch executor |
+| `HttpError` | 비-2xx 응답 시 `createFetchExecutor`가 throw |
+| [`withRetry`](/ko/api-reference/middleware#withretry) | 재시도 미들웨어 |
+| [`withTimeout`](/ko/api-reference/middleware#withtimeout) | 타임아웃 미들웨어 |
+| [`withLogger`](/ko/api-reference/middleware#withlogger) | 로거 미들웨어 |
+| [`defineMiddleware`](/ko/api-reference/middleware#definemiddleware) | 커스텀 미들웨어 생성 |
+| `ValidationError` | 요청/응답 검증 실패 시 throw |
+| [`ApiTypes<TApi>`](/ko/api-reference/api-types) | API 클라이언트에서 요청/응답 타입 추출 |
+| `PathParams<TPath>` | 경로에서 `:param` 이름 추출 유틸리티 |

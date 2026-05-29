@@ -1,3 +1,47 @@
-# createExecutor()
+---
+title: createExecutor()
+description: 모든 HTTP 클라이언트를 routar의 미들웨어 체인과 통합하기 위한 저수준 팩토리.
+---
 
-번역 준비 중입니다.
+# `createExecutor(transportFn, middlewares?)`
+
+`createFetchExecutor`, `@routar/axios`, `@routar/ky`가 내부적으로 사용하는 저수준 팩토리입니다.
+
+```ts
+import { createExecutor } from '@routar/core'
+
+const executor = createExecutor(
+  async ({ method, url, params, body, headers, signal }) => {
+    const res = await myClient.request({ method, url, params, body, headers, signal })
+    return res.data
+  },
+  [withTimeout(5000), withRetry(2)],
+)
+```
+
+## 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|-----------|------|-------------|
+| `transportFn` | `(opts: ExecuteOptions) => Promise<unknown>` | 실제 HTTP 호출 |
+| `middlewares` | `ExecutorMiddleware[]` | 선택적 미들웨어 체인 |
+
+## `ExecuteOptions`
+
+```ts
+interface ExecuteOptions {
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
+  url: string
+  params?: Record<string, unknown>
+  body?: unknown
+  headers?: Record<string, string>
+  signal?: AbortSignal
+}
+```
+
+## 미들웨어 체인
+
+```ts
+createExecutor(transport, [withTimeout(8_000), withRetry(3), withLogger()])
+// 실행 순서: withTimeout → withRetry → withLogger → transport
+```

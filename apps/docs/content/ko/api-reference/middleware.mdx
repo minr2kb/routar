@@ -1,3 +1,61 @@
+---
+title: 미들웨어
+description: 내장 재시도, 타임아웃, 로거 미들웨어 — 그리고 커스텀 미들웨어를 위한 defineMiddleware.
+---
+
 # 미들웨어
 
-번역 준비 중입니다.
+미들웨어는 선언 순서로 적용되는 `(opts, next) => Promise<unknown>` 함수입니다.
+
+```ts
+const executor = createExecutor(transport, [
+  withTimeout(8_000),
+  withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }),
+  withLogger({ log: (msg, data) => logger.debug(msg, data) }),
+])
+```
+
+## 내장 미들웨어
+
+### `withRetry`
+
+실패한 요청을 최대 `count`번 재시도합니다.
+
+| 옵션 | 타입 | 기본값 | 설명 |
+|--------|------|---------|-------------|
+| `count` | `number` | — | 최대 재시도 횟수 |
+| `shouldRetry` | `(err: unknown, attempt: number) => boolean` | `() => true` | 재시도 여부 결정 |
+
+```ts
+withRetry(3)
+withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) })
+```
+
+### `withTimeout`
+
+```ts
+withTimeout(5_000)  // 5초
+
+import { TimeoutError } from '@routar/core'
+try { await api.getList() } catch (err) {
+  if (err instanceof TimeoutError) console.log(`${err.ms}ms 후 타임아웃`)
+}
+```
+
+### `withLogger`
+
+```ts
+withLogger()
+withLogger({ log: (msg, data) => logger.debug(msg, data) })
+```
+
+## 커스텀 미들웨어
+
+```ts
+import { defineMiddleware } from '@routar/core'
+
+const withAuth = defineMiddleware(async (opts, next) => {
+  const token = await getToken()
+  return next({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${token}` } })
+})
+```

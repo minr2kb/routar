@@ -1,3 +1,49 @@
-# ApiTypes&lt;T&gt;
+---
+title: ApiTypes<T>
+description: 타입이 지정된 API 클라이언트에서 추론된 요청 및 응답 타입을 추출합니다.
+---
 
-번역 준비 중입니다.
+# `ApiTypes<TApi>`
+
+```ts
+import type { ApiTypes } from '@routar/core'
+
+type TodoApiTypes = ApiTypes<typeof todoApi>
+type CreateRequest  = TodoApiTypes['create']['request']   // { body: { title: string } }
+type CreateResponse = TodoApiTypes['create']['response']  // Todo
+```
+
+## 사용 이유
+
+```ts
+// ❌ 수동으로 타입 중복
+type CreateTodoInput = { body: { title: string } }
+
+// ✅ API 클라이언트에서 도출
+type CreateTodoInput = ApiTypes<typeof todoApi>['create']['request']
+```
+
+## 타입 형태
+
+```ts
+// {
+//   getList:   { request: {};                          response: Todo[] }
+//   getDetail: { request: { path: { id: number } };   response: Todo   }
+//   create:    { request: { body: { title: string } }; response: Todo  }
+// }
+```
+
+## 중첩 라우터와 함께
+
+```ts
+type ApiT = ApiTypes<typeof api>
+type UserDetailResponse = ApiT['users']['getDetail']['response']
+```
+
+## API 모듈에서 타입 내보내기
+
+```ts
+export const todoApi = createApi(executor, todoRouter)
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+export type TodoItem = TodoApiTypes['getDetail']['response']
+```

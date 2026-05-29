@@ -1,3 +1,53 @@
-# defineRouter()
+---
+title: defineRouter()
+description: 관련 엔드포인트를 기본 경로 아래 그룹화하고 대규모 API를 위한 중첩 라우터를 구성합니다.
+---
 
-번역 준비 중입니다.
+# `defineRouter(prefix, endpoints)`
+
+엔드포인트를 공유 URL 접두사 아래 그룹화합니다.
+
+```ts
+import { defineRouter, endpoint } from '@routar/core'
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+  create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
+                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+})
+```
+
+## 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|-----------|------|-------------|
+| `prefix` | `string` | URL 접두사 |
+| `endpoints` | `Record<string, endpoint \| defineRouter>` | 엔드포인트 또는 중첩 라우터 |
+
+## 중첩 라우터
+
+```ts
+const apiRouter = defineRouter('/api', {
+  users: defineRouter('/users', {
+    getList:   endpoint({ method: 'GET', path: '/',    response: UserListSchema }),
+    getDetail: endpoint({ method: 'GET', path: '/:id', response: UserSchema }),
+    todos: defineRouter('/todos', {
+      getList: endpoint({ method: 'GET', path: '/', response: TodoListSchema }),
+    }),
+  }),
+})
+
+await api.users.getList({})
+await api.users.getDetail({ path: { id: 1 } })
+await api.users.todos.getList({})
+```
+
+## 인라인 사용
+
+```ts
+const api = createApi(executor, todoRouter)
+const api = createApi(executor, '/todos', { getList: endpoint({ ... }) })
+const api = createApi(executor, { getList: endpoint({ ... }) })
+```
