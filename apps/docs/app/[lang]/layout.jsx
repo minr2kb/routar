@@ -42,7 +42,7 @@ export function generateStaticParams() {
 
 export default async function LangLayout({ children, params }) {
   const { lang } = await params;
-  const pageMap = await getPageMap(lang);
+  const pageMap = await getPageMap(`/${lang}`);
 
   return (
     <Layout
