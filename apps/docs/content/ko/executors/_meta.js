@@ -1,5 +1,5 @@
 export default {
-  index: "Executors",
+  index: "Executor",
   fetch: "createFetchExecutor",
   axios: "createAxiosExecutor",
   ky: "createKyExecutor",
