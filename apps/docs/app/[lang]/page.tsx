@@ -43,7 +43,7 @@ const t: Record<Lang, {
     tagline: "스키마 우선 · 타입 안전 · 트랜스포트 독립적",
     description: "API 스키마를 한 번 정의하고\n모든 HTTP 클라이언트와 모든 환경에서\n완전한 타입 안전성과 런타임 검증을 활용하세요.",
     getStarted: "시작하기 →",
-    whyRoutar: "routar를 쓰는 이유?",
+    whyRoutar: "routar란?",
     features: [
       { icon: "🔒", title: "완전한 타입 추론", desc: "요청 파라미터와 응답 타입 — any 없이 모두 추론됩니다." },
       { icon: "✅", title: "런타임 검증", desc: "Zod, Valibot, Yup, 또는 .parse() — 양쪽을 모두 검증합니다." },
@@ -60,7 +60,7 @@ const t: Record<Lang, {
     ],
     navLinks: [
       { label: "시작하기", href: "/ko/getting-started" },
-      { label: "routar를 쓰는 이유?", href: "/ko/why" },
+      { label: "routar란?", href: "/ko/why" },
       { label: "API 레퍼런스", href: "/ko/api-reference" },
       { label: "가이드", href: "/ko/guides/ssr-csr" },
     ],
