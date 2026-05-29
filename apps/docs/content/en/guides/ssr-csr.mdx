@@ -1,0 +1,146 @@
+---
+title: SSR / CSR Pattern
+description: Use the same endpoint schema with different executors for server-side and client-side rendering in Next.js.
+---
+
+# SSR / CSR Pattern
+
+routar's core insight: define the endpoint spec once, swap the executor per environment.
+
+## The pattern
+
+Use `dispatchExecutor` to pick the right transport at request time — one API client works in both SSR and CSR without duplicate `*ServerApi` instances.
+
+```ts
+// remote/lib/executor.ts
+import axios from 'axios'
+import { createAxiosExecutor } from '@routar/axios'
+import { dispatchExecutor } from '@routar/core'
+import { createFetchExecutor } from '@routar/core'
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!
+
+// CSR — shared axios instance with interceptors (localStorage, redirects)
+const _clientExecutor = createAxiosExecutor(
+  axios.create({ baseURL: BASE_URL })
+)
+
+// SSR — fetch factory, injects httpOnly cookie per-request
+const _fetchExecutor = createFetchExecutor(BASE_URL, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('access_token')?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+})
+
+// Single executor — picks transport at request time
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? _fetchExecutor : _clientExecutor
+)
+```
+
+```ts
+// remote/services/todo/todo.api.ts
+import { defineRouter, createApi, endpoint } from '@routar/core'
+import { apiExecutor } from '../../lib/executor'
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET', path: '/',    response: TodoListSchema }),
+  getDetail: endpoint({ method: 'GET', path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+})
+
+// One API client — works in both SSR and CSR
+export const todoApi = createApi(apiExecutor, todoRouter)
+
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+```
+
+## Own API routes (no auth difference)
+
+If your endpoint hits your own Next.js Route Handlers and doesn't need environment-specific auth, a single `createFetchExecutor` with an absolute URL works in both environments — no `dispatchExecutor` needed.
+
+```ts
+// remote/lib/executor.ts
+const LOCAL_API_BASE = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api`
+
+export const localExecutor = createFetchExecutor(LOCAL_API_BASE)
+```
+
+```ts
+// remote/services/todo/todo.api.ts
+export const todoApi = createApi(localExecutor, todoRouter)
+```
+
+## With TanStack Query
+
+Components only import from `*.queries.ts`, never from executors or api files directly.
+`queryOptions` is the single source of truth for both the key and the queryFn — no separate KEYS object.
+
+```ts
+// remote/services/todo/todo.queries.ts
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
+import { todoApi } from './todo.api'
+
+export const todoListQueryOptions = () =>
+  queryOptions({
+    queryKey: ['todos', 'list'] as const,
+    queryFn:  () => todoApi.getList({}),
+  })
+
+export const todoDetailQueryOptions = (id: number) =>
+  queryOptions({
+    queryKey: ['todos', 'detail', id] as const,
+    queryFn:  () => todoApi.getDetail({ path: { id } }),
+  })
+```
+
+### SSR prefetch — server page
+
+Pass `queryOptions(params)` directly to `prefetchQuery`. Because `dispatchExecutor` picks the fetch transport on the server automatically, no queryFn override is needed.
+
+```tsx
+// app/todos/page.tsx
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import { getQueryClient } from '@/utils/get-query-client'
+import { todoListQueryOptions } from '@/remote/services/todo/todo.queries'
+import { Suspense } from 'react'
+
+export default async function TodosPage() {
+  const queryClient = getQueryClient()
+  await queryClient.prefetchQuery(todoListQueryOptions())
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<p>Loading…</p>}>
+        <TodoListClient />
+      </Suspense>
+    </HydrationBoundary>
+  )
+}
+```
+
+### Client component — useSuspenseQuery
+
+```tsx
+'use client'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { todoListQueryOptions } from '@/remote/services/todo/todo.queries'
+
+export function TodoListClient() {
+  const { data } = useSuspenseQuery(todoListQueryOptions()) // data is always non-nullable
+  return <ul>{data.map(t => <li key={t.id}>{t.label}</li>)}</ul>
+}
+```
+
+## Dependency direction
+
+```
+Component
+  └─ *.queries.ts    (TanStack Query interface)
+       └─ *.api.ts   (spec + executor)
+            └─ executor.ts  (HTTP, auth, middleware)
+```
+
+Each layer only knows about the layer below it. Components never import executors.

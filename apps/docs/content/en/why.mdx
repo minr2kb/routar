@@ -1,0 +1,194 @@
+---
+title: Why routar?
+description: The philosophy behind routar — why schema-first API clients lead to fewer bugs, better DX, and simpler code.
+---
+
+import { Callout } from 'nextra/components'
+
+# Why routar?
+
+Every frontend project eventually builds an API layer. Most start the same way — a `fetch` wrapper, some TypeScript generics, maybe Axios. It feels fine at first. Then the codebase grows, and the cracks appear.
+
+This page explains the problem space that led to routar, and the design principles that emerged from it.
+
+## The problem with typical API layers
+
+### Stage 1: TypeScript gives you false confidence
+
+The most common pattern looks like this:
+
+```ts
+async function getTodo(id: number): Promise<Todo> {
+  const res = await fetch(`/todos/${id}`)
+  return res.json() as Todo
+}
+```
+
+The `as Todo` cast feels safe — you wrote the type, so surely it's right. But TypeScript types exist only at compile time. If the server returns `{ id: "1" }` instead of `{ id: 1 }`, your runtime code has no idea. You get silent bugs, NaN where you expected a number, undefined where you expected a string.
+
+<Callout type="warning">
+TypeScript types are a promise to the compiler, not a guarantee at runtime. The server can — and will — break that promise.
+</Callout>
+
+### Stage 2: Type systems grow, but the contract stays implicit
+
+As projects grow, types get more structured:
+
+```ts
+type UpdateTodoRequest = {
+  todoId: number   // is this a path param or body field?
+  title: string
+  completed: boolean
+}
+```
+
+You know `todoId` is a path param because you wrote this code. Your teammate doesn't. Six months later, neither do you. The type looks like a plain object — the routing contract is invisible.
+
+### Stage 3: CSR and SSR want different HTTP clients, but the same schema
+
+Next.js introduced a new dimension: Server Components need `fetch` with cookie forwarding, client components use Axios with interceptors. The naive solution is branching inside your API functions:
+
+```ts
+async function getTodo(id: number) {
+  if (typeof window === 'undefined') {
+    // server path — forward cookies
+  } else {
+    // client path — use axios instance
+  }
+}
+```
+
+Now your API layer knows about `window`, cookies, and HTTP configuration all at once. Every endpoint carries this burden. The real problem: **the spec (what to call) is tangled with the execution (how to call it)**.
+
+## The core insight
+
+Routar is built on one observation:
+
+> **An API endpoint is a specification. How you execute it is a separate concern.**
+
+The schema — path, method, request shape, response shape — should be defined once. Which HTTP client runs it, in which environment, with which headers, is injected at runtime.
+
+```ts
+// Define once — pure specification
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: z.object({ path: z.object({ id: z.number() }) }),
+    response: TodoSchema,
+  }),
+})
+
+// Execute anywhere — inject the environment
+const clientApi = createApi(axiosExecutor, todoRouter)   // CSR
+const serverApi = createApi(fetchExecutor, todoRouter)   // SSR — same schema, zero duplication
+```
+
+## Design principles
+
+### 1. Schemas, not types
+
+Types are erased at runtime. Schemas aren't. Routar requires a validator with a `.parse()` method — Zod, Valibot, Yup, or your own. Every request is validated before it leaves, every response is validated before it's returned.
+
+```ts
+// If the server returns { id: "1" } instead of { id: 1 },
+// this throws immediately — not silently NaN somewhere downstream
+const todo = await todoApi.getDetail({ path: { id: 1 } })
+// todo.id is guaranteed to be number ✓
+```
+
+### 2. Structure makes contracts explicit
+
+Separating `path`, `query`, and `body` in the request schema isn't ceremony — it's the contract made visible:
+
+```ts
+request: z.object({
+  path:  z.object({ id: z.number() }),   // → /todos/1
+  query: z.object({ include: z.string().optional() }), // → ?include=...
+  body:  z.object({ title: z.string() }), // → request body
+})
+```
+
+The type tells you exactly where each field goes. There's no implicit convention to remember.
+
+### 3. Response and adapter are always separate
+
+When you add `.transform()` to a Zod schema, it becomes a `ZodEffects` — you lose `.extend()`, `.merge()`, and all the composability that makes schemas reusable. Routar keeps them apart:
+
+```ts
+endpoint({
+  response: TodoSchema,           // stays a pure ZodObject — composable, reusable
+  adapter: (raw) => ({            // transformation lives here, not in the schema
+    ...raw,
+    createdAt: new Date(raw.createdAt),
+  }),
+})
+```
+
+The raw schema can be shared across endpoints. The adapter is local to the call.
+
+### 4. Structure follows need, not convention
+
+A single-environment app doesn't need `defineRouter`:
+
+```ts
+// Inline — no ceremony for simple cases
+const api = createApi(executor, {
+  getList: endpoint({ method: 'GET', path: '/todos', response: TodoListSchema }),
+})
+```
+
+When you need the same spec in two environments, extract it:
+
+```ts
+const todoRouter = defineRouter('/todos', { getList: ... })
+
+const clientApi = createApi(clientExecutor, todoRouter)
+const serverApi = createApi(serverExecutor, todoRouter)
+```
+
+Structure appears when you need it, not before.
+
+### 5. One-way dependency flow
+
+In a well-structured project, the data flows in one direction:
+
+```
+Component → *.queries.ts → *.api.ts → executor
+```
+
+Components never import executors. Executors never know about components. Each layer has exactly one responsibility, and you can swap any layer without touching the others.
+
+## What this looks like in practice
+
+```ts
+// todo.api.ts — spec + types
+export const todoApi = createApi(clientExecutor, todoRouter)
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+export type TodoItem = TodoApiTypes['getDetail']['response']
+
+// todo.queries.ts — TanStack Query interface
+export const todoDetailQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['todos', 'detail', id],
+    queryFn: () => todoApi.getDetail({ path: { id } }),
+  })
+
+// Component — knows nothing about HTTP
+const { data } = useQuery(todoDetailQuery(id))
+```
+
+Add a new endpoint: update `todo.api.ts`, done. The type flows through automatically.
+
+## The alternative
+
+There are excellent libraries in this space — the right choice depends on your situation:
+
+| Situation | Recommended |
+|-----------|-------------|
+| You already have an OpenAPI / Swagger spec | [orval](https://orval.dev/) or [hey-api](https://heyapi.dev/) — generate a client from the spec automatically |
+| You need a shared contract between backend and frontend | [ts-rest](https://ts-rest.com/) or [oRPC](https://orpc.unnoq.com/) — both sides share the same schema definition |
+| Full-stack type safety with RPC-style APIs | [tRPC](https://trpc.io/) |
+| Frontend owns the schema, no backend coordination | **routar** |
+
+Routar is the right fit when your **frontend team manages the API schema directly** — without waiting for a backend spec or generating code from one. It solves the frontend API layer problem specifically: define your schema once, get runtime validation and end-to-end types with zero backend coordination.

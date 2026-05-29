@@ -1,0 +1,55 @@
+---
+title: AI Integration
+description: Use routar with AI coding assistants — llms.txt, AGENTS.md, and IDE-ready JSDoc.
+---
+
+# AI Integration
+
+routar ships with resources so AI coding assistants (Claude Code, Copilot, Cursor) give accurate, routar-specific suggestions out of the box.
+
+## llms.txt
+
+Two machine-readable documentation files are available at the root of this site:
+
+| URL | Purpose |
+|-----|---------|
+| [`/llms.txt`](/llms.txt) | Concise API index — all exports with one-line descriptions |
+| [`/llms-full.txt`](/llms-full.txt) | Full API reference with signatures and code examples |
+
+These follow the [llms.txt standard](https://llmstxt.org). You can point any AI tool directly at these URLs for up-to-date routar documentation.
+
+## AGENTS.md
+
+[`AGENTS.md`](https://github.com/minr2kb/routar/blob/main/AGENTS.md) at the repository root is a reference guide for AI agents. It covers the core patterns, executor selection, SSR/CSR setup, MSW testing, and common anti-patterns.
+
+Copy the relevant sections into your own project's `AGENTS.md` so AI assistants understand how your API layer is structured:
+
+```md
+<!-- In your project's AGENTS.md -->
+## API layer
+
+This project uses routar. See https://github.com/minr2kb/routar/blob/main/AGENTS.md
+for patterns, executor selection, and anti-patterns.
+```
+
+## IDE experience (JSDoc)
+
+Every exported function in `@routar/core` and `@routar/msw` ships with `@example` blocks in the published `.d.ts` files. Hover docs and inline suggestions work immediately after `npm install` — no configuration needed.
+
+```ts
+// Hover over endpoint( in your editor:
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: z.object({ path: z.object({ id: z.number() }) }),
+  response: TodoSchema,
+});
+
+// Hover over createMswHandlers( in your editor:
+const server = setupServer(
+  ...createMswHandlers(todoRouter, 'https://api.example.com', {
+    getList: () => HttpResponse.json([]),
+    getDetail: ({ params }) => HttpResponse.json({ id: params.id }),
+  }),
+);
+```

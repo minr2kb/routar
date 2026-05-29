@@ -1,0 +1,67 @@
+---
+title: defineRouter()
+description: Group related endpoints under a base path and compose nested routers for large APIs.
+---
+
+# `defineRouter(prefix, endpoints)`
+
+Groups endpoints under a shared URL prefix. Supports arbitrary nesting.
+
+```ts
+import { defineRouter, endpoint } from '@routar/core'
+
+const todoRouter = defineRouter('/todos', {
+  getList:   endpoint({ method: 'GET',  path: '/',    response: TodoListSchema }),
+  getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
+                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+  create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
+                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+})
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `prefix` | `string` | URL prefix for all endpoints in this router |
+| `endpoints` | `Record<string, endpoint \| defineRouter>` | Named endpoints or nested routers |
+
+## Nested routers
+
+Mirror your URL structure in the type system by nesting `defineRouter` calls.
+
+```ts
+const apiRouter = defineRouter('/api', {
+  users: defineRouter('/users', {
+    getList:   endpoint({ method: 'GET', path: '/',    response: UserListSchema }),
+    getDetail: endpoint({ method: 'GET', path: '/:id', response: UserSchema }),
+
+    todos: defineRouter('/todos', {
+      getList: endpoint({ method: 'GET', path: '/', response: TodoListSchema }),
+    }),
+  }),
+})
+
+const api = createApi(executor, apiRouter)
+
+await api.users.getList({})                         // GET /api/users
+await api.users.getDetail({ path: { id: 1 } })      // GET /api/users/1
+await api.users.todos.getList({})                   // GET /api/users/todos
+```
+
+## Inline usage
+
+You can skip `defineRouter` and pass endpoints directly to `createApi`:
+
+```ts
+// pre-built router (prefix comes from defineRouter)
+const api = createApi(executor, todoRouter)
+
+// inline with explicit prefix
+const api = createApi(executor, '/todos', { getList: endpoint({ ... }) })
+
+// inline without prefix (flat endpoint map)
+const api = createApi(executor, { getList: endpoint({ ... }) })
+```
+
+Use `defineRouter` when you want to reuse the router definition across multiple executors (SSR/CSR pattern).

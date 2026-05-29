@@ -1,0 +1,5 @@
+export default {
+  fetch: "createFetchExecutor",
+  axios: "createAxiosExecutor",
+  ky: "createKyExecutor",
+};
