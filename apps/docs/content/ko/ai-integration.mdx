@@ -1,0 +1,40 @@
+---
+title: AI 통합
+description: AI 코딩 어시스턴트와 함께 routar 사용하기 — llms.txt, AGENTS.md, IDE에 최적화된 JSDoc.
+---
+
+# AI 통합
+
+routar는 AI 코딩 어시스턴트(Claude Code, Copilot, Cursor)가 바로 routar에 특화된 제안을 제공할 수 있도록 리소스를 포함합니다.
+
+## llms.txt
+
+| URL | 목적 |
+|-----|---------|
+| [`/llms.txt`](/llms.txt) | 간결한 API 인덱스 — 한 줄 설명이 포함된 모든 내보내기 |
+| [`/llms-full.txt`](/llms-full.txt) | 시그니처와 코드 예제가 포함된 전체 API 레퍼런스 |
+
+이 파일들은 [llms.txt 표준](https://llmstxt.org)을 따릅니다.
+
+## AGENTS.md
+
+저장소 루트의 [`AGENTS.md`](https://github.com/minr2kb/routar/blob/main/AGENTS.md)는 AI 에이전트를 위한 참조 가이드입니다.
+
+```md
+## API 레이어
+이 프로젝트는 routar를 사용합니다.
+https://github.com/minr2kb/routar/blob/main/AGENTS.md 를 참조하세요.
+```
+
+## IDE 경험 (JSDoc)
+
+`@routar/core`와 `@routar/msw`의 모든 내보내기 함수는 배포된 `.d.ts` 파일에 `@example` 블록이 포함됩니다.
+
+```ts
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: z.object({ path: z.object({ id: z.number() }) }),
+  response: TodoSchema,
+});
+```

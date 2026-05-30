@@ -1,0 +1,62 @@
+---
+title: 커스텀 Executor
+description: ky, got, 또는 직접 만든 HTTP 클라이언트를 createExecutor로 통합합니다.
+---
+
+# 커스텀 Executor
+
+모든 HTTP 클라이언트가 routar와 함께 동작합니다. `createExecutor`로 래핑하세요.
+
+## 기본 예제
+
+```ts
+import { createExecutor, serializeParams } from '@routar/core'
+
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  const fullURL = new URL(url)
+  if (params) serializeParams(params).forEach((v, k) => fullURL.searchParams.set(k, v))
+  const res = await fetch(fullURL.toString(), {
+    method,
+    body: body != null ? JSON.stringify(body) : undefined,
+    headers: { ...(body != null ? { 'Content-Type': 'application/json' } : {}), ...headers },
+    signal,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+})
+```
+
+## `ky`와 함께
+
+```ts
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  return ky(url, { method, json: body, searchParams: params, headers, signal }).json()
+})
+```
+
+## `got`과 함께
+
+```ts
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  const { body: data } = await got(url, { method, json: body, searchParams: params, headers, signal, responseType: 'json' })
+  return data
+})
+```
+
+## 미들웨어 추가
+
+```ts
+const executor = createExecutor(transport, [withTimeout(8_000), withRetry(3), withLogger()])
+```
+
+## Validator 호환성
+
+```ts
+const TodoValidator = {
+  parse(data: unknown): Todo {
+    if (typeof data !== 'object' || data === null) throw new Error('invalid')
+    return data as Todo
+  },
+}
+endpoint({ method: 'GET', path: '/', response: TodoValidator })
+```

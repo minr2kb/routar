@@ -1,0 +1,46 @@
+---
+title: createFetchExecutor
+description: "@routar/core에 내장된 네이티브 fetch executor."
+---
+
+# `createFetchExecutor(baseURL, options?)` — `@routar/core`
+
+```ts
+import { createFetchExecutor } from '@routar/core'
+
+const executor = createFetchExecutor('https://api.example.com')
+```
+
+## 옵션
+
+| 옵션 | 타입 | 설명 |
+|--------|------|-------------|
+| `defaultHeaders` | `() => Promise<Record<string, string>> \| Record<string, string>` | 모든 요청에 적용, 요청별 평가 |
+| `middlewares` | `ExecutorMiddleware[]` | 미들웨어 체인 |
+
+## `HttpError`
+
+```ts
+import { HttpError } from '@routar/core'
+
+try {
+  await todoApi.getDetail({ path: { id: 999 } })
+} catch (err) {
+  if (err instanceof HttpError) {
+    console.log(err.status, err.statusText, err.body)
+  }
+}
+```
+
+## SSR 사용법 (Next.js)
+
+```ts
+export const serverExecutor = createFetchExecutor(process.env.API_BASE_URL!, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('access_token')?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+  middlewares: [withTimeout(10_000)],
+})
+```

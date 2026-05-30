@@ -1,0 +1,138 @@
+---
+title: routar란?
+description: routar의 철학 — 스키마 우선 API 클라이언트가 왜 버그를 줄이고 DX를 향상시키며 코드를 단순하게 만드는지.
+---
+
+import { Callout } from 'nextra/components'
+
+# routar란?
+
+모든 프론트엔드 프로젝트는 결국 API 레이어를 구축하게 됩니다. 대부분은 동일한 방식으로 시작합니다 — `fetch` 래퍼, TypeScript 제네릭, 아마도 Axios. 처음에는 괜찮아 보입니다. 그러다 코드베이스가 커지면 문제가 드러납니다.
+
+## 일반적인 API 레이어의 문제점
+
+### 1단계: TypeScript가 가짜 안전감을 줍니다
+
+```ts
+async function getTodo(id: number): Promise<Todo> {
+  const res = await fetch(`/todos/${id}`)
+  return res.json() as Todo
+}
+```
+
+`as Todo` 타입 단언은 안전해 보입니다. 하지만 TypeScript 타입은 컴파일 타임에만 존재합니다. 서버가 `{ id: "1" }`을 반환하면 런타임 코드는 알 방법이 없습니다.
+
+<Callout type="warning">
+TypeScript 타입은 컴파일러에 대한 약속이지, 런타임의 보장이 아닙니다. 서버는 그 약속을 어깁니다.
+</Callout>
+
+### 2단계: 타입 시스템은 커지지만 계약은 암묵적으로 남습니다
+
+```ts
+type UpdateTodoRequest = {
+  todoId: number   // path param인가요, body 필드인가요?
+  title: string
+  completed: boolean
+}
+```
+
+라우팅 계약이 보이지 않습니다.
+
+### 3단계: CSR과 SSR은 다른 HTTP 클라이언트를 원하지만 동일한 스키마를 씁니다
+
+```ts
+async function getTodo(id: number) {
+  if (typeof window === 'undefined') {
+    // 서버 경로
+  } else {
+    // 클라이언트 경로
+  }
+}
+```
+
+**스펙(무엇을 호출할지)이 실행(어떻게 호출할지)과 뒤섞입니다**.
+
+## 핵심 통찰
+
+> **API 엔드포인트는 명세입니다. 실행 방법은 별개의 관심사입니다.**
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: z.object({ path: z.object({ id: z.number() }) }),
+    response: TodoSchema,
+  }),
+})
+
+const clientApi = createApi(axiosExecutor, todoRouter)   // CSR
+const serverApi = createApi(fetchExecutor, todoRouter)   // SSR — 동일한 스키마, 중복 없음
+```
+
+## 설계 원칙
+
+### 1. 타입이 아닌 스키마
+
+```ts
+const todo = await todoApi.getDetail({ path: { id: 1 } })
+// todo.id는 number임이 보장됩니다 ✓
+```
+
+### 2. 구조가 계약을 명시적으로 만듭니다
+
+```ts
+request: z.object({
+  path:  z.object({ id: z.number() }),
+  query: z.object({ include: z.string().optional() }),
+  body:  z.object({ title: z.string() }),
+})
+```
+
+### 3. response와 adapter는 항상 분리됩니다
+
+```ts
+endpoint({
+  response: TodoSchema,
+  adapter: (raw) => ({ ...raw, createdAt: new Date(raw.createdAt) }),
+})
+```
+
+### 4. 구조는 필요에 따라 생깁니다
+
+```ts
+const api = createApi(executor, {
+  getList: endpoint({ method: 'GET', path: '/todos', response: TodoListSchema }),
+})
+```
+
+### 5. 단방향 의존성 흐름
+
+```
+Component → *.queries.ts → *.api.ts → executor
+```
+
+## 실제로 어떻게 보이는가
+
+```ts
+export const todoApi = createApi(clientExecutor, todoRouter)
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+export type TodoItem = TodoApiTypes['getDetail']['response']
+
+export const todoDetailQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['todos', 'detail', id],
+    queryFn: () => todoApi.getDetail({ path: { id } }),
+  })
+
+const { data } = useQuery(todoDetailQuery(id))
+```
+
+## 대안
+
+| 상황 | 권장 |
+|-----------|-------------|
+| 이미 OpenAPI / Swagger 스펙이 있다 | [orval](https://orval.dev/) 또는 [hey-api](https://heyapi.dev/) |
+| 백엔드와 프론트엔드 간 공유 계약이 필요하다 | [ts-rest](https://ts-rest.com/) 또는 [oRPC](https://orpc.unnoq.com/) |
+| RPC 스타일 풀스택 타입 안전성 | [tRPC](https://trpc.io/) |
+| 프론트엔드가 스키마를 소유, 백엔드 조율 불필요 | **routar** |

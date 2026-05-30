@@ -1,0 +1,54 @@
+---
+title: createApi()
+description: executor를 라우터에 바인딩하고 완전히 타입이 지정된 API 클라이언트를 얻습니다.
+---
+
+# `createApi(executor, router)`
+
+완전히 타입이 지정된 API 클라이언트를 생성합니다.
+
+```ts
+const todoApi = createApi(executor, todoRouter)
+
+await todoApi.getDetail({ path: { id: 1 } })
+await todoApi.create({ body: { title: 'buy milk' } })
+```
+
+## 오버로드
+
+| 형태 | 사용법 |
+|------|-------|
+| `createApi(executor, router)` | 사전 빌드된 라우터 |
+| `createApi(executor, prefix, endpoints)` | URL 접두사가 있는 인라인 |
+| `createApi(executor, endpoints)` | 접두사 없는 인라인 |
+
+## 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|-----------|------|-------------|
+| `executor` | `Executor` | HTTP 트랜스포트 |
+| `router` | `RouterDef \| RouterEndpoints` | 라우터 또는 인라인 엔드포인트 |
+| `prefix` | `string` (선택) | URL 접두사 |
+
+## 요청 파라미터
+
+```ts
+await api.getDetail({ path: { id: 1 } })
+await api.getList({ query: { page: 2 } })
+await api.create({ body: { title: 'buy milk' } })
+```
+
+## AbortSignal
+
+```ts
+const controller = new AbortController()
+await todoApi.getList({}, controller.signal)
+controller.abort()
+```
+
+## SSR/CSR 패턴
+
+```ts
+export const todoApi       = createApi(clientExecutor, todoRouter) // CSR
+export const todoServerApi = createApi(serverExecutor, todoRouter) // SSR
+```
