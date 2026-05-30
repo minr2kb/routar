@@ -1,6 +1,29 @@
-import type { Executor, ExecutorMiddleware } from "./types.js";
-import { createExecutor } from "./create-executor.js";
+import type { CreateExecutorOptions, ExecuteOptions, Executor, ExecutorMiddleware } from "./types.js";
+import { buildChain, createExecutor } from "./create-executor.js";
+import { withRetry, withTimeout } from "./middleware.js";
 import { serializeParams } from "./utils/params.js";
+
+type RetryOption =
+  | number
+  | { count: number; shouldRetry?: (error: unknown, attempt: number) => boolean };
+
+function buildFetchChain(
+  transport: (opts: ExecuteOptions) => Promise<unknown>,
+  retry?: RetryOption,
+  timeout?: number,
+): (opts: ExecuteOptions) => Promise<unknown> {
+  const middlewares: ExecutorMiddleware[] = [
+    ...(retry != null
+      ? [
+          typeof retry === "number"
+            ? withRetry(retry)
+            : withRetry(retry.count, { shouldRetry: retry.shouldRetry }),
+        ]
+      : []),
+    ...(timeout != null ? [withTimeout(timeout)] : []),
+  ];
+  return middlewares.length > 0 ? buildChain(transport, middlewares) : transport;
+}
 
 /**
  * Creates an {@link Executor} backed by the browser / Node.js `fetch` API.
@@ -48,47 +71,55 @@ import { serializeParams } from "./utils/params.js";
  */
 export function createFetchExecutor(
   baseURL: string,
-  options?: {
+  options?: CreateExecutorOptions & {
     defaultHeaders?: () =>
       | Record<string, string>
       | Promise<Record<string, string>>;
-    middlewares?: ExecutorMiddleware[];
+    retry?: RetryOption;
+    timeout?: number;
   },
 ): Executor {
-  return createExecutor(
-    async ({ method, url, params, body, headers, signal }) => {
-      const fullURL = new URL(baseURL.replace(/\/$/, "") + url);
-      if (params) {
-        serializeParams(params).forEach((v, k) => {
-          fullURL.searchParams.set(k, v);
-        });
-      }
-
-      const defaultHeaders = (await options?.defaultHeaders?.()) ?? {};
-
-      const res = await fetch(fullURL.toString(), {
-        method,
-        headers: {
-          ...defaultHeaders,
-          ...headers,
-          ...(body != null ? { "Content-Type": "application/json" } : {}),
-        },
-        body: body != null ? JSON.stringify(body) : undefined,
-        signal,
+  const transport = async ({
+    method,
+    url,
+    params,
+    body,
+    headers,
+    signal,
+  }: ExecuteOptions) => {
+    const fullURL = new URL(baseURL.replace(/\/$/, "") + url);
+    if (params) {
+      serializeParams(params).forEach((v, k) => {
+        fullURL.searchParams.set(k, v);
       });
+    }
 
-      if (!res.ok) {
-        const errorBody = await res.json().catch(() => null);
-        throw new HttpError(res.status, res.statusText, errorBody);
-      }
-      if (res.status === 204 || res.status === 205 || res.status === 304) {
-        return null;
-      }
-      const text = await res.text();
-      return text === "" ? null : JSON.parse(text);
-    },
-    options?.middlewares,
-  );
+    const defaultHeaders = (await options?.defaultHeaders?.()) ?? {};
+
+    const res = await fetch(fullURL.toString(), {
+      method,
+      headers: {
+        ...defaultHeaders,
+        ...headers,
+        ...(body != null ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body != null ? JSON.stringify(body) : undefined,
+      signal,
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => null);
+      throw new HttpError(res.status, res.statusText, errorBody);
+    }
+    if (res.status === 204 || res.status === 205 || res.status === 304) {
+      return null;
+    }
+    const text = await res.text();
+    return text === "" ? null : JSON.parse(text);
+  };
+
+  const wrappedTransport = buildFetchChain(transport, options?.retry, options?.timeout);
+  return createExecutor(wrappedTransport, { plugins: options?.plugins });
 }
 
 /**

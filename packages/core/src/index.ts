@@ -7,21 +7,16 @@ export type { PathParams } from "./define-endpoint.js";
 export { endpoint } from "./define-endpoint.js";
 // core functions
 export { defineRouter, isRouterDef } from "./define-router.js";
-// middleware
-export {
-  defineMiddleware,
-  TimeoutError,
-  withLogger,
-  withRetry,
-  withTimeout,
-} from "./middleware.js";
+// plugin
+export { definePlugin, logger, TimeoutError } from "./middleware.js";
 export type {
   ApiTypes,
   CreateApiOptions,
+  CreateExecutorOptions,
   EndpointSpec,
   ExecuteOptions,
   Executor,
-  ExecutorMiddleware,
+  ExecutorPlugin,
   HttpMethod,
   InferResponse,
   RequestShape,

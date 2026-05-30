@@ -7,7 +7,7 @@ export interface ExecuteOptions {
   params?: Record<string, unknown>;
   body?: unknown;
   /**
-   * Per-request headers injected by middleware (e.g. `defineMiddleware`).
+   * Per-request headers injected by a plugin's `onRequest` hook.
    * Headers cannot be set from `createApi` call sites directly — use middleware
    * to add dynamic headers such as `Authorization` or `X-Request-Id`.
    */
@@ -31,6 +31,10 @@ export interface Executor {
  * the next middleware (or the underlying transport). Must return the response
  * promise.
  *
+ * Prefer {@link ExecutorPlugin} for most use cases. Use middleware only when
+ * you need to span the full request/response lifecycle in a single closure
+ * (e.g. duration measurement, per-request cleanup).
+ *
  * @example
  * ```ts
  * const myMiddleware: ExecutorMiddleware = async (opts, next) => {
@@ -43,6 +47,59 @@ export type ExecutorMiddleware = (
   options: ExecuteOptions,
   next: (options: ExecuteOptions) => Promise<unknown>,
 ) => Promise<unknown>;
+
+/**
+ * A named, composable unit of executor behavior.
+ *
+ * Each lifecycle hook is optional — implement only what you need.
+ * Related concerns (e.g. auth header injection + 401 refresh) can be
+ * bundled into a single plugin.
+ *
+ * @example Auth plugin
+ * ```ts
+ * const authPlugin: ExecutorPlugin = {
+ *   name: 'auth',
+ *   onRequest: async (opts) => ({
+ *     ...opts,
+ *     headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+ *   }),
+ *   onError: async (err) => {
+ *     if (isUnauthorized(err)) await refreshToken();
+ *     throw err;
+ *   },
+ * };
+ * ```
+ */
+export interface ExecutorPlugin {
+  /** Optional name — used for introspection and `eject`. */
+  name?: string;
+  /** Runs before the request is sent. Return modified opts to transform the request. */
+  onRequest?: (
+    opts: ExecuteOptions,
+  ) => ExecuteOptions | Promise<ExecuteOptions>;
+  /** Runs after a successful response. Return a modified value to transform the response. */
+  onResponse?: (
+    response: unknown,
+    opts: ExecuteOptions,
+  ) => unknown | Promise<unknown>;
+  /** Runs when the request throws. Must re-throw (or throw a different error). */
+  onError?: (error: unknown, opts: ExecuteOptions) => never | Promise<never>;
+}
+
+/**
+ * Options for {@link createExecutor}.
+ *
+ * @example
+ * ```ts
+ * const executor = createExecutor(transport, {
+ *   plugins: [authPlugin, logger()],
+ * });
+ * ```
+ */
+export interface CreateExecutorOptions {
+  /** Plugins applied in declaration order (first plugin is outermost). */
+  plugins?: ExecutorPlugin[];
+}
 
 /**
  * Any object with a `parse` method — compatible with Zod, Valibot, Yup, etc.
