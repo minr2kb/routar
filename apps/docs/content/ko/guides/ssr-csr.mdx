@@ -1,0 +1,78 @@
+---
+title: SSR / CSR 패턴
+description: 서버 사이드 렌더링과 클라이언트 사이드 렌더링에 동일한 엔드포인트 스키마를 다른 executor와 함께 사용합니다.
+---
+
+# SSR / CSR 패턴
+
+엔드포인트 스펙을 한 번 정의하고, 환경별로 executor를 교체합니다.
+
+```ts
+// remote/lib/executor.ts
+const _clientExecutor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }))
+
+const _fetchExecutor = createFetchExecutor(BASE_URL, {
+  defaultHeaders: async () => {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('access_token')?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+})
+
+export const apiExecutor = dispatchExecutor(() =>
+  typeof window === 'undefined' ? _fetchExecutor : _clientExecutor
+)
+```
+
+```ts
+// remote/services/todo/todo.api.ts
+export const todoApi = createApi(apiExecutor, todoRouter)
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+```
+
+## 자체 API 라우트
+
+```ts
+const LOCAL_API_BASE = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api`
+export const localExecutor = createFetchExecutor(LOCAL_API_BASE)
+```
+
+## TanStack Query와 함께
+
+```ts
+export const todoListQueryOptions = () =>
+  queryOptions({ queryKey: ['todos', 'list'] as const, queryFn: () => todoApi.getList({}) })
+
+export const todoDetailQueryOptions = (id: number) =>
+  queryOptions({ queryKey: ['todos', 'detail', id] as const, queryFn: () => todoApi.getDetail({ path: { id } }) })
+```
+
+### SSR prefetch
+
+```tsx
+export default async function TodosPage() {
+  const queryClient = getQueryClient()
+  await queryClient.prefetchQuery(todoListQueryOptions())
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<p>로딩 중…</p>}><TodoListClient /></Suspense>
+    </HydrationBoundary>
+  )
+}
+```
+
+### 클라이언트 컴포넌트
+
+```tsx
+'use client'
+export function TodoListClient() {
+  const { data } = useSuspenseQuery(todoListQueryOptions())
+  return <ul>{data.map(t => <li key={t.id}>{t.label}</li>)}</ul>
+}
+```
+
+## 의존성 방향
+
+```
+Component → *.queries.ts → *.api.ts → executor.ts
+```

@@ -1,0 +1,67 @@
+---
+title: endpoint()
+description: 메서드, 경로, 요청 스키마, 응답 스키마로 타입 API 엔드포인트를 정의합니다.
+---
+
+# `endpoint(spec)`
+
+단일 엔드포인트를 정의합니다. `adapter`에서 완전한 타입 추론을 제공합니다.
+
+```ts
+import { endpoint } from '@routar/core'
+import { z } from 'zod'
+
+const TodoSchema = z.object({ id: z.number(), title: z.string() })
+
+endpoint({ method: 'GET', path: '/', response: z.array(TodoSchema) })
+
+endpoint({
+  method: 'GET',
+  path: '/',
+  response: z.array(TodoSchema),
+  adapter: (raw) => raw.map(todo => ({ ...todo, label: todo.title })),
+})
+```
+
+## 파라미터
+
+| 필드 | 타입 | 필수 | 설명 |
+|-------|------|----------|-------------|
+| `method` | `'GET' \| 'POST' \| 'PUT' \| 'PATCH' \| 'DELETE'` | Yes | HTTP 메서드 |
+| `path` | `string` | Yes | 라우터 접두사에 상대적인 경로 |
+| `response` | `Validator<T>` | Yes | 응답 검증 스키마 |
+| `request` | `Validator<R>` | No | `{ path?, query?, body? }`용 스키마 |
+| `adapter` | `(raw: T) => U` | No | 검증된 응답 변환 |
+
+## Path param 강제
+
+```ts
+// ✅ 올바름
+endpoint({ path: '/:id', request: z.object({ path: z.object({ id: z.number() }) }), response: TodoSchema, method: 'GET' })
+
+// ❌ 컴파일 에러
+endpoint({ path: '/:id', request: z.object({ query: z.object({ q: z.string() }) }), response: TodoSchema, method: 'GET' })
+```
+
+## Adapter
+
+```ts
+const TodoRawSchema = z.object({ id: z.number(), title: z.string() })
+
+endpoint({
+  method: 'GET', path: '/',
+  response: z.array(TodoRawSchema),
+  adapter: (raw) => raw.map(r => ({ ...r, label: r.title })),
+})
+```
+
+`response` 스키마에 `.transform()`을 사용하지 마세요.
+
+## 타입 유틸리티
+
+```ts
+import type { ApiTypes, PathParams } from '@routar/core'
+
+type TodoApiTypes = ApiTypes<typeof todoApi>
+type P = PathParams<'/:userId/posts/:postId'> // 'userId' | 'postId'
+```

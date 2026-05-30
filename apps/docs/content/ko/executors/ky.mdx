@@ -1,0 +1,44 @@
+---
+title: createKyExecutor
+description: ky executor(@routar/ky) 사용.
+---
+
+# `createKyExecutor(instanceOrFactory, options?)` — `@routar/ky`
+
+```ts
+import ky from 'ky'
+import { createKyExecutor } from '@routar/ky'
+
+const executor = createKyExecutor(ky.create({ prefixUrl: 'https://api.example.com' }))
+```
+
+## 인스턴스 vs. 팩토리
+
+```ts
+// CSR
+const executor = createKyExecutor(ky.create({ prefixUrl: BASE_URL }))
+
+// SSR
+const executor = createKyExecutor(async () => {
+  const token = await getServerToken()
+  return ky.create({ prefixUrl: BASE_URL, headers: { Authorization: `Bearer ${token}` } })
+})
+```
+
+## 에러
+
+```ts
+import { HTTPError } from 'ky'
+
+try {
+  await todoApi.getDetail({ path: { id: 999 } })
+} catch (err) {
+  if (err instanceof HTTPError) {
+    console.log(err.response.status, await err.response.json())
+  }
+}
+```
+
+## prefixUrl 요구사항
+
+`KyInstance`에 `prefixUrl`이 설정되어 있어야 합니다. routar의 경로는 ky에 전달되기 전에 앞의 `/`가 제거됩니다.

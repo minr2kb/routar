@@ -1,0 +1,78 @@
+---
+title: MSW로 모킹하기
+description: "@routar/msw를 사용하여 RouterDef에서 타입이 적용된 MSW v2 핸들러를 생성합니다."
+---
+
+# MSW로 모킹하기
+
+## 설치
+
+```bash
+npm install @routar/msw msw
+```
+
+## 기본 사용법
+
+```ts
+import { createMswHandlers } from '@routar/msw'
+import { HttpResponse } from 'msw'
+import { setupServer } from 'msw/node'
+
+const handlers = createMswHandlers(TodoRouter, 'https://api.example.com', {
+  getList: () => HttpResponse.json([{ id: 1, title: 'buy milk', completed: false }]),
+  getDetail: ({ params }) => HttpResponse.json({ id: params.id, title: 'buy milk', completed: false }),
+})
+
+const server = setupServer(...handlers)
+```
+
+## 타입이 적용된 리졸버 컨텍스트
+
+| 필드 | 타입 | 소스 |
+|---|---|---|
+| `params` | `path` 스키마에서 추론 | URL path params |
+| `query` | `query` 스키마에서 추론 | URL 쿼리 스트링 |
+| `body` | `body` 스키마에서 추론 | 요청 본문 (JSON) |
+| `request` | `Request` | Raw MSW 요청 객체 |
+| `cookies` | `Record<string, string>` | 요청 쿠키 |
+
+## 중첩 라우터
+
+```ts
+const handlers = createMswHandlers(UserRouter, BASE_URL, {
+  getList: () => HttpResponse.json([]),
+  todos: {
+    getList: () => HttpResponse.json([]),
+    getDetail: ({ params }) => HttpResponse.json({ id: params.id, title: 'x' }),
+  },
+})
+```
+
+## Path param 강제 변환
+
+```ts
+getDetail: endpoint({
+  path: '/:id',
+  request: z.object({ path: z.object({ id: z.coerce.number() }) }),
+})
+```
+
+## 상태를 유지하는 목 스토어
+
+```ts
+let nextId = 11
+const store = [{ id: 1, title: 'Buy milk', completed: false }]
+export const getAllTodos = () => store.slice()
+export const createTodo = (data) => { const t = { id: nextId++, ...data }; store.push(t); return t }
+```
+
+## 브라우저 설정
+
+```ts
+if (process.env.NODE_ENV === 'development') {
+  const { worker } = await import('@/remote/mocks/browser')
+  await worker.start({ onUnhandledRequest: 'bypass' })
+}
+```
+
+`npx msw init public/`을 한 번 실행하세요.

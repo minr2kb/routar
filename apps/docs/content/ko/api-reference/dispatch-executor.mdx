@@ -1,0 +1,36 @@
+---
+title: dispatchExecutor()
+description: 런타임 조건에 따라 요청 시 기본 트랜스포트를 선택하는 executor를 생성합니다.
+---
+
+# `dispatchExecutor(resolver)`
+
+요청 시 선택된 다른 executor에 위임하는 `Executor`를 생성합니다.
+
+```ts
+import { dispatchExecutor } from '@routar/core'
+
+const apiExecutor = dispatchExecutor((opts) => pickExecutor(opts))
+```
+
+## 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|-----------|------|-------------|
+| `resolver` | `(opts: ExecuteOptions) => Executor` | 위임할 executor를 반환하는 함수 |
+
+## 예제
+
+```ts
+dispatchExecutor(() =>
+  typeof window === 'undefined' ? serverExecutor : clientExecutor
+)
+
+dispatchExecutor((opts) =>
+  opts.url.startsWith('/internal') ? internalExecutor : publicExecutor
+)
+```
+
+## Next.js App Router 주의사항
+
+`typeof window === 'undefined'`는 Server Components에서 항상 `true`입니다. 올바른 executor를 명시적으로 전달하세요. [SSR / CSR 패턴](/ko/guides/ssr-csr)을 참조하세요.

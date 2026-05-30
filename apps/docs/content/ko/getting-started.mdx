@@ -1,0 +1,112 @@
+---
+title: 시작하기
+description: routar를 설치하고 몇 분 안에 첫 번째 타입 안전 API 호출을 만들어보세요.
+---
+
+import { PackageInstall } from '../../components/PackageInstall'
+
+# 시작하기
+
+## 설치
+
+**fetch 사용** (core에 내장 — 추가 의존성 없음):
+
+<PackageInstall packages={['@routar/core']} />
+
+**Axios 사용:**
+
+<PackageInstall packages={['@routar/core', '@routar/axios', 'axios']} />
+
+## 빠른 시작
+
+### 1. 스키마 정의
+
+```ts
+import { z } from 'zod'
+
+const TodoSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  completed: z.boolean(),
+})
+```
+
+### 2. 엔드포인트와 라우터 정의
+
+```ts
+import { endpoint, defineRouter } from '@routar/core'
+
+const todoRouter = defineRouter('/todos', {
+  getList: endpoint({
+    method: 'GET',
+    path: '/',
+    response: z.array(TodoSchema),
+  }),
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: z.object({ path: z.object({ id: z.number() }) }),
+    response: TodoSchema,
+  }),
+  create: endpoint({
+    method: 'POST',
+    path: '/',
+    request: z.object({ body: z.object({ title: z.string() }) }),
+    response: TodoSchema,
+  }),
+})
+```
+
+### 3. Executor와 API 클라이언트 생성
+
+```ts
+import { createApi, createFetchExecutor } from '@routar/core'
+
+const executor = createFetchExecutor('https://api.example.com')
+const todoApi  = createApi(executor, todoRouter)
+```
+
+### 4. 요청 실행
+
+```ts
+const todos = await todoApi.getList({})
+const todo  = await todoApi.getDetail({ path: { id: 1 } })
+const next  = await todoApi.create({ body: { title: 'buy milk' } })
+```
+
+모든 반환 타입은 완전히 추론됩니다 — 타입 어노테이션이 필요 없습니다.
+
+### AbortSignal
+
+```ts
+const controller = new AbortController()
+const todos = await todoApi.getList({}, controller.signal)
+controller.abort()
+```
+
+## 미들웨어 사용
+
+```ts
+import { createFetchExecutor, withTimeout, withRetry, withLogger } from '@routar/core'
+
+const executor = createFetchExecutor('https://api.example.com', {
+  middlewares: [withTimeout(8_000), withRetry(3), withLogger()],
+})
+```
+
+## Axios 사용
+
+```ts
+import axios from 'axios'
+import { createAxiosExecutor } from '@routar/axios'
+
+const executor = createAxiosExecutor(
+  axios.create({ baseURL: 'https://api.example.com' })
+)
+```
+
+## 다음 단계
+
+- [API 레퍼런스](/ko/api-reference) — 모든 내보내기에 대한 전체 문서
+- [Executor](/ko/executors) — fetch vs. axios, SSR/CSR 패턴
+- [가이드](/ko/guides) — SSR/CSR, 커스텀 executor, 에러 처리

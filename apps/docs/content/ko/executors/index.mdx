@@ -1,0 +1,28 @@
+---
+title: Executor
+description: 네이티브 fetch executor, Axios executor, ky executor 중 선택하거나 createExecutor로 직접 빌드하세요.
+---
+
+# Executor
+
+executor는 실제 HTTP 호출을 처리하는 트랜스포트 레이어입니다.
+
+| 패키지 | Executor | 최적 사용처 |
+|---------|----------|----------|
+| `@routar/core` | [`createFetchExecutor`](/ko/executors/fetch) | SSR, Node.js 18+, 의존성 없음 |
+| `@routar/axios` | [`createAxiosExecutor`](/ko/executors/axios) | CSR, 기존 Axios 인스턴스, 인터셉터 |
+| `@routar/ky` | [`createKyExecutor`](/ko/executors/ky) | CSR/SSR, ky 훅, 현대적 fetch 기반 클라이언트 |
+
+모두 동일한 `Executor` 인터페이스를 구현하며 상호 교환 가능합니다.
+
+## executor 선택
+
+**`createFetchExecutor` 사용 시:** 요청별 동적 헤더, 추가 의존성 없음, Node.js 18+
+
+**`@routar/axios` 사용 시:** 기존 Axios 인스턴스와 인터셉터가 있을 때
+
+**`@routar/ky` 사용 시:** ky 훅 시스템, 현대적 fetch 기반 클라이언트
+
+## 커스텀 executor
+
+[`createExecutor`](/ko/api-reference/create-executor)로 모든 HTTP 클라이언트를 래핑하세요. [커스텀 Executor 가이드](/ko/guides/custom-executor)를 참조하세요.

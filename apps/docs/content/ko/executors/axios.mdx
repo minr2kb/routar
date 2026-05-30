@@ -1,0 +1,40 @@
+---
+title: createAxiosExecutor
+description: Axios executor(@routar/axios) 사용.
+---
+
+# `createAxiosExecutor(instanceOrFactory, options?)` — `@routar/axios`
+
+```ts
+import axios from 'axios'
+import { createAxiosExecutor } from '@routar/axios'
+
+const executor = createAxiosExecutor(axios.create({ baseURL: 'https://api.example.com' }))
+```
+
+## 인스턴스 vs. 팩토리
+
+```ts
+// CSR — 인스턴스 직접 전달
+const executor = createAxiosExecutor(axios.create({ baseURL: BASE_URL }))
+
+// SSR — 팩토리
+const executor = createAxiosExecutor(async () => {
+  const token = await getServerToken()
+  return axios.create({ baseURL: BASE_URL, headers: { Authorization: `Bearer ${token}` } })
+})
+```
+
+## 에러
+
+```ts
+import { isAxiosError } from 'axios'
+
+try {
+  await todoApi.getDetail({ path: { id: 999 } })
+} catch (err) {
+  if (isAxiosError(err)) {
+    console.log(err.response?.status, err.response?.data)
+  }
+}
+```
