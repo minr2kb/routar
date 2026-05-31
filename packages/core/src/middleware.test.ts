@@ -1,5 +1,5 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
-import { buildChain, createExecutor } from "./create-executor.js";
+import { createExecutor } from "./create-executor.js";
 import {
   definePlugin,
   logger,
@@ -208,7 +208,7 @@ describe("logger plugin", () => {
   });
 });
 
-describe("plugins + retry + timeout compose (via buildChain)", () => {
+describe("plugins + retry + timeout compose", () => {
   it("plugin sees request headers, retry retries, timeout applies per attempt", async () => {
     let headerSeen: string | undefined;
     let calls = 0;
@@ -217,19 +217,19 @@ describe("plugins + retry + timeout compose (via buildChain)", () => {
       if (++calls < 2) throw new Error("transient");
       return "ok";
     });
-    const executor = createExecutor(
-      buildChain(execute, [withRetry(2), withTimeout(1000)]),
-      {
-        plugins: [
-          definePlugin({
-            onRequest: (o) => ({
-              ...o,
-              headers: { ...o.headers, "X-Auth": "token" },
-            }),
+    // Manually chain retry → timeout → execute (same as createFetchExecutor does internally)
+    const transport = (o: ExecuteOptions) =>
+      withRetry(2)(o, (o2) => withTimeout(1000)(o2, execute));
+    const executor = createExecutor(transport, {
+      plugins: [
+        definePlugin({
+          onRequest: (o) => ({
+            ...o,
+            headers: { ...o.headers, "X-Auth": "token" },
           }),
-        ],
-      },
-    );
+        }),
+      ],
+    });
     await expect(executor.execute(opts)).resolves.toBe("ok");
     expect(execute).toHaveBeenCalledTimes(2);
     expect(headerSeen).toBe("token");

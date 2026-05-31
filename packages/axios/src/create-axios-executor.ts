@@ -79,6 +79,6 @@ export function createAxiosExecutor(
       });
       return data;
     },
-    options ?? {},
+    options,
   );
 }

@@ -5,6 +5,6 @@ export default {
   "create-api": "createApi()",
   "create-executor": "createExecutor()",
   "dispatch-executor": "dispatchExecutor()",
-  middleware: "미들웨어",
+  middleware: "플러그인",
   "api-types": "ApiTypes<T>",
 };

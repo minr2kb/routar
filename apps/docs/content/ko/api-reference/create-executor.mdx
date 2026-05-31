@@ -1,11 +1,11 @@
 ---
 title: createExecutor()
-description: 모든 HTTP 클라이언트를 routar의 미들웨어 체인과 통합하기 위한 저수준 팩토리.
+description: 모든 HTTP 클라이언트를 routar의 플러그인 시스템과 통합하기 위한 저수준 팩토리.
 ---
 
-# `createExecutor(transportFn, middlewares?)`
+# `createExecutor(transport, options?)`
 
-`createFetchExecutor`, `@routar/axios`, `@routar/ky`가 내부적으로 사용하는 저수준 팩토리입니다.
+`createFetchExecutor`, `@routar/axios`, `@routar/ky`가 내부적으로 사용하는 저수준 팩토리입니다. 임의의 HTTP 클라이언트를 routar의 플러그인 시스템과 연결할 때 사용하세요.
 
 ```ts
 import { createExecutor } from '@routar/core'
@@ -15,33 +15,44 @@ const executor = createExecutor(
     const res = await myClient.request({ method, url, params, body, headers, signal })
     return res.data
   },
-  [withTimeout(5000), withRetry(2)],
+  { plugins: [authPlugin, logger()] },
 )
 ```
 
 ## 파라미터
 
 | 파라미터 | 타입 | 설명 |
-|-----------|------|-------------|
-| `transportFn` | `(opts: ExecuteOptions) => Promise<unknown>` | 실제 HTTP 호출 |
-| `middlewares` | `ExecutorMiddleware[]` | 선택적 미들웨어 체인 |
+|-----------|------|------|
+| `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | 실제 HTTP 호출 |
+| `options.plugins` | `ExecutorPlugin[]` | 선언 순서대로 적용되는 플러그인 (첫 번째가 가장 바깥쪽) |
+
+`retry`와 `timeout`은 [`createFetchExecutor`](/ko/executors/fetch) 옵션을 사용하세요. axios와 ky는 각 라이브러리 인스턴스에서 설정합니다.
 
 ## `ExecuteOptions`
+
+transport 함수에 전달되는 객체입니다:
 
 ```ts
 interface ExecuteOptions {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   url: string
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>  // 쿼리스트링 파라미터
   body?: unknown
   headers?: Record<string, string>
   signal?: AbortSignal
 }
 ```
 
-## 미들웨어 체인
+## 플러그인 실행 순서
+
+플러그인은 선언 순서로 실행됩니다 — 배열의 첫 번째 플러그인이 가장 바깥쪽입니다:
 
 ```ts
-createExecutor(transport, [withTimeout(8_000), withRetry(3), withLogger()])
-// 실행 순서: withTimeout → withRetry → withLogger → transport
+createExecutor(transport, { plugins: [authPlugin, logger()] })
+// onRequest:  authPlugin → logger → transport
+// onResponse: logger → authPlugin
 ```
+
+플러그인 작성 방법은 [플러그인](/ko/api-reference/middleware)을 참고하세요.
+
+SSR/CSR 환경 분기가 필요한 경우 [`dispatchExecutor()`](/ko/api-reference/dispatch-executor)를 참고하세요.

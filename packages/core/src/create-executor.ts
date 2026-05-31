@@ -21,7 +21,7 @@ function pluginToMiddleware(plugin: ExecutorPlugin): ExecutorMiddleware {
   };
 }
 
-export function buildChain(
+function buildChain(
   execute: (options: ExecuteOptions) => Promise<unknown>,
   middlewares: ExecutorMiddleware[],
 ): (options: ExecuteOptions) => Promise<unknown> {

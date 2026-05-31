@@ -1,11 +1,11 @@
 ---
 title: createExecutor()
-description: Low-level factory for integrating any HTTP client with routar's middleware chain.
+description: Low-level factory for integrating any HTTP client with routar's plugin system.
 ---
 
-# `createExecutor(transportFn, middlewares?)`
+# `createExecutor(transport, options?)`
 
-Low-level factory used internally by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`. Use this to integrate any HTTP client.
+Low-level factory used internally by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`. Use this to integrate any HTTP client with routar's plugin system.
 
 ```ts
 import { createExecutor } from '@routar/core'
@@ -15,7 +15,7 @@ const executor = createExecutor(
     const res = await myClient.request({ method, url, params, body, headers, signal })
     return res.data
   },
-  [withTimeout(5000), withRetry(2)],
+  { plugins: [authPlugin, logger()] },
 )
 ```
 
@@ -23,8 +23,10 @@ const executor = createExecutor(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `transportFn` | `(opts: ExecuteOptions) => Promise<unknown>` | The actual HTTP call |
-| `middlewares` | `ExecutorMiddleware[]` | Optional middleware chain, applied in declaration order |
+| `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | The actual HTTP call |
+| `options.plugins` | `ExecutorPlugin[]` | Plugins applied in declaration order (first is outermost) |
+
+For `retry` and `timeout`, use the options on [`createFetchExecutor`](/en/executors/fetch). For axios and ky, configure them on the underlying instance.
 
 ## `ExecuteOptions`
 
@@ -43,15 +45,16 @@ interface ExecuteOptions {
 
 `params` contains the `query` fields from your endpoint's `request` schema. Serialize them as a query string when constructing the request URL.
 
-## Middleware chain
+## Plugin execution order
 
-Middlewares wrap the transport in declaration order — the first middleware in the array is the outermost wrapper:
+Plugins run in declaration order — the first plugin in the array is the outermost wrapper:
 
 ```ts
-createExecutor(transport, [withTimeout(8_000), withRetry(3), withLogger()])
-// execution order: withTimeout → withRetry → withLogger → transport
+createExecutor(transport, { plugins: [authPlugin, logger()] })
+// onRequest:  authPlugin → logger → transport
+// onResponse: logger → authPlugin
 ```
 
-See [Middleware](/en/api-reference/middleware) for built-in options and custom middleware.
+See [Plugins](/en/api-reference/middleware) for built-in options and how to write custom plugins.
 
 To select the transport dynamically at request time (e.g. SSR vs CSR), see [`dispatchExecutor()`](/en/api-reference/dispatch-executor).

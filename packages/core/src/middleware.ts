@@ -75,8 +75,6 @@ export function logger(options?: {
   });
 }
 
-// Internal helpers — not part of the public API
-
 export function withRetry(
   count: number,
   options?: { shouldRetry?: (error: unknown, attempt: number) => boolean },

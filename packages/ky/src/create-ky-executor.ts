@@ -80,6 +80,6 @@ export function createKyExecutor(
       const text = await response.text();
       return text === "" ? null : JSON.parse(text);
     },
-    options ?? {},
+    options,
   );
 }
