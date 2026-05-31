@@ -5,27 +5,27 @@ description: Named, composable executor plugins with request/response/error hook
 
 # Plugins
 
-Plugins are named objects with optional lifecycle hooks. Pass them via `plugins` in `createExecutor`. `retry` and `timeout` are first-class options on `createFetchExecutor`.
+## Why plugins, not middleware?
+
+The classic middleware pattern (`(opts, next) => Promise`) works well for cross-lifecycle concerns like retry and timeout. But for the most common use cases — auth header injection, error handling, logging — related concerns get split across multiple functions:
 
 ```ts
-import { createExecutor, definePlugin, logger } from '@routar/core'
+// middleware approach: auth header injection and 401 refresh are separate
+createExecutor(transport, [withAuth, withAuthRefresh])
+```
 
+Plugins bundle related concerns into a single named unit:
+
+```ts
+// plugin approach: auth header + 401 refresh in one place
 const authPlugin = definePlugin({
   name: 'auth',
-  onRequest: async (opts) => ({
-    ...opts,
-    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
-  }),
-  onError: async (err) => {
-    if (isUnauthorized(err)) await refreshToken()
-    throw err
-  },
-})
-
-const executor = createExecutor(transport, {
-  plugins: [authPlugin, logger({ log: (msg, data) => myLogger.debug(msg, data) })],
+  onRequest: async (opts) => ({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` } }),
+  onError: async (err) => { if (isUnauthorized(err)) await refreshToken(); throw err },
 })
 ```
+
+`retry` and `timeout` remain as first-class options on `createFetchExecutor` because they require cross-lifecycle state that cannot be cleanly expressed as a plugin.
 
 ## Plugin interface
 
@@ -38,7 +38,11 @@ interface ExecutorPlugin {
 }
 ```
 
-All hooks are optional. Implement only what you need.
+All hooks are optional — implement only what you need.
+
+**`onError` must always throw.** The return type is `never`, meaning you must re-throw the original error or throw a different one. You cannot swallow an error by returning normally.
+
+**`name`** is optional but useful for debugging. When you log the active plugins on an executor, named plugins are identifiable. Future versions may support `eject` by name.
 
 ## Built-in plugin
 
@@ -57,7 +61,7 @@ logger({ log: (msg, data) => myLogger.debug(msg, data) })
 
 ## Custom plugins
 
-Use `definePlugin` for type inference:
+Use `definePlugin` for full type inference on all hooks:
 
 ```ts
 import { definePlugin } from '@routar/core'
@@ -69,23 +73,69 @@ const correlationPlugin = definePlugin({
     headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() },
   }),
 })
+```
 
-const errorNormalizerPlugin = definePlugin({
+## Real-world examples
+
+### Auth with token refresh
+
+Bundle header injection and 401 recovery in one plugin. This is the primary motivation for the plugin design — these two concerns belong together:
+
+```ts
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
   onError: async (err) => {
-    if (isAxiosError(err)) throw new HttpError(err.response?.status ?? 0, err.message)
+    if (err instanceof HttpError && err.status === 401) {
+      await refreshToken()
+    }
     throw err
   },
 })
 ```
 
+### Error normalization
+
+Different transports throw different error types. Normalize them for consistent error handling across your app:
+
+```ts
+import { isAxiosError } from 'axios'
+import { HttpError } from '@routar/core'
+
+const errorNormalizerPlugin = definePlugin({
+  name: 'error-normalizer',
+  onError: async (err) => {
+    if (isAxiosError(err)) {
+      throw new HttpError(err.response?.status ?? 0, err.message, err.response?.data)
+    }
+    throw err
+  },
+})
+```
+
+### Response transformation
+
+Transform responses globally — useful for unwrapping API envelopes:
+
+```ts
+// If your API wraps responses as { data: ..., meta: ... }
+const unwrapPlugin = definePlugin({
+  onResponse: (res) => (res as { data: unknown }).data ?? res,
+})
+```
+
 ## retry and timeout
 
-`retry` and `timeout` are available on `createFetchExecutor`:
+`retry` and `timeout` are available as options on `createFetchExecutor`, not as plugins. They require cross-lifecycle state (a timer that must be cleaned up in both success and error paths for timeout; a loop that re-calls `next` for retry) that cannot be expressed cleanly as `onRequest`/`onResponse`/`onError` hooks.
 
 ```ts
 import { createFetchExecutor } from '@routar/core'
 
 const executor = createFetchExecutor('https://api.example.com', {
+  plugins: [authPlugin, logger()],
   retry: 3,
   timeout: 5_000,
 })
@@ -97,7 +147,7 @@ const executor = createFetchExecutor('https://api.example.com', {
 retry: { count: 3, shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }
 ```
 
-When the timeout fires, the rejection is a `TimeoutError`:
+When the timeout fires, the rejection is a `TimeoutError` (distinguishable from a user-initiated `AbortSignal`):
 
 ```ts
 import { TimeoutError } from '@routar/core'
@@ -105,9 +155,7 @@ import { TimeoutError } from '@routar/core'
 try {
   await api.getList()
 } catch (err) {
-  if (err instanceof TimeoutError) {
-    console.log(`Timed out after ${err.ms}ms`)
-  }
+  if (err instanceof TimeoutError) console.log(`Timed out after ${err.ms}ms`)
 }
 ```
 

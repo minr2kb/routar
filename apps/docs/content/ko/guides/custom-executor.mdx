@@ -43,13 +43,31 @@ const executor = createExecutor(async ({ method, url, params, body, headers, sig
 })
 ```
 
-## 미들웨어 추가
+## 플러그인 추가
+
+`options` 객체로 플러그인을 전달합니다. 이 executor를 통한 모든 요청에 적용됩니다.
 
 ```ts
-const executor = createExecutor(transport, [withTimeout(8_000), withRetry(3), withLogger()])
+import { createExecutor, definePlugin, logger } from '@routar/core'
+
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+})
+
+const executor = createExecutor(transport, {
+  plugins: [authPlugin, logger()],
+})
 ```
 
+커스텀 transport에서 retry와 timeout이 필요하면 각 HTTP 클라이언트에서 설정하세요 (예: `ky.create({ retry, timeout })`, `got({ retry, timeout })`). 내장 `retry`와 `timeout` 옵션은 `createFetchExecutor`에서만 사용할 수 있습니다.
+
 ## Validator 호환성
+
+`response` 스키마는 `.parse(data: unknown): T` 메서드만 있으면 됩니다. Zod, Valibot, Yup 또는 직접 만든 validator 모두 가능합니다:
 
 ```ts
 const TodoValidator = {

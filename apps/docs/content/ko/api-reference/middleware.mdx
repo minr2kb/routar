@@ -5,27 +5,27 @@ description: request/response/error 훅을 가진 이름 있는 플러그인 —
 
 # 플러그인
 
-플러그인은 선택적 라이프사이클 훅을 가진 이름 있는 객체입니다. `createExecutor`의 `plugins` 옵션으로 전달합니다. `retry`와 `timeout`은 `createFetchExecutor`의 first-class 옵션입니다.
+## 왜 미들웨어 대신 플러그인인가?
+
+미들웨어 패턴(`(opts, next) => Promise`)은 retry, timeout 같이 라이프사이클 전체를 감싸야 하는 케이스에는 적합합니다. 하지만 가장 흔한 사용 케이스인 인증 헤더 주입, 에러 처리, 로깅에서는 연관된 관심사가 두 개로 쪼개집니다:
 
 ```ts
-import { createExecutor, definePlugin, logger } from '@routar/core'
+// 미들웨어 방식: 인증 헤더 주입과 401 갱신이 별개 함수
+createExecutor(transport, [withAuth, withAuthRefresh])
+```
 
+플러그인은 연관된 관심사를 하나의 이름 있는 단위로 묶습니다:
+
+```ts
+// 플러그인 방식: 인증 헤더 + 401 갱신을 한 곳에
 const authPlugin = definePlugin({
   name: 'auth',
-  onRequest: async (opts) => ({
-    ...opts,
-    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
-  }),
-  onError: async (err) => {
-    if (isUnauthorized(err)) await refreshToken()
-    throw err
-  },
-})
-
-const executor = createExecutor(transport, {
-  plugins: [authPlugin, logger({ log: (msg, data) => myLogger.debug(msg, data) })],
+  onRequest: async (opts) => ({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` } }),
+  onError: async (err) => { if (isUnauthorized(err)) await refreshToken(); throw err },
 })
 ```
+
+`retry`와 `timeout`은 `createFetchExecutor`의 first-class 옵션으로 남습니다. 이 둘은 플러그인의 `onRequest`/`onResponse`/`onError` 훅으로 깔끔하게 표현할 수 없는 cross-lifecycle 상태(timeout의 타이머 정리, retry의 `next` 재호출)를 필요로 하기 때문입니다.
 
 ## 플러그인 인터페이스
 
@@ -39,6 +39,10 @@ interface ExecutorPlugin {
 ```
 
 모든 훅은 선택적입니다. 필요한 것만 구현하세요.
+
+**`onError`는 반드시 throw해야 합니다.** 반환 타입이 `never`이므로 원본 에러를 re-throw하거나 다른 에러를 throw해야 합니다. 정상적으로 return해서 에러를 삼킬 수 없습니다.
+
+**`name`** 은 선택적이지만 디버깅에 유용합니다. executor의 활성 플러그인을 로깅할 때 이름 있는 플러그인을 식별할 수 있습니다.
 
 ## 내장 플러그인
 
@@ -57,7 +61,7 @@ logger({ log: (msg, data) => myLogger.debug(msg, data) })
 
 ## 커스텀 플러그인
 
-`definePlugin`으로 타입 추론을 제공합니다:
+`definePlugin`으로 모든 훅에 대한 완전한 타입 추론을 제공받습니다:
 
 ```ts
 import { definePlugin } from '@routar/core'
@@ -69,23 +73,69 @@ const correlationPlugin = definePlugin({
     headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() },
   }),
 })
+```
 
-const errorNormalizerPlugin = definePlugin({
+## 실전 예제
+
+### 토큰 갱신이 포함된 인증
+
+헤더 주입과 401 복구를 하나의 플러그인으로 묶습니다. 이것이 플러그인 설계의 핵심 동기입니다 — 이 두 관심사는 함께 있어야 합니다:
+
+```ts
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
   onError: async (err) => {
-    if (isAxiosError(err)) throw new HttpError(err.response?.status ?? 0, err.message)
+    if (err instanceof HttpError && err.status === 401) {
+      await refreshToken()
+    }
     throw err
   },
 })
 ```
 
+### 에러 정규화
+
+transport마다 다른 에러 타입을 앱 전체에서 일관되게 처리할 수 있도록 정규화합니다:
+
+```ts
+import { isAxiosError } from 'axios'
+import { HttpError } from '@routar/core'
+
+const errorNormalizerPlugin = definePlugin({
+  name: 'error-normalizer',
+  onError: async (err) => {
+    if (isAxiosError(err)) {
+      throw new HttpError(err.response?.status ?? 0, err.message, err.response?.data)
+    }
+    throw err
+  },
+})
+```
+
+### 응답 변환
+
+API 응답을 전역으로 변환합니다 — API envelope를 unwrap할 때 유용합니다:
+
+```ts
+// API가 { data: ..., meta: ... } 형태로 응답을 감싸는 경우
+const unwrapPlugin = definePlugin({
+  onResponse: (res) => (res as { data: unknown }).data ?? res,
+})
+```
+
 ## retry와 timeout
 
-`retry`와 `timeout`은 `createFetchExecutor`에서 사용합니다:
+`retry`와 `timeout`은 플러그인이 아닌 `createFetchExecutor`의 옵션입니다. 이 둘은 플러그인 훅으로 표현할 수 없는 cross-lifecycle 상태를 필요로 합니다(timeout은 성공/실패 양쪽에서 타이머를 정리해야 하고, retry는 `next`를 다시 호출해야 합니다).
 
 ```ts
 import { createFetchExecutor } from '@routar/core'
 
 const executor = createFetchExecutor('https://api.example.com', {
+  plugins: [authPlugin, logger()],
   retry: 3,
   timeout: 5_000,
 })
@@ -97,7 +147,7 @@ const executor = createFetchExecutor('https://api.example.com', {
 retry: { count: 3, shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }
 ```
 
-타임아웃 발생 시 `TimeoutError`가 던져집니다:
+타임아웃 발생 시 `TimeoutError`가 던져집니다 (사용자가 직접 취소한 `AbortSignal`과 구분 가능):
 
 ```ts
 import { TimeoutError } from '@routar/core'
@@ -105,9 +155,7 @@ import { TimeoutError } from '@routar/core'
 try {
   await api.getList()
 } catch (err) {
-  if (err instanceof TimeoutError) {
-    console.log(`${err.ms}ms 후 타임아웃`)
-  }
+  if (err instanceof TimeoutError) console.log(`${err.ms}ms 후 타임아웃`)
 }
 ```
 

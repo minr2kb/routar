@@ -8,7 +8,15 @@ description: Low-level factory for integrating any HTTP client with routar's plu
 Low-level factory used internally by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`. Use this to integrate any HTTP client with routar's plugin system.
 
 ```ts
-import { createExecutor } from '@routar/core'
+import { createExecutor, definePlugin, logger } from '@routar/core'
+
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+})
 
 const executor = createExecutor(
   async ({ method, url, params, body, headers, signal }) => {
@@ -53,6 +61,7 @@ Plugins run in declaration order — the first plugin in the array is the outerm
 createExecutor(transport, { plugins: [authPlugin, logger()] })
 // onRequest:  authPlugin → logger → transport
 // onResponse: logger → authPlugin
+// onError:    logger → authPlugin
 ```
 
 See [Plugins](/en/api-reference/middleware) for built-in options and how to write custom plugins.
