@@ -40,7 +40,6 @@
     "dev": "tsup --watch"
   },
   "peerDependencies": {
-    "@routar/core": ">=1.2.1",
     "msw": ">=2.0.0"
   },
   "devDependencies": {
