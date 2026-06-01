@@ -32,7 +32,7 @@ const executor = createExecutor(
 | 파라미터 | 타입 | 설명 |
 |-----------|------|------|
 | `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | 실제 HTTP 호출 |
-| `options.plugins` | `ExecutorPlugin[]` | 선언 순서대로 적용되는 플러그인 (첫 번째가 가장 바깥쪽) |
+| `options.plugins` | `ExecutorPlugin[]` | 선언 순서대로 적용되는 플러그인 (첫 번째가 가장 바깥쪽). [Plugin](/ko/api-reference/middleware) 참고. |
 
 `retry`와 `timeout`은 [`createFetchExecutor`](/ko/executors/fetch) 옵션을 사용하세요. axios와 ky는 각 라이브러리 인스턴스에서 설정합니다.
 
@@ -50,7 +50,5 @@ interface ExecuteOptions {
   signal?: AbortSignal
 }
 ```
-
-실행 순서와 플러그인 작성 방법은 [Plugin](/ko/api-reference/middleware)을 참고하세요.
 
 SSR/CSR 환경 분기가 필요한 경우 [`dispatchExecutor()`](/ko/api-reference/dispatch-executor)를 참고하세요.

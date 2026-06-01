@@ -32,7 +32,7 @@ const executor = createExecutor(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | The actual HTTP call |
-| `options.plugins` | `ExecutorPlugin[]` | Plugins applied in declaration order (first is outermost) |
+| `options.plugins` | `ExecutorPlugin[]` | Plugins applied in declaration order (first is outermost). See [Plugins](/en/api-reference/middleware). |
 
 For `retry` and `timeout`, use the options on [`createFetchExecutor`](/en/executors/fetch). For axios and ky, configure them on the underlying instance.
 
@@ -52,7 +52,5 @@ interface ExecuteOptions {
 ```
 
 `params` contains the `query` fields from your endpoint's `request` schema. Serialize them as a query string when constructing the request URL.
-
-See [Plugins](/en/api-reference/middleware) for execution order, built-in options, and how to write custom plugins.
 
 To select the transport dynamically at request time (e.g. SSR vs CSR), see [`dispatchExecutor()`](/en/api-reference/dispatch-executor).
