@@ -5,27 +5,7 @@ description: request/response/error 훅을 가진 이름 있는 플러그인 —
 
 # 플러그인
 
-## 왜 미들웨어 대신 플러그인인가?
-
-미들웨어 패턴(`(opts, next) => Promise`)은 retry, timeout 같이 라이프사이클 전체를 감싸야 하는 케이스에는 적합합니다. 하지만 가장 흔한 사용 케이스인 인증 헤더 주입, 에러 처리, 로깅에서는 연관된 관심사가 두 개로 쪼개집니다:
-
-```ts
-// 미들웨어 방식: 인증 헤더 주입과 401 갱신이 별개 함수
-createExecutor(transport, [withAuth, withAuthRefresh])
-```
-
-플러그인은 연관된 관심사를 하나의 이름 있는 단위로 묶습니다:
-
-```ts
-// 플러그인 방식: 인증 헤더 + 401 갱신을 한 곳에
-const authPlugin = definePlugin({
-  name: 'auth',
-  onRequest: async (opts) => ({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` } }),
-  onError: async (err) => { if (isUnauthorized(err)) await refreshToken(); throw err },
-})
-```
-
-`retry`와 `timeout`은 `createFetchExecutor`의 first-class 옵션으로 남습니다. 이 둘은 플러그인의 `onRequest`/`onResponse`/`onError` 훅으로 깔끔하게 표현할 수 없는 cross-lifecycle 상태(timeout의 타이머 정리, retry의 `next` 재호출)를 필요로 하기 때문입니다.
+플러그인은 선택적 라이프사이클 훅(`onRequest`, `onResponse`, `onError`)을 가진 이름 있는 객체입니다. 연관된 관심사를 하나의 플러그인으로 묶을 수 있습니다. 예를 들어 인증 헤더 주입과 401 토큰 갱신은 함께 있어야 하는 관심사이며 하나의 단위로 표현할 수 있습니다.
 
 ## 플러그인 인터페이스
 
@@ -129,7 +109,7 @@ const unwrapPlugin = definePlugin({
 
 ## retry와 timeout
 
-`retry`와 `timeout`은 플러그인이 아닌 `createFetchExecutor`의 옵션입니다. 이 둘은 플러그인 훅으로 표현할 수 없는 cross-lifecycle 상태를 필요로 합니다(timeout은 성공/실패 양쪽에서 타이머를 정리해야 하고, retry는 `next`를 다시 호출해야 합니다).
+`retry`와 `timeout`은 `createFetchExecutor`의 옵션입니다:
 
 ```ts
 import { createFetchExecutor } from '@routar/core'

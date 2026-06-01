@@ -5,27 +5,7 @@ description: Named, composable executor plugins with request/response/error hook
 
 # Plugins
 
-## Why plugins, not middleware?
-
-The classic middleware pattern (`(opts, next) => Promise`) works well for cross-lifecycle concerns like retry and timeout. But for the most common use cases — auth header injection, error handling, logging — related concerns get split across multiple functions:
-
-```ts
-// middleware approach: auth header injection and 401 refresh are separate
-createExecutor(transport, [withAuth, withAuthRefresh])
-```
-
-Plugins bundle related concerns into a single named unit:
-
-```ts
-// plugin approach: auth header + 401 refresh in one place
-const authPlugin = definePlugin({
-  name: 'auth',
-  onRequest: async (opts) => ({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` } }),
-  onError: async (err) => { if (isUnauthorized(err)) await refreshToken(); throw err },
-})
-```
-
-`retry` and `timeout` remain as first-class options on `createFetchExecutor` because they require cross-lifecycle state that cannot be cleanly expressed as a plugin.
+Plugins are named objects with optional lifecycle hooks — `onRequest`, `onResponse`, `onError`. Bundle related concerns into a single plugin: for example, injecting an auth header and handling 401 token refresh belong together and can be expressed as one unit.
 
 ## Plugin interface
 
@@ -129,7 +109,7 @@ const unwrapPlugin = definePlugin({
 
 ## retry and timeout
 
-`retry` and `timeout` are available as options on `createFetchExecutor`, not as plugins. They require cross-lifecycle state (a timer that must be cleaned up in both success and error paths for timeout; a loop that re-calls `next` for retry) that cannot be expressed cleanly as `onRequest`/`onResponse`/`onError` hooks.
+`retry` and `timeout` are available as options on `createFetchExecutor`:
 
 ```ts
 import { createFetchExecutor } from '@routar/core'
