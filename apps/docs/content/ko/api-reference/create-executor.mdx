@@ -51,17 +51,6 @@ interface ExecuteOptions {
 }
 ```
 
-## 플러그인 실행 순서
-
-플러그인은 선언 순서로 실행됩니다 — 배열의 첫 번째 플러그인이 가장 바깥쪽입니다:
-
-```ts
-createExecutor(transport, { plugins: [authPlugin, logger()] })
-// onRequest:  authPlugin → logger → transport
-// onResponse: logger → authPlugin
-// onError:    logger → authPlugin
-```
-
-플러그인 작성 방법은 [플러그인](/ko/api-reference/middleware)을 참고하세요.
+실행 순서와 플러그인 작성 방법은 [Plugin](/ko/api-reference/middleware)을 참고하세요.
 
 SSR/CSR 환경 분기가 필요한 경우 [`dispatchExecutor()`](/ko/api-reference/dispatch-executor)를 참고하세요.

@@ -53,17 +53,6 @@ interface ExecuteOptions {
 
 `params` contains the `query` fields from your endpoint's `request` schema. Serialize them as a query string when constructing the request URL.
 
-## Plugin execution order
-
-Plugins run in declaration order — the first plugin in the array is the outermost wrapper:
-
-```ts
-createExecutor(transport, { plugins: [authPlugin, logger()] })
-// onRequest:  authPlugin → logger → transport
-// onResponse: logger → authPlugin
-// onError:    logger → authPlugin
-```
-
-See [Plugins](/en/api-reference/middleware) for built-in options and how to write custom plugins.
+See [Plugins](/en/api-reference/middleware) for execution order, built-in options, and how to write custom plugins.
 
 To select the transport dynamically at request time (e.g. SSR vs CSR), see [`dispatchExecutor()`](/en/api-reference/dispatch-executor).

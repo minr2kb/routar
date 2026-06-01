@@ -24,6 +24,17 @@ All hooks are optional — implement only what you need.
 
 **`name`** is optional but useful for debugging. When you log the active plugins on an executor, named plugins are identifiable. Future versions may support `eject` by name.
 
+## Execution order
+
+Plugins run in declaration order — the first plugin in the array is the outermost wrapper:
+
+```ts
+createExecutor(transport, { plugins: [authPlugin, logger()] })
+// onRequest:  authPlugin → logger → transport
+// onResponse: logger → authPlugin
+// onError:    logger → authPlugin
+```
+
 ## Built-in plugin
 
 ### `logger(options?)`
