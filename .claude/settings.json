@@ -9,6 +9,12 @@
             "if": "Bash(git commit*)",
             "command": "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[PRE-COMMIT CHECKLIST] Before committing, verify all 4 steps are complete: (1) README updated (2) Tests updated (3) CLAUDE.md updated (4) apps/docs updated. Stop and complete any missing steps first.\"}}'",
             "statusMessage": "Checking pre-commit requirements..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "staged=$(git diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q 'apps/docs/content/'; then missing=''; echo \"$staged\" | grep -q 'apps/docs/public/llms.txt' || missing=\"$missing llms.txt\"; echo \"$staged\" | grep -q 'AGENTS.md' || missing=\"$missing AGENTS.md\"; if [ -n \"$missing\" ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[LLM DOCS ALERT] apps/docs/content changed but these LLM docs are NOT staged:%s — update them before committing.\"}}' \"$missing\"; fi; fi",
+            "statusMessage": "Checking LLM docs sync..."
           }
         ]
       }

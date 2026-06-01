@@ -6,7 +6,7 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 
 ## Packages
 
-- `@routar/core` — endpoint definitions, router, API client, middleware, native fetch executor
+- `@routar/core` — endpoint definitions, router, API client, plugin system, native fetch executor
 - `@routar/axios` — Axios-based executor
 - `@routar/ky` — ky-based executor
 - `@routar/msw` — MSW v2 mock handler factory (for testing)
@@ -16,7 +16,7 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 [endpoint(spec)](https://routar.vercel.app/api-reference): Define a single typed endpoint. Enforces path params at compile time.
 [defineRouter(prefix, endpoints)](https://routar.vercel.app/api-reference): Group endpoints under a shared URL prefix. Supports arbitrary nesting.
 [createApi(executor, router)](https://routar.vercel.app/api-reference): Build a fully-typed API client. Each endpoint becomes an async function `(params, signal?) => Promise<Response>`.
-[createExecutor(transportFn, middlewares?)](https://routar.vercel.app/api-reference): Wrap any HTTP client with a middleware chain.
+[createExecutor(transport, options?)](https://routar.vercel.app/api-reference): Wrap any HTTP client with routar's plugin system. Pass `plugins` via options.
 [dispatchExecutor(resolver)](https://routar.vercel.app/api-reference): Pick executor at request time — use for SSR/CSR routing without duplicate API instances.
 
 ## Executors
@@ -25,12 +25,12 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 [createAxiosExecutor(instanceOrFactory, options?)](https://routar.vercel.app/executors): Axios instance or async factory — great for CSR with interceptors. From `@routar/axios`.
 [createKyExecutor(instanceOrFactory, options?)](https://routar.vercel.app/executors): ky instance or factory. From `@routar/ky`.
 
-## Middleware
+## Plugins
 
-[withRetry(count, options?)](https://routar.vercel.app/api-reference): Retry on failure up to count times. Accepts custom `shouldRetry` predicate.
-[withTimeout(ms)](https://routar.vercel.app/api-reference): Abort if no response within ms milliseconds. Throws `TimeoutError`.
-[withLogger(options?)](https://routar.vercel.app/api-reference): Log each request with method, URL, and duration.
-[defineMiddleware(fn)](https://routar.vercel.app/api-reference): Create a custom middleware with full type inference on `opts` and `next`.
+[definePlugin(plugin)](https://routar.vercel.app/api-reference): Create a named plugin with `onRequest`, `onResponse`, `onError` hooks. Use for auth, logging, error normalization.
+[logger(options?)](https://routar.vercel.app/api-reference): Built-in plugin — logs method, URL, and duration. Pass `{ log }` for a custom log function.
+
+`retry` and `timeout` are options on `createFetchExecutor` (not plugins): `retry: 3`, `timeout: 5_000`.
 
 ## Testing
 
