@@ -15,6 +15,18 @@
             "if": "Bash(git commit*)",
             "command": "staged=$(git diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q 'apps/docs/content/'; then missing=''; echo \"$staged\" | grep -q 'apps/docs/public/llms.txt' || missing=\"$missing llms.txt\"; echo \"$staged\" | grep -q 'AGENTS.md' || missing=\"$missing AGENTS.md\"; if [ -n \"$missing\" ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[LLM DOCS ALERT] apps/docs/content changed but these LLM docs are NOT staged:%s — update them before committing.\"}}' \"$missing\"; fi; fi",
             "statusMessage": "Checking LLM docs sync..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[PUSH GUARD] git push requires explicit user confirmation. Do NOT push unless the user has explicitly asked to push or create a PR in this message.\"}}' ",
+            "statusMessage": "Checking push authorization..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh pr create*)",
+            "command": "cs=$(find .changeset -name '*.md' ! -name 'README.md' 2>/dev/null | wc -l | tr -d ' '); if [ \"$cs\" -eq 0 ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[CHANGESET REMINDER] No pending changeset found. Ask the user whether a version bump is needed (minor for new features, patch for bug fixes, major for breaking changes) before opening the PR.\"}}'; fi",
+            "statusMessage": "Checking changeset..."
           }
         ]
       }
