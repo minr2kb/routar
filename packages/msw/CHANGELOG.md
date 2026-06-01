@@ -1,5 +1,11 @@
 # @routar/msw
 
+## 1.3.0
+
+### Minor Changes
+
+- Updated dependency `@routar/core` to `1.3.0`.
+
 ## 1.2.1
 
 ### Patch Changes

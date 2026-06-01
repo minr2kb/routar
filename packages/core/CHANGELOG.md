@@ -1,5 +1,11 @@
 # @routar/core
 
+## 1.3.0
+
+### Minor Changes
+
+- Replace middleware system with plugin API. `createExecutor` now accepts `{ plugins }` option with `ExecutorPlugin` objects (`onRequest` / `onResponse` / `onError` hooks). Add `definePlugin` and `logger` helpers. `retry` and `timeout` remain as options on `createFetchExecutor`.
+
 ## 1.2.1
 
 ### Patch Changes
