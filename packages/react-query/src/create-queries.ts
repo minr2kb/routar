@@ -1,5 +1,10 @@
+import type {
+  ApiClient,
+  EndpointSpec,
+  RouterDef,
+  RouterEndpoints,
+} from "@routar/core";
 import { isRouterDef } from "@routar/core";
-import type { ApiClient, EndpointSpec, RouterDef, RouterEndpoints } from "@routar/core";
 import { queryOptions } from "@tanstack/react-query";
 import type { CreateQueriesOptions, Queries } from "./types.js";
 import { buildQueryKey, prefixToSegments } from "./utils/key.js";
@@ -15,7 +20,11 @@ export function createQueries<TEndpoints extends RouterEndpoints>(
   options?: CreateQueriesOptions,
 ): Queries<TEndpoints> {
   const root = options?.key ? [options.key] : prefixToSegments(router.prefix);
-  return buildQueries(api as Record<string, unknown>, router.endpoints, root) as Queries<TEndpoints>;
+  return buildQueries(
+    api as Record<string, unknown>,
+    router.endpoints,
+    root,
+  ) as Queries<TEndpoints>;
 }
 
 function buildQueries(
@@ -36,7 +45,10 @@ function buildQueries(
       continue;
     }
     const spec = entry as EndpointSpec<any, any, any>;
-    const fn = apiNode[name] as (params?: unknown, signal?: AbortSignal) => Promise<unknown>;
+    const fn = apiNode[name] as (
+      params?: unknown,
+      signal?: AbortSignal,
+    ) => Promise<unknown>;
     out[name] =
       spec.method === "GET"
         ? makeQueryAccessor(fn, root, name)

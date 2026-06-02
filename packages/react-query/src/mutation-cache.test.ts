@@ -9,7 +9,9 @@ describe("routarMutationCache", () => {
     qc.invalidateQueries = spy as unknown as typeof qc.invalidateQueries;
 
     const cache = routarMutationCache(() => qc);
-    const fakeMutation = { meta: { invalidates: [["todos"], ["users", "detail"]] } };
+    const fakeMutation = {
+      meta: { invalidates: [["todos"], ["users", "detail"]] },
+    };
 
     // The MutationCache onSuccess callback is stored on its config.
     cache.config.onSuccess?.(
@@ -31,8 +33,20 @@ describe("routarMutationCache", () => {
     qc.invalidateQueries = spy as unknown as typeof qc.invalidateQueries;
 
     const cache = routarMutationCache(() => qc);
-    cache.config.onSuccess?.(undefined, undefined, undefined, { meta: {} } as never, undefined as never);
-    cache.config.onSuccess?.(undefined, undefined, undefined, {} as never, undefined as never);
+    cache.config.onSuccess?.(
+      undefined,
+      undefined,
+      undefined,
+      { meta: {} } as never,
+      undefined as never,
+    );
+    cache.config.onSuccess?.(
+      undefined,
+      undefined,
+      undefined,
+      {} as never,
+      undefined as never,
+    );
 
     expect(spy).not.toHaveBeenCalled();
   });

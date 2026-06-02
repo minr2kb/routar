@@ -1,5 +1,5 @@
-import { MutationCache } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
+import { MutationCache } from "@tanstack/react-query";
 
 /**
  * Builds a {@link MutationCache} that reads `mutation.meta.invalidates` and

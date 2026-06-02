@@ -9,7 +9,6 @@ import type {
   DefaultError,
   QueryFunction,
   QueryKey,
-  SkipToken,
   UseMutationOptions,
   UseQueryOptions,
 } from "@tanstack/react-query";
@@ -53,17 +52,18 @@ type ParamsOptional<TParams> = [TParams] extends [void]
     : false;
 
 /** A GET endpoint exposed as a query-options factory. */
-export type QueryAccessor<TParams, TData> = (ParamsOptional<TParams> extends true
-  ? (
-      params?: TParams,
-      options?: QueryAccessorOptions<TData>,
-    ) => QueryAccessorResult<TData>
-  : (
-      params: TParams,
-      options?: QueryAccessorOptions<TData>,
-    ) => QueryAccessorResult<TData>) & {
-  queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
-};
+export type QueryAccessor<TParams, TData> =
+  (ParamsOptional<TParams> extends true
+    ? (
+        params?: TParams,
+        options?: QueryAccessorOptions<TData>,
+      ) => QueryAccessorResult<TData>
+    : (
+        params: TParams,
+        options?: QueryAccessorOptions<TData>,
+      ) => QueryAccessorResult<TData>) & {
+    queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
+  };
 
 /** Mutation options plus the declarative `invalidates` sugar. */
 export type RoutarMutationOptions<TData, TVars> = Omit<
