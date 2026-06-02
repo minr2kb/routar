@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { createFetchExecutor, HttpError } from "./create-fetch-executor.js";
 import { definePlugin } from "./middleware.js";
+import type { ExecuteOptions } from "./types.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -173,7 +174,7 @@ describe("createFetchExecutor — plugin + retry execution order", () => {
   });
 
   it("plugin.onRequest runs on every retry attempt", async () => {
-    const onRequest = mock((o: Parameters<typeof definePlugin>[0]["onRequest"] extends (o: infer O) => any ? O : never) => o);
+    const onRequest = mock((o: ExecuteOptions) => o);
     let calls = 0;
     globalThis.fetch = mock(async () => {
       if (++calls < 3) throw new TypeError("transient");
