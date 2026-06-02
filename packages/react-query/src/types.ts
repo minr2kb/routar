@@ -1,7 +1,6 @@
 import type {
   EndpointSpec,
   InferResponse,
-  RequestShape,
   RouterDef,
   RouterEndpoints,
 } from "@routar/core";
@@ -72,7 +71,13 @@ export type Queries<TEndpoints extends RouterEndpoints> = {
     ? Queries<Nested>
     : TEndpoints[K] extends EndpointSpec<any, any, any>
       ? TEndpoints[K]["method"] extends "GET"
-        ? QueryAccessor<EndpointParams<TEndpoints[K]>, InferResponse<TEndpoints[K]>>
-        : MutationAccessor<EndpointParams<TEndpoints[K]>, InferResponse<TEndpoints[K]>>
+        ? QueryAccessor<
+            EndpointParams<TEndpoints[K]>,
+            InferResponse<TEndpoints[K]>
+          >
+        : MutationAccessor<
+            EndpointParams<TEndpoints[K]>,
+            InferResponse<TEndpoints[K]>
+          >
       : never;
 } & { $key: QueryKey };
