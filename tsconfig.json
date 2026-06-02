@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/axios" },
-    { "path": "./packages/ky" }
+    { "path": "./packages/ky" },
+    { "path": "./packages/react-query" }
   ]
 }
