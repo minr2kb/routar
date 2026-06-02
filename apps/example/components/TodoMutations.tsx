@@ -1,16 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import type { TodoItem } from "@/remote/services/todo/todo.api";
-import {
-  useCreateTodo,
-  useDeleteTodo,
-  useUpdateTodo,
-} from "../remote/services/todo/todo.queries";
+import { todoQuery } from "../remote/services/todo/todo.queries";
 
 export function CreateTodoForm() {
   const [title, setTitle] = useState("");
-  const create = useCreateTodo();
+  const create = useMutation(todoQuery.create({ invalidates: [todoQuery.$key] }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,8 +38,8 @@ export function CreateTodoForm() {
 }
 
 export function TodoRow({ todo }: { todo: TodoItem }) {
-  const update = useUpdateTodo();
-  const remove = useDeleteTodo();
+  const update = useMutation(todoQuery.update({ invalidates: [todoQuery.$key] }));
+  const remove = useMutation(todoQuery.remove({ invalidates: [todoQuery.$key] }));
 
   return (
     <li
@@ -74,7 +71,7 @@ export function TodoRow({ todo }: { todo: TodoItem }) {
       <small style={{ color: "#999" }}>user {todo.userId}</small>
       <button
         type="button"
-        onClick={() => remove.mutate(todo.id)}
+        onClick={() => remove.mutate({ path: { id: todo.id } })}
         disabled={remove.isPending}
         style={{
           color: "red",

@@ -7,7 +7,9 @@ import type {
 import type {
   DataTag,
   DefaultError,
+  QueryFunction,
   QueryKey,
+  SkipToken,
   UseMutationOptions,
   UseQueryOptions,
 } from "@tanstack/react-query";
@@ -31,13 +33,17 @@ export type QueryAccessorOptions<TData> = Omit<
   "queryKey" | "queryFn"
 >;
 
-/** The shape returned by a query accessor — matches TanStack's `queryOptions()`. */
-export type QueryAccessorResult<TData> = UseQueryOptions<
-  TData,
-  DefaultError,
-  TData,
-  QueryKey
-> & { queryKey: DataTag<QueryKey, TData, DefaultError> };
+/** The shape returned by a query accessor — matches TanStack's `queryOptions()`.
+ * `queryFn` explicitly excludes `SkipToken` so the result is assignable to
+ * both `useQuery` and `useSuspenseQuery` (which rejects `skipToken`).
+ */
+export type QueryAccessorResult<TData> = Omit<
+  UseQueryOptions<TData, DefaultError, TData, QueryKey>,
+  "queryFn"
+> & {
+  queryFn?: QueryFunction<TData, QueryKey, never>;
+  queryKey: DataTag<QueryKey, TData, DefaultError>;
+};
 
 /** True when the accessor can be called with no params (no request, or fully-optional request). */
 type ParamsOptional<TParams> = [TParams] extends [void]

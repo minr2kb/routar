@@ -2,7 +2,7 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { todoListQueryOptions } from "@/remote/services/todo/todo.queries";
+import { todoQuery } from "@/remote/services/todo/todo.queries";
 import { CreateTodoForm, TodoRow } from "./TodoMutations";
 
 export function TodoListClient() {
@@ -13,7 +13,7 @@ export function TodoListClient() {
     showCompleted !== undefined
       ? { query: { completed: showCompleted, _limit: 20 } }
       : { query: { _limit: 20 } };
-  const { data } = useSuspenseQuery(todoListQueryOptions(params));
+  const { data } = useSuspenseQuery(todoQuery.getList(params));
 
   return (
     <section>
