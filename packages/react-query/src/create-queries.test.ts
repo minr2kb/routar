@@ -84,3 +84,100 @@ describe("createQueries — queries", () => {
     expect(q.getList().queryKey as unknown).toEqual(["todo", "getList"]);
   });
 });
+
+const TodoMutationRouter = defineRouter("/todos", {
+  create: endpoint({
+    method: "POST",
+    path: "/",
+    request: z.object({ body: z.object({ title: z.string() }) }),
+    response: z.object({ id: z.number() }),
+  }),
+});
+
+describe("createQueries — mutations", () => {
+  it("builds mutationKey [root, name]", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries({ create } as any, TodoMutationRouter);
+    expect(q.create.mutationKey).toEqual(["todos", "create"]);
+    expect(q.create().mutationKey).toEqual(["todos", "create"]);
+  });
+
+  it("mutationFn delegates to the api client with vars", async () => {
+    const create = mock(async () => ({ id: 7 }));
+    const q = createQueries({ create } as any, TodoMutationRouter);
+    const opts = q.create();
+    const mutationFn = opts.mutationFn as (vars: any) => Promise<unknown>;
+    const result = await mutationFn({ body: { title: "x" } });
+    expect(result).toEqual({ id: 7 });
+    expect(create).toHaveBeenCalledWith({ body: { title: "x" } });
+  });
+
+  it("loads invalidates into meta.invalidates", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries({ create } as any, TodoMutationRouter);
+    const opts = q.create({ invalidates: [["todos"]] });
+    expect(opts.meta).toEqual({ invalidates: [["todos"]] });
+  });
+
+  it("preserves user-supplied handlers and meta", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries({ create } as any, TodoMutationRouter);
+    const onSuccess = mock(() => {});
+    const opts = q.create({
+      onSuccess,
+      meta: { trace: "abc" },
+      invalidates: [["todos"]],
+    });
+    expect(opts.onSuccess).toBe(onSuccess);
+    expect(opts.meta).toEqual({ trace: "abc", invalidates: [["todos"]] });
+  });
+});
+
+const NestedRouter = defineRouter("/users", {
+  getList: endpoint({
+    method: "GET",
+    path: "/",
+    response: z.array(z.object({ id: z.number() })),
+  }),
+  todos: defineRouter("/todos", {
+    getList: endpoint({
+      method: "GET",
+      path: "/",
+      response: z.array(z.object({ id: z.number() })),
+    }),
+  }),
+});
+
+describe("createQueries — nested routers", () => {
+  it("recurses and accumulates root segments", () => {
+    const usersGetList = mock(async () => []);
+    const todosGetList = mock(async () => []);
+    const api = {
+      getList: usersGetList,
+      todos: { getList: todosGetList },
+    } as any;
+    const q = createQueries(api, NestedRouter);
+
+    expect(q.$key).toEqual(["users"]);
+    expect(q.todos.$key).toEqual(["users", "todos"]);
+    expect(q.getList().queryKey as unknown).toEqual(["users", "getList"]);
+    expect(q.todos.getList().queryKey as unknown).toEqual([
+      "users",
+      "todos",
+      "getList",
+    ]);
+  });
+
+  it("nested queryFn delegates to the nested api function", async () => {
+    const todosGetList = mock(async () => [{ id: 3 }]);
+    const api = {
+      getList: mock(async () => []),
+      todos: { getList: todosGetList },
+    } as any;
+    const q = createQueries(api, NestedRouter);
+    const queryFn = q.todos.getList().queryFn as (ctx: any) => Promise<unknown>;
+    const result = await queryFn({ signal: undefined });
+    expect(result).toEqual([{ id: 3 }]);
+    expect(todosGetList).toHaveBeenCalled();
+  });
+});
