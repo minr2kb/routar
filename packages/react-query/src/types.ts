@@ -5,8 +5,8 @@ import type {
   RouterEndpoints,
 } from "@routar/core";
 import type {
+  DataTag,
   DefaultError,
-  QueryFunction,
   QueryKey,
   UseMutationOptions,
   UseQueryOptions,
@@ -32,20 +32,31 @@ export type QueryAccessorOptions<TData> = Omit<
 >;
 
 /** The shape returned by a query accessor — matches TanStack's `queryOptions()`. */
-export type QueryAccessorResult<TData> = Omit<
-  UseQueryOptions<TData, DefaultError, TData, QueryKey>,
-  "queryKey" | "queryFn"
-> & {
-  queryKey: QueryKey;
-  queryFn: QueryFunction<TData, QueryKey>;
-};
+export type QueryAccessorResult<TData> = UseQueryOptions<
+  TData,
+  DefaultError,
+  TData,
+  QueryKey
+> & { queryKey: DataTag<QueryKey, TData, DefaultError> };
+
+/** True when the accessor can be called with no params (no request, or fully-optional request). */
+type ParamsOptional<TParams> = [TParams] extends [void]
+  ? true
+  : {} extends TParams
+    ? true
+    : false;
 
 /** A GET endpoint exposed as a query-options factory. */
-export type QueryAccessor<TParams, TData> = ((
-  params?: TParams,
-  options?: QueryAccessorOptions<TData>,
-) => QueryAccessorResult<TData>) & {
-  queryKey: (params?: TParams) => QueryKey;
+export type QueryAccessor<TParams, TData> = (ParamsOptional<TParams> extends true
+  ? (
+      params?: TParams,
+      options?: QueryAccessorOptions<TData>,
+    ) => QueryAccessorResult<TData>
+  : (
+      params: TParams,
+      options?: QueryAccessorOptions<TData>,
+    ) => QueryAccessorResult<TData>) & {
+  queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
 };
 
 /** Mutation options plus the declarative `invalidates` sugar. */

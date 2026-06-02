@@ -30,19 +30,23 @@ describe("createQueries — queries", () => {
     const { api } = makeApi();
     const q = createQueries(api, TodoRouter);
     const opts = q.getList({ query: { userId: 1 } });
-    expect(opts.queryKey).toEqual(["todos", "getList", { query: { userId: 1 } }]);
+    expect(opts.queryKey as unknown).toEqual([
+      "todos",
+      "getList",
+      { query: { userId: 1 } },
+    ]);
   });
 
   it("omits the params element when called with no params", () => {
     const { api } = makeApi();
     const q = createQueries(api, TodoRouter);
-    expect(q.getList().queryKey).toEqual(["todos", "getList"]);
+    expect(q.getList().queryKey as unknown).toEqual(["todos", "getList"]);
   });
 
   it(".queryKey() helper matches the generated key", () => {
     const { api } = makeApi();
     const q = createQueries(api, TodoRouter);
-    expect(q.getDetail.queryKey({ path: { id: 5 } })).toEqual([
+    expect(q.getDetail.queryKey({ path: { id: 5 } }) as unknown).toEqual([
       "todos",
       "getDetail",
       { path: { id: 5 } },
@@ -54,7 +58,8 @@ describe("createQueries — queries", () => {
     const q = createQueries(api, TodoRouter);
     const opts = q.getDetail({ path: { id: 9 } });
     const ac = new AbortController();
-    const result = await opts.queryFn!({ signal: ac.signal } as any);
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    const result = await queryFn({ signal: ac.signal });
     expect(result).toEqual({ id: 9 });
     expect(getDetail).toHaveBeenCalledWith({ path: { id: 9 } }, ac.signal);
   });
@@ -76,6 +81,6 @@ describe("createQueries — queries", () => {
     const { api } = makeApi();
     const q = createQueries(api, TodoRouter, { key: "todo" });
     expect(q.$key).toEqual(["todo"]);
-    expect(q.getList().queryKey).toEqual(["todo", "getList"]);
+    expect(q.getList().queryKey as unknown).toEqual(["todo", "getList"]);
   });
 });
