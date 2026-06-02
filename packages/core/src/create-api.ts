@@ -25,7 +25,7 @@ type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
  * Fully-typed API client produced by {@link createApi}.
  * Nested {@link RouterDef} entries become nested sub-client objects.
  */
-type ApiClient<TEndpoints extends RouterEndpoints> = {
+export type ApiClient<TEndpoints extends RouterEndpoints> = {
   [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<
     infer TNestedEndpoints
   >

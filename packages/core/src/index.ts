@@ -1,6 +1,7 @@
 // types
 
 export { createApi } from "./create-api.js";
+export type { ApiClient } from "./create-api.js";
 export { createExecutor, dispatchExecutor } from "./create-executor.js";
 export {
   createFetchExecutor,
