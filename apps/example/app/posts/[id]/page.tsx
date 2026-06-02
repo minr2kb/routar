@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { PostDetailClient } from "@/components/PostDetailClient";
-import { postQuery } from "@/remote/services/post/post.queries";
+import { postQuery } from "@/remote/services/post";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export default async function PostDetailPage({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuspenseQueries } from "@tanstack/react-query";
-import { postQuery } from "@/remote/services/post/post.queries";
+import { postQuery } from "@/remote/services/post";
 
 export function PostDetailClient({ id }: { id: number }) {
   const [{ data: post }, { data: comments }] = useSuspenseQueries({

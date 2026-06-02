@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { userQuery } from "@/remote/services/user/user.queries";
+import { userQuery } from "@/remote/services/user";
 
 export function UserListClient() {
   const { data: users } = useSuspenseQuery(userQuery.getList());

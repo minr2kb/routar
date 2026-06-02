@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { PostListClient } from "@/components/PostListClient";
-import { postQuery } from "@/remote/services/post/post.queries";
+import { postQuery } from "@/remote/services/post";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export const dynamic = "force-dynamic";

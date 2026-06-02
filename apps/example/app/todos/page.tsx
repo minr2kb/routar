@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { TodoListClient } from "@/components/TodoListClient";
-import { todoQuery } from "@/remote/services/todo/todo.queries";
+import { todoQuery } from "@/remote/services/todo";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export const dynamic = "force-dynamic";

@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { TodoRawSchema } from "@/remote/services/todo/todo.api";
+import { TodoRawSchema } from "@/remote/services/todo";
 import { noContent, notFound, ok, parseBody } from "../../_lib/http";
 import { deleteTodo, getTodoById, updateTodo } from "../_store";
 

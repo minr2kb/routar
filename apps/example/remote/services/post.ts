@@ -1,7 +1,8 @@
 import type { ApiTypes } from "@routar/core";
 import { createApi, defineRouter, endpoint } from "@routar/core";
+import { createQueries } from "@routar/react-query";
 import { z } from "zod";
-import { apiExecutor } from "../../lib/executor";
+import { apiExecutor } from "../lib/executor";
 
 const PostRawSchema = z.object({
   id: z.number(),
@@ -64,6 +65,8 @@ export const PostRouter = defineRouter("/posts", {
 });
 
 export const postApi = createApi(apiExecutor, PostRouter);
+
+export const postQuery = createQueries(postApi, PostRouter);
 
 export type PostApiTypes = ApiTypes<typeof postApi>;
 export type Post = PostApiTypes["getDetail"]["response"];

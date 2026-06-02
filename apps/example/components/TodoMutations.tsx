@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import type { TodoItem } from "@/remote/services/todo/todo.api";
-import { todoQuery } from "../remote/services/todo/todo.queries";
+import { useState } from "react";
+import type { TodoItem } from "@/remote/services/todo";
+import { todoQuery } from "@/remote/services/todo";
 
 export function CreateTodoForm() {
   const [title, setTitle] = useState("");
-  const create = useMutation(todoQuery.create({ invalidates: [todoQuery.$key] }));
+  const create = useMutation(
+    todoQuery.create({ invalidates: [todoQuery.$key] }),
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +40,12 @@ export function CreateTodoForm() {
 }
 
 export function TodoRow({ todo }: { todo: TodoItem }) {
-  const update = useMutation(todoQuery.update({ invalidates: [todoQuery.$key] }));
-  const remove = useMutation(todoQuery.remove({ invalidates: [todoQuery.$key] }));
+  const update = useMutation(
+    todoQuery.update({ invalidates: [todoQuery.$key] }),
+  );
+  const remove = useMutation(
+    todoQuery.remove({ invalidates: [todoQuery.$key] }),
+  );
 
   return (
     <li

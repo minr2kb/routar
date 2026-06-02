@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { TodoRawSchema } from "@/remote/services/todo/todo.api";
+import { TodoRawSchema } from "@/remote/services/todo";
 import { created, ok, parseBody, parseQuery } from "../_lib/http";
 import { createTodo, getAllTodos } from "./_store";
 

@@ -1,8 +1,8 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { UserDetailClient } from "@/components/UserDetailClient";
-import { postQuery } from "@/remote/services/post/post.queries";
-import { userQuery } from "@/remote/services/user/user.queries";
+import { postQuery } from "@/remote/services/post";
+import { userQuery } from "@/remote/services/user";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export default async function UserDetailPage({

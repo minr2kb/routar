@@ -96,16 +96,14 @@ remote/
   lib/executor.ts   clientExecutor (axios+interceptors, CSR) + fetchExecutor (fetch+cookies, SSR)
                     localClientExecutor + localFetchExecutor (→ NEXT_PUBLIC_APP_URL)
   services/
-    index.ts             re-export barrel: { todoServerApi, postServerApi, userServerApi }
-    <domain>/
-      <domain>.api.ts    defineRouter + endpoint() + createApi + ApiTypes export
-      <domain>.queries.ts  queryOptions factories + mutation hooks only (no wrapper hooks)
+    <domain>.ts          one file per domain: defineRouter + endpoint() + createApi
+                         + createQueries (TanStack Query helpers) + ApiTypes export
 components/
   *Client.tsx       client components using useSuspenseQuery / useSuspenseQueries
 ```
 
 **TanStack Query patterns (`@routar/react-query`):**
-- `*.queries.ts` exports `export const <domain>Query = createQueries(<domain>Api, <Domain>Router)` — the single source of truth for keys + queryFn/mutationFn
+- `services/<domain>.ts` exports `export const <domain>Query = createQueries(<domain>Api, <Domain>Router)` alongside the api client — the single source of truth for keys + queryFn/mutationFn
 - Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
 - Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
 - Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
@@ -114,7 +112,7 @@ components/
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`
 - Invalidation: pure by default; opt-in `invalidates: [<domain>Query.$key]` or `[<domain>Query.<endpoint>.queryKey()]` requires `routarMutationCache` wired in `QueryClient`
 
-**Shared contract pattern (todo):** `TodoRawSchema` exported from `todo.api.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
+**Shared contract pattern (todo):** `TodoRawSchema` exported from `services/todo.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
 
 ### PathParams enforcement
 

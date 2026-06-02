@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { TodoRawSchema } from "@/remote/services/todo/todo.api";
+import type { TodoRawSchema } from "@/remote/services/todo";
 
 type TodoRaw = z.infer<typeof TodoRawSchema>;
 

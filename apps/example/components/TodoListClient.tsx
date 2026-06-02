@@ -2,7 +2,7 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { todoQuery } from "@/remote/services/todo/todo.queries";
+import { todoQuery } from "@/remote/services/todo";
 import { CreateTodoForm, TodoRow } from "./TodoMutations";
 
 export function TodoListClient() {
