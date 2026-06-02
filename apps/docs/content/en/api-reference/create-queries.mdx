@@ -5,23 +5,22 @@ description: createQueries derives typed queryOptions and mutationOptions factor
 
 # `@routar/react-query`
 
-## `createQueries(api, router, options?)`
+## `createQueries(api, options?)`
 
-Derives typed `queryOptions` and `mutationOptions` factories from a routar API client and router. The returned object mirrors the router's shape — GET endpoints become query accessors, non-GET endpoints become mutation accessors.
+Derives typed `queryOptions` and `mutationOptions` factories from a routar API client. The router does not need to be re-passed — `createApi` stamps it on the client's `$router` property and `createQueries` recovers it. The returned object mirrors the router's shape — GET endpoints become query accessors, non-GET endpoints become mutation accessors.
 
 ```ts
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo.api'
+import { todoApi } from './todo'
 
-export const todoQuery = createQueries(todoApi, TodoRouter)
+export const todoQuery = createQueries(todoApi)
 ```
 
 ### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `api` | `TApi` (routar API client) | The typed client produced by `createApi` |
-| `router` | `RouterDef` | The router definition passed to `createApi` |
+| `api` | `ApiClientWithRouter` (from `createApi`) | The typed client produced by `createApi`; carries its source router on `$router` |
 | `options.key` | `string \| string[]` | Override the root key segments (default: derived from router prefix) |
 
 ### Query accessors (GET endpoints)

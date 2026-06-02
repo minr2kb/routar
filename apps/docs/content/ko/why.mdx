@@ -120,7 +120,7 @@ export const todoApi = createApi(clientExecutor, todoRouter)
 export type TodoApiTypes = ApiTypes<typeof todoApi>
 export type TodoItem = TodoApiTypes['getDetail']['response']
 
-export const todoQuery = createQueries(todoApi, TodoRouter)
+export const todoQuery = createQueries(todoApi)
 
 // Component — HTTP를 알지 못함
 const { data } = useSuspenseQuery(todoQuery.getDetail({ path: { id } }))

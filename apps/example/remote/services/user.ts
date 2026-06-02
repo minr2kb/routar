@@ -46,7 +46,7 @@ export const UserRouter = defineRouter("/users", {
 
 export const userApi = createApi(apiExecutor, UserRouter);
 
-export const userQuery = createQueries(userApi, UserRouter);
+export const userQuery = createQueries(userApi);
 
 export type UserApiTypes = ApiTypes<typeof userApi>;
 export type User = UserApiTypes["getDetail"]["response"];

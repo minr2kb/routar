@@ -16,14 +16,14 @@ npm install @routar/react-query @tanstack/react-query
 
 ## createQueries
 
-`createApi` 클라이언트와 라우터 정의를 `createQueries`에 전달합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 **쿼리 접근자**, 나머지는 **뮤테이션 접근자**가 됩니다.
+`createApi` 클라이언트를 `createQueries`에 전달합니다 — 라우터는 클라이언트에서 자동으로 복원되므로 다시 넘기지 않습니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 **쿼리 접근자**, 나머지는 **뮤테이션 접근자**가 됩니다.
 
 ```ts
-// remote/services/todo.ts
+// remote/services/todo.ts (createApi 클라이언트와 같은 파일)
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo'
+import { todoApi } from './todo'
 
-export const todoQuery = createQueries(todoApi, TodoRouter)
+export const todoQuery = createQueries(todoApi)
 ```
 
 ## 쿼리
@@ -231,6 +231,6 @@ userQuery.posts.getList.queryKey()    // → ["api", "v1", "users", "posts", "ge
 생성 시점에 루트 세그먼트를 재정의합니다:
 
 ```ts
-const todoQuery = createQueries(todoApi, TodoRouter, { key: 'todo' })
+const todoQuery = createQueries(todoApi, { key: 'todo' })
 todoQuery.$key  // → ["todo"]
 ```

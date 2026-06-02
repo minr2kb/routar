@@ -16,14 +16,14 @@ npm install @routar/react-query @tanstack/react-query
 
 ## createQueries
 
-Pass your `createApi` client and the router definition to `createQueries`. The result mirrors the shape of your router — every GET endpoint becomes a **query accessor**, every non-GET endpoint becomes a **mutation accessor**.
+Pass your `createApi` client to `createQueries` — the router is recovered from the client automatically, so you never pass it twice. The result mirrors the shape of your router — every GET endpoint becomes a **query accessor**, every non-GET endpoint becomes a **mutation accessor**.
 
 ```ts
-// remote/services/todo.ts
+// remote/services/todo.ts (same file as the createApi client)
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo'
+import { todoApi } from './todo'
 
-export const todoQuery = createQueries(todoApi, TodoRouter)
+export const todoQuery = createQueries(todoApi)
 ```
 
 ## Queries
@@ -231,6 +231,6 @@ userQuery.posts.getList.queryKey()    // → ["api", "v1", "users", "posts", "ge
 Override the root segments at creation time:
 
 ```ts
-const todoQuery = createQueries(todoApi, TodoRouter, { key: 'todo' })
+const todoQuery = createQueries(todoApi, { key: 'todo' })
 todoQuery.$key  // → ["todo"]
 ```

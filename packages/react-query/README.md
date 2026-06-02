@@ -16,17 +16,17 @@ npm install @routar/react-query @tanstack/react-query
 ## Quick start
 
 ```ts
-// todo.queries.ts
+// todo.ts
 import { createQueries } from "@routar/react-query";
-import { todoApi, TodoRouter } from "./todo.api"; // routar createApi client + router
+import { todoApi } from "./todo"; // routar createApi client (createQueries lives here too)
 
-export const todoQuery = createQueries(todoApi, TodoRouter);
+export const todoQuery = createQueries(todoApi);
 ```
 
 ```tsx
 // TodoList.tsx
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { todoQuery } from "./todo.queries";
+import { todoQuery } from "./todo";
 
 export function TodoList() {
   const { data } = useSuspenseQuery(todoQuery.getList());
@@ -37,7 +37,7 @@ export function TodoList() {
 ```tsx
 // CreateTodo.tsx
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { todoQuery } from "./todo.queries";
+import { todoQuery } from "./todo";
 
 export function CreateTodo() {
   const qc = useQueryClient();
@@ -95,7 +95,7 @@ qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() });
 // app/(pages)/todos/page.tsx  (Next.js server component)
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { getQueryClient } from "@/utils/get-query-client";
-import { todoQuery } from "@/remote/services/todo/todo.queries";
+import { todoQuery } from "@/remote/services/todo";
 
 export default async function TodosPage() {
   const qc = getQueryClient();
@@ -244,7 +244,7 @@ userQuery.posts.getList.queryKey()  // → ["api", "v1", "users", "posts", "getL
 Override the root segments at creation time:
 
 ```ts
-const todoQuery = createQueries(todoApi, TodoRouter, { key: "todo" });
+const todoQuery = createQueries(todoApi, { key: "todo" });
 todoQuery.$key  // → ["todo"]
 ```
 

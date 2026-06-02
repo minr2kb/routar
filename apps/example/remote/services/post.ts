@@ -66,7 +66,7 @@ export const PostRouter = defineRouter("/posts", {
 
 export const postApi = createApi(apiExecutor, PostRouter);
 
-export const postQuery = createQueries(postApi, PostRouter);
+export const postQuery = createQueries(postApi);
 
 export type PostApiTypes = ApiTypes<typeof postApi>;
 export type Post = PostApiTypes["getDetail"]["response"];

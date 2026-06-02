@@ -1,15 +1,15 @@
 // types
 
+export type { ApiClient, ApiClientWithRouter } from "./create-api.js";
 export { createApi } from "./create-api.js";
-export type { ApiClient } from "./create-api.js";
 export { createExecutor, dispatchExecutor } from "./create-executor.js";
-export {
-  createFetchExecutor,
-  HttpError,
-} from "./create-fetch-executor.js";
 export type {
   FetchExecutorOptions,
   FetchRetryOption,
+} from "./create-fetch-executor.js";
+export {
+  createFetchExecutor,
+  HttpError,
 } from "./create-fetch-executor.js";
 export type { PathParams } from "./define-endpoint.js";
 export { endpoint } from "./define-endpoint.js";

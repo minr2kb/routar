@@ -84,7 +84,7 @@ export const TodoRouter = defineRouter("/todos", {
 
 export const todoApi = createApi(localExecutor, TodoRouter);
 
-export const todoQuery = createQueries(todoApi, TodoRouter);
+export const todoQuery = createQueries(todoApi);
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>;
 export type TodoItem = TodoApiTypes["getDetail"]["response"];

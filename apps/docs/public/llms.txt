@@ -35,7 +35,7 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 
 ## TanStack Query
 
-[createQueries(api, router, options?)](https://routar.vercel.app/api-reference/create-queries): Derive typed `queryOptions` / `mutationOptions` factories from a routar router. GET endpoints become query accessors; non-GET endpoints become mutation accessors. From `@routar/react-query`.
+[createQueries(api, options?)](https://routar.vercel.app/api-reference/create-queries): Derive typed `queryOptions` / `mutationOptions` factories from a routar API client (the router is recovered from the client's `$router` — not re-passed). GET endpoints become query accessors; non-GET endpoints become mutation accessors. From `@routar/react-query`.
 [routarMutationCache(getClient)](https://routar.vercel.app/api-reference/create-queries): `MutationCache` factory — processes declarative `invalidates` stored in `mutation.meta` after each successful mutation. Wire once at `QueryClient` creation.
 
 Key helpers: `<domain>Query.<endpoint>.queryKey(params?)`, `<domain>Query.<endpoint>.mutationKey`, `<domain>Query.$key` (domain root for broad invalidation).

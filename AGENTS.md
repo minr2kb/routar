@@ -11,6 +11,7 @@ Packages:
 - `@routar/axios` — Axios executor
 - `@routar/ky` — ky executor
 - `@routar/msw` — MSW v2 mock handler factory (for testing)
+- `@routar/react-query` — TanStack Query bindings (`createQueries`, `routarMutationCache`)
 
 ## Installation
 
@@ -24,6 +25,9 @@ npm install @routar/core @routar/axios axios
 # for testing
 npm install @routar/core msw
 npm install --save-dev @routar/msw
+
+# with TanStack Query (React)
+npm install @routar/core @routar/react-query @tanstack/react-query
 ```
 
 ## Core Pattern
@@ -185,6 +189,50 @@ createMswHandlers(todoRouter, 'https://api.example.com', {
 request: z.object({ path: z.object({ id: z.coerce.number() }) }) // ✅ in MSW context
 ```
 
+## TanStack Query (`@routar/react-query`)
+
+`createQueries(api)` turns a routar client into TanStack Query `queryOptions`/`mutationOptions` factories. The router is **not** re-passed — it is recovered from the client (`createApi` stamps it on `$router`). There is no new hook API: you keep using TanStack's own hooks. GET endpoints become query accessors, non-GET endpoints become mutation accessors (decided at the type level).
+
+```ts
+import { createQueries } from '@routar/react-query';
+
+// todoApi is a createApi(...) client — createQueries reads its router automatically
+export const todoQuery = createQueries(todoApi);
+
+// queries — call the accessor, pass the result to any native hook
+useSuspenseQuery(todoQuery.getList({ query: { userId: 1 } }));
+useQuery(todoQuery.getDetail({ path: { id } }, { staleTime: 60_000 }));
+queryClient.prefetchQuery(todoQuery.getList()); // SSR
+
+// mutations — variables go to .mutate()
+useMutation(todoQuery.create());
+useMutation(todoQuery.update({ invalidates: [todoQuery.$key] }));
+```
+
+Signatures: query accessor `(params?, queryOptions?) => queryOptions`; mutation accessor `(options?) => mutationOptions`, where `options` also accepts `invalidates?: QueryKey[]`.
+
+Keys: `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix (override with `createQueries(api, { key })`).
+
+### Invalidation (pure by default)
+
+Mutations invalidate nothing unless you ask. Declare target keys with `invalidates`, and wire `routarMutationCache` once at `QueryClient` creation:
+
+```ts
+import { QueryClient } from '@tanstack/react-query';
+import { routarMutationCache } from '@routar/react-query';
+
+let queryClient: QueryClient;
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+});
+```
+
+Without this wiring, `invalidates` is ignored — handle invalidation in a native `onSuccess` instead.
+
+### Optimistic updates
+
+Accessor options are merged, so pass native `onMutate`/`onError`/`onSettled`; the key helpers make `cancelQueries`/`setQueryData` ergonomic. The library only fills `mutationFn`/`mutationKey` (+ `meta.invalidates`), so it never overwrites your handlers.
+
 ## Plugins
 
 Use `definePlugin` to add cross-cutting behavior. Plugins run in declaration order (first is outermost).
@@ -240,3 +288,5 @@ try {
 - Never duplicate API clients for SSR/CSR — use `dispatchExecutor`
 - In MSW, use `z.coerce.number()` for path params, not `z.number()`
 - Don't skip `request.path` when `path` contains `:param` segments
+- Don't re-pass the router to `createQueries` — it takes only the client (`createQueries(api)`) and recovers the router from it
+- Don't hand-write `queryOptions`/`useMutation` boilerplate per domain — derive it with `createQueries`

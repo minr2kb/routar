@@ -200,7 +200,10 @@ export interface RouterDef<
  * ```
  */
 export type ApiTypes<TApi> = {
-  [K in keyof TApi]: TApi[K] extends (...args: any[]) => Promise<infer R>
+  // Skip the internal `$router` property that createApi stamps on the client.
+  [K in keyof TApi as K extends "$router" ? never : K]: TApi[K] extends (
+    ...args: any[]
+  ) => Promise<infer R>
     ? {
         request: Parameters<TApi[K]>[0];
         response: R;

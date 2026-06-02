@@ -5,23 +5,22 @@ description: "createQueries는 routar 라우터에서 타입이 적용된 queryO
 
 # `@routar/react-query`
 
-## `createQueries(api, router, options?)`
+## `createQueries(api, options?)`
 
-routar API 클라이언트와 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 파생합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 쿼리 접근자, GET이 아닌 엔드포인트는 뮤테이션 접근자가 됩니다.
+routar API 클라이언트에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 파생합니다. 라우터를 다시 전달할 필요가 없습니다 — `createApi`가 클라이언트의 `$router` 프로퍼티에 라우터를 실어두고 `createQueries`가 이를 복원합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 쿼리 접근자, GET이 아닌 엔드포인트는 뮤테이션 접근자가 됩니다.
 
 ```ts
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo.api'
+import { todoApi } from './todo'
 
-export const todoQuery = createQueries(todoApi, TodoRouter)
+export const todoQuery = createQueries(todoApi)
 ```
 
 ### 파라미터
 
 | 파라미터 | 타입 | 설명 |
 |---------|------|------|
-| `api` | `TApi` (routar API 클라이언트) | `createApi`로 생성된 타입 지정 클라이언트 |
-| `router` | `RouterDef` | `createApi`에 전달한 라우터 정의 |
+| `api` | `ApiClientWithRouter` (`createApi` 반환) | `createApi`로 생성된 타입 지정 클라이언트; 소스 라우터를 `$router`에 실고 있음 |
 | `options.key` | `string \| string[]` | 루트 키 세그먼트 재정의 (기본값: 라우터 prefix에서 파생) |
 
 ### 쿼리 접근자 (GET 엔드포인트)

@@ -77,7 +77,7 @@ import { createQueries } from '@routar/react-query'
 
 export const TodoRouter = defineRouter('/todos', { /* ... */ })
 export const todoApi = createApi(executor, TodoRouter)
-export const todoQuery = createQueries(todoApi, TodoRouter)
+export const todoQuery = createQueries(todoApi)
 ```
 
 ```tsx

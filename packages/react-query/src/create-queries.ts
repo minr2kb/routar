@@ -1,27 +1,29 @@
-import type {
-  ApiClient,
-  EndpointSpec,
-  RouterDef,
-  RouterEndpoints,
+import {
+  type ApiClientWithRouter,
+  type EndpointSpec,
+  isRouterDef,
+  type RouterEndpoints,
 } from "@routar/core";
-import { isRouterDef } from "@routar/core";
 import { queryOptions } from "@tanstack/react-query";
 import type { CreateQueriesOptions, Queries } from "./types.js";
 import { buildQueryKey, prefixToSegments } from "./utils/key.js";
 
 /**
- * Derives TanStack Query accessors from a routar API client + router.
+ * Derives TanStack Query accessors from a routar API client.
  * GET endpoints become query-options factories; other methods become
  * mutation-options factories. The returned object mirrors the client shape.
+ *
+ * The router does not need to be re-passed — {@link createApi} stamps it on the
+ * client's `$router` property, and it is recovered here.
  */
 export function createQueries<TEndpoints extends RouterEndpoints>(
-  api: ApiClient<TEndpoints>,
-  router: RouterDef<TEndpoints>,
+  api: ApiClientWithRouter<TEndpoints>,
   options?: CreateQueriesOptions,
 ): Queries<TEndpoints> {
+  const router = api.$router;
   const root = options?.key ? [options.key] : prefixToSegments(router.prefix);
   return buildQueries(
-    api as Record<string, unknown>,
+    api as unknown as Record<string, unknown>,
     router.endpoints,
     root,
   ) as Queries<TEndpoints>;

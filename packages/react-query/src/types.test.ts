@@ -1,5 +1,5 @@
 import { describe, it } from "bun:test";
-import { defineRouter, endpoint } from "@routar/core";
+import { createApi, defineRouter, endpoint } from "@routar/core";
 import { z } from "zod";
 import { createQueries } from "./index.js";
 
@@ -24,8 +24,10 @@ const Router = defineRouter("/todos", {
   }),
 });
 
-// Build the query helpers from a fake client (never invoked — only the static type matters).
-const q = createQueries({} as never, Router);
+// Build the query helpers from a real client (never invoked — only the static type matters).
+// createApi stamps the router on `$router`, so createQueries needs no router arg.
+const api = createApi({} as never, Router);
+const q = createQueries(api);
 
 describe("type-level", () => {
   it("discriminates query vs mutation, enforces params, infers data", () => {
