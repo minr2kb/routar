@@ -42,6 +42,10 @@ type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
  * that `request` includes a matching `path` field with those param names.
  * A mismatch or missing key is a compile-time error.
  *
+ * The literal HTTP method (`'GET'`, `'POST'`, …) is preserved on the return
+ * type — `endpoint({ method: 'GET', ... }).method` is typed `'GET'`, not the
+ * `HttpMethod` union.
+ *
  * @example Basic GET with no params
  * ```ts
  * const getList = endpoint({ method: 'GET', path: '/', response: z.array(TodoSchema) });

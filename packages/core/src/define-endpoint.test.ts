@@ -30,4 +30,26 @@ describe("endpoint() literal method", () => {
     type _check = Expect<Equal<typeof e.method, "POST">>;
     expect(e.method).toBe("POST");
   });
+
+  it("preserves literal method with request-only overload", () => {
+    const e = endpoint({
+      method: "PATCH",
+      path: "/",
+      request: z.object({ body: z.object({ done: z.boolean() }) }),
+      response: z.object({ id: z.number() }),
+    });
+    type _check = Expect<Equal<typeof e.method, "PATCH">>;
+    expect(e.method).toBe("PATCH");
+  });
+
+  it("preserves literal method with adapter-only overload", () => {
+    const e = endpoint({
+      method: "DELETE",
+      path: "/",
+      response: z.object({ id: z.number() }),
+      adapter: (raw) => raw.id,
+    });
+    type _check = Expect<Equal<typeof e.method, "DELETE">>;
+    expect(e.method).toBe("DELETE");
+  });
 });
