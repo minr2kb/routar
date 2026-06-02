@@ -15,13 +15,16 @@ function pluginToMiddleware(plugin: ExecutorPlugin): ExecutorMiddleware {
         ? await plugin.onResponse(response, resolvedOpts)
         : response;
     } catch (err) {
-      if (plugin.onError) return await plugin.onError(err, resolvedOpts);
+      if (plugin.onError) {
+        await plugin.onError(err, resolvedOpts);
+        throw err;
+      }
       throw err;
     }
   };
 }
 
-function buildChain(
+export function buildChain(
   execute: (options: ExecuteOptions) => Promise<unknown>,
   middlewares: ExecutorMiddleware[],
 ): (options: ExecuteOptions) => Promise<unknown> {

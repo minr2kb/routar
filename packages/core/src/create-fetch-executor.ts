@@ -1,5 +1,5 @@
 import type { CreateExecutorOptions, ExecuteOptions, Executor, ExecutorMiddleware } from "./types.js";
-import { createExecutor } from "./create-executor.js";
+import { buildChain, createExecutor } from "./create-executor.js";
 import { withRetry, withTimeout } from "./middleware.js";
 import { serializeParams } from "./utils/params.js";
 
@@ -29,10 +29,7 @@ function buildFetchChain(
     ...(timeout != null ? [withTimeout(timeout)] : []),
   ];
   if (middlewares.length === 0) return transport;
-  return middlewares.reduceRight<(opts: ExecuteOptions) => Promise<unknown>>(
-    (next, mw) => (opts) => mw(opts, next),
-    transport,
-  );
+  return buildChain(transport, middlewares);
 }
 
 /**
@@ -50,7 +47,11 @@ function buildFetchChain(
  * @param baseURL - Absolute base URL prepended to every endpoint path.
  * @param options.defaultHeaders - Async factory called on every request to
  *   produce headers (e.g. reading cookies in a Next.js server component).
- * @param options.plugins - Plugins applied before the fetch call.
+ * @param options.plugins - Plugins applied around the fetch call. Each retry
+ *   attempt re-runs `onRequest` hooks (so headers are refreshed per attempt)
+ *   and `onError` hooks. Token-refresh-on-401 patterns work by updating an
+ *   external token store in `onError` and letting `onRequest` pick it up on
+ *   the next attempt.
  * @param options.retry - Number of retries, or `{ count, shouldRetry? }`.
  * @param options.timeout - Per-attempt timeout in milliseconds.
  *
@@ -120,8 +121,8 @@ export function createFetchExecutor(
     return text === "" ? null : JSON.parse(text);
   };
 
-  const wrappedTransport = buildFetchChain(transport, options?.retry, options?.timeout);
-  return createExecutor(wrappedTransport, { plugins: options?.plugins });
+  const executor = createExecutor(transport, { plugins: options?.plugins });
+  return { execute: buildFetchChain(executor.execute, options?.retry, options?.timeout) };
 }
 
 /**
