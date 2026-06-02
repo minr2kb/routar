@@ -19,9 +19,9 @@ npm install @routar/react-query @tanstack/react-query
 Pass your `createApi` client and the router definition to `createQueries`. The result mirrors the shape of your router — every GET endpoint becomes a **query accessor**, every non-GET endpoint becomes a **mutation accessor**.
 
 ```ts
-// remote/services/todo/todo.queries.ts
+// remote/services/todo.ts
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo.api'
+import { todoApi, TodoRouter } from './todo'
 
 export const todoQuery = createQueries(todoApi, TodoRouter)
 ```
@@ -41,8 +41,8 @@ todoQuery.getList({ query: { done: true } }, { staleTime: 60_000 })
 ```tsx
 'use client'
 import { useSuspenseQuery, useSuspenseQueries } from '@tanstack/react-query'
-import { todoQuery } from '@/remote/services/todo/todo.queries'
-import { userQuery } from '@/remote/services/user/user.queries'
+import { todoQuery } from '@/remote/services/todo'
+import { userQuery } from '@/remote/services/user'
 
 // Single query
 export function TodoList() {
@@ -77,7 +77,7 @@ qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() })
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import { Suspense } from 'react'
 import { getQueryClient } from '@/utils/get-query-client'
-import { todoQuery } from '@/remote/services/todo/todo.queries'
+import { todoQuery } from '@/remote/services/todo'
 
 export default async function TodosPage() {
   const qc = getQueryClient()
@@ -108,7 +108,7 @@ The variables passed to `.mutate()` are the routar request object:
 
 ```ts
 import { useMutation } from '@tanstack/react-query'
-import { todoQuery } from '@/remote/services/todo/todo.queries'
+import { todoQuery } from '@/remote/services/todo'
 
 const { mutate } = useMutation(todoQuery.create())
 mutate({ body: { title: 'New todo' } })

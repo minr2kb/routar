@@ -19,9 +19,9 @@ npm install @routar/react-query @tanstack/react-query
 `createApi` 클라이언트와 라우터 정의를 `createQueries`에 전달합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 **쿼리 접근자**, 나머지는 **뮤테이션 접근자**가 됩니다.
 
 ```ts
-// remote/services/todo/todo.queries.ts
+// remote/services/todo.ts
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo.api'
+import { todoApi, TodoRouter } from './todo'
 
 export const todoQuery = createQueries(todoApi, TodoRouter)
 ```
@@ -41,8 +41,8 @@ todoQuery.getList({ query: { done: true } }, { staleTime: 60_000 })
 ```tsx
 'use client'
 import { useSuspenseQuery, useSuspenseQueries } from '@tanstack/react-query'
-import { todoQuery } from '@/remote/services/todo/todo.queries'
-import { userQuery } from '@/remote/services/user/user.queries'
+import { todoQuery } from '@/remote/services/todo'
+import { userQuery } from '@/remote/services/user'
 
 // 단일 쿼리
 export function TodoList() {
@@ -77,7 +77,7 @@ qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() })
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import { Suspense } from 'react'
 import { getQueryClient } from '@/utils/get-query-client'
-import { todoQuery } from '@/remote/services/todo/todo.queries'
+import { todoQuery } from '@/remote/services/todo'
 
 export default async function TodosPage() {
   const qc = getQueryClient()
@@ -108,7 +108,7 @@ todoQuery.remove(options?)
 
 ```ts
 import { useMutation } from '@tanstack/react-query'
-import { todoQuery } from '@/remote/services/todo/todo.queries'
+import { todoQuery } from '@/remote/services/todo'
 
 const { mutate } = useMutation(todoQuery.create())
 mutate({ body: { title: '새 할 일' } })

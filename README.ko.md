@@ -71,10 +71,12 @@ npm install @routar/react-query @tanstack/react-query
 ```
 
 ```ts
-// todo.queries.ts
+// remote/services/todo.ts
+import { createApi, defineRouter } from '@routar/core'
 import { createQueries } from '@routar/react-query'
-import { todoApi, TodoRouter } from './todo.api'
 
+export const TodoRouter = defineRouter('/todos', { /* ... */ })
+export const todoApi = createApi(executor, TodoRouter)
 export const todoQuery = createQueries(todoApi, TodoRouter)
 ```
 
@@ -400,7 +402,7 @@ export const apiExecutor = dispatchExecutor(() =>
   typeof window === 'undefined' ? serverExecutor : clientExecutor,
 );
 
-// todo.api.ts — SSR과 CSR 모두에서 동작하는 하나의 클라이언트
+// remote/services/todo.ts — SSR과 CSR 모두에서 동작하는 하나의 클라이언트
 export const todoApi = createApi(apiExecutor, todoRouter);
 ```
 
