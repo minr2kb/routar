@@ -1,10 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { PostDetailClient } from "@/components/PostDetailClient";
-import {
-  postCommentsQueryOptions,
-  postDetailQueryOptions,
-} from "@/remote/services/post/post.queries";
+import { postQuery } from "@/remote/services/post/post.queries";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export default async function PostDetailPage({
@@ -17,8 +14,8 @@ export default async function PostDetailPage({
   const queryClient = getQueryClient();
 
   await Promise.all([
-    queryClient.prefetchQuery(postDetailQueryOptions(postId)),
-    queryClient.prefetchQuery(postCommentsQueryOptions(postId)),
+    queryClient.prefetchQuery(postQuery.getDetail({ path: { id: postId } })),
+    queryClient.prefetchQuery(postQuery.getComments({ path: { id: postId } })),
   ]);
 
   return (

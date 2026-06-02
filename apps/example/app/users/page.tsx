@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { UserListClient } from "@/components/UserListClient";
-import { userListQueryOptions } from "@/remote/services/user/user.queries";
+import { userQuery } from "@/remote/services/user/user.queries";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function UsersPage() {
   const queryClient = getQueryClient();
 
-  await queryClient.prefetchQuery(userListQueryOptions());
+  await queryClient.prefetchQuery(userQuery.getList());
 
   return (
     <div>
