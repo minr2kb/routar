@@ -1,8 +1,9 @@
-import type { ExecutorMiddleware } from "./types.js";
+import type { ExecuteOptions, ExecutorMiddleware, ExecutorPlugin } from "./types.js";
 
 /**
- * Thrown by {@link withTimeout} when a request exceeds the configured duration.
- * Distinguishable from a user-initiated {@link AbortSignal} cancellation.
+ * Thrown by the built-in `timeout` option when a request exceeds the
+ * configured duration. Distinguishable from a user-initiated
+ * {@link AbortSignal} cancellation.
  */
 export class TimeoutError extends Error {
   constructor(public readonly ms: number) {
@@ -12,45 +13,73 @@ export class TimeoutError extends Error {
 }
 
 /**
- * Identity helper that returns the middleware as-is.
- *
- * Wrap your middleware function with this to get full type inference on `opts`
- * and `next` without having to annotate the type manually.
+ * Identity helper that returns the plugin as-is, providing full type inference.
  *
  * @example
  * ```ts
- * const withCorrelationId = defineMiddleware((opts, next) =>
- *   next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
- * );
+ * const authPlugin = definePlugin({
+ *   name: 'auth',
+ *   onRequest: async (opts) => ({
+ *     ...opts,
+ *     headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+ *   }),
+ * });
  * ```
  */
-export function defineMiddleware(fn: ExecutorMiddleware): ExecutorMiddleware {
-  return fn;
+export function definePlugin(plugin: ExecutorPlugin): ExecutorPlugin {
+  return plugin;
 }
 
 /**
- * Retries a failed request up to `count` additional times.
+ * Logs each request and its outcome (success duration or error).
  *
- * By default all errors trigger a retry. Pass `shouldRetry` to skip retries
- * for non-transient errors (e.g. 4xx responses).
- *
- * @param count - Number of retries (not counting the initial attempt).
- * @param options.shouldRetry - Return `false` to stop retrying early.
- *   Receives the error and a zero-based `attempt` index (0 = first failure,
- *   1 = second failure, …) so you can limit retries by count or error type.
+ * @param options.log - Custom logging function. Defaults to `console.log`.
  *
  * @example
  * ```ts
- * withRetry(3, {
- *   shouldRetry: (err) => err instanceof HttpError && err.status >= 500,
+ * createExecutor(transport, {
+ *   plugins: [logger({ log: (msg, data) => myLogger.debug(msg, data) })],
  * })
  * ```
  */
+export function logger(options?: {
+  log?: (message: string, data?: unknown) => void;
+}): ExecutorPlugin {
+  const log = options?.log ?? ((msg, data) => console.log(msg, data));
+  const timings = new WeakMap<ExecuteOptions, number>();
+  return definePlugin({
+    name: "logger",
+    onRequest: (opts) => {
+      timings.set(opts, Date.now());
+      log(`[routar] ${opts.method} ${opts.url}`, {
+        params: opts.params,
+        body: opts.body,
+      });
+      return opts;
+    },
+    onResponse: (res, opts) => {
+      log(
+        `[routar] ${opts.method} ${opts.url} — ${Date.now() - (timings.get(opts) ?? Date.now())}ms`,
+      );
+      timings.delete(opts);
+      return res;
+    },
+    onError: (err, opts) => {
+      log(
+        `[routar] ${opts.method} ${opts.url} — error after ${Date.now() - (timings.get(opts) ?? Date.now())}ms`,
+        err,
+      );
+      timings.delete(opts);
+      throw err as never;
+    },
+  });
+}
+
 export function withRetry(
   count: number,
   options?: { shouldRetry?: (error: unknown, attempt: number) => boolean },
 ): ExecutorMiddleware {
-  return defineMiddleware(async (opts, next) => {
+  return async (opts, next) => {
     let lastError: unknown;
     for (let attempt = 0; attempt <= count; attempt++) {
       try {
@@ -62,33 +91,11 @@ export function withRetry(
       }
     }
     throw lastError;
-  });
+  };
 }
 
-/**
- * Aborts a request if it does not complete within `ms` milliseconds.
- *
- * Merges the timeout signal with any existing `AbortSignal` on the request,
- * so whichever fires first wins.
- *
- * @param ms - Timeout in milliseconds.
- *
- * @example
- * ```ts
- * const executor = createFetchExecutor('https://api.example.com', {
- *   middlewares: [withTimeout(5_000)],
- * });
- *
- * // Combine with retry — timeout applies per attempt
- * const executor = createExecutor(transport, [
- *   withTimeout(5_000),
- *   withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }),
- *   withLogger(),
- * ]);
- * ```
- */
 export function withTimeout(ms: number): ExecutorMiddleware {
-  return defineMiddleware(async (opts, next) => {
+  return async (opts, next) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new TimeoutError(ms)), ms);
 
@@ -102,44 +109,9 @@ export function withTimeout(ms: number): ExecutorMiddleware {
       clearTimeout(timer);
       cleanup();
     }
-  });
+  };
 }
 
-/**
- * Logs each request and its outcome (success duration or error).
- *
- * @param options.log - Custom logging function. Defaults to `console.log`.
- *
- * @example
- * ```ts
- * withLogger({ log: (msg, data) => logger.debug(msg, data) })
- * ```
- */
-export function withLogger(options?: {
-  log?: (message: string, data?: unknown) => void;
-}): ExecutorMiddleware {
-  const log = options?.log ?? ((msg, data) => console.log(msg, data));
-  return defineMiddleware(async (opts, next) => {
-    const start = Date.now();
-    log(`[routar] ${opts.method} ${opts.url}`, {
-      params: opts.params,
-      body: opts.body,
-    });
-    try {
-      const result = await next(opts);
-      log(`[routar] ${opts.method} ${opts.url} — ${Date.now() - start}ms`);
-      return result;
-    } catch (err) {
-      log(
-        `[routar] ${opts.method} ${opts.url} — error after ${Date.now() - start}ms`,
-        err,
-      );
-      throw err;
-    }
-  });
-}
-
-/** Combines multiple AbortSignals into one that aborts when any of them fire. */
 function anySignal(signals: AbortSignal[]): {
   signal: AbortSignal;
   cleanup: () => void;

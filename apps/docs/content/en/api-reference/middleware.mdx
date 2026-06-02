@@ -1,73 +1,43 @@
 ---
-title: Middleware
-description: Built-in retry, timeout, and logger middleware — plus defineMiddleware for custom middleware.
+title: Plugins
+description: Named, composable executor plugins with request/response/error hooks — plus definePlugin for custom plugins.
 ---
 
-# Middleware
+# Plugins
 
-Middlewares are `(opts, next) => Promise<unknown>` functions applied in declaration order. Pass them when creating an executor.
+Plugins are named objects with optional lifecycle hooks — `onRequest`, `onResponse`, `onError`. Bundle related concerns into a single plugin: for example, injecting an auth header and handling 401 token refresh belong together and can be expressed as one unit.
 
-```ts
-import { createExecutor, withTimeout, withRetry, withLogger, defineMiddleware } from '@routar/core'
-
-const executor = createExecutor(transport, [
-  withTimeout(8_000),
-  withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }),
-  withLogger({ log: (msg, data) => logger.debug(msg, data) }),
-])
-```
-
-## Built-in middleware
-
-### `withRetry`
+## Plugin interface
 
 ```ts
-withRetry(count, options?)
-```
-
-Retries failed requests up to `count` times.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `count` | `number` | — | Maximum retry attempts |
-| `shouldRetry` | `(err: unknown, attempt: number) => boolean` | `() => true` | Return `false` to skip retry for specific errors. `attempt` is zero-indexed (0 = first failure). |
-
-```ts
-withRetry(3)
-withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) })
-```
-
-### `withTimeout`
-
-```ts
-withTimeout(ms)
-```
-
-Aborts the request if no response arrives within `ms` milliseconds. Uses `AbortSignal` internally and merges with any existing signal passed to the executor.
-
-```ts
-withTimeout(5_000)  // 5 seconds
-```
-
-When the timeout fires, the rejection reason is a `TimeoutError` (exported from `@routar/core`), so you can distinguish a timeout from a user-initiated `AbortSignal` cancellation:
-
-```ts
-import { TimeoutError } from '@routar/core'
-
-try {
-  await api.getList()
-} catch (err) {
-  if (err instanceof TimeoutError) {
-    console.log(`Timed out after ${err.ms}ms`)
-  }
+interface ExecutorPlugin {
+  name?: string
+  onRequest?: (opts: ExecuteOptions) => ExecuteOptions | Promise<ExecuteOptions>
+  onResponse?: (response: unknown, opts: ExecuteOptions) => unknown | Promise<unknown>
+  onError?: (error: unknown, opts: ExecuteOptions) => never | Promise<never>
 }
 ```
 
-### `withLogger`
+All hooks are optional — implement only what you need.
+
+**`onError` must always throw.** The return type is `never`, meaning you must re-throw the original error or throw a different one. You cannot swallow an error by returning normally.
+
+**`name`** is optional but useful for debugging. When you log the active plugins on an executor, named plugins are identifiable. Future versions may support `eject` by name.
+
+## Execution order
+
+Plugins run in declaration order — the first plugin in the array is the outermost wrapper:
 
 ```ts
-withLogger(options?)
+createExecutor(transport, { plugins: [authPlugin, logger()] })
+// onRequest:  authPlugin → logger → transport
+// onResponse: logger → authPlugin
+// onError:    logger → authPlugin
 ```
+
+## Built-in plugin
+
+### `logger(options?)`
 
 Logs each request with method, URL, and duration.
 
@@ -76,43 +46,108 @@ Logs each request with method, URL, and duration.
 | `log` | `(msg: string, data?: unknown) => void` | `console.log` | Custom log function |
 
 ```ts
-withLogger()
-withLogger({ log: (msg, data) => logger.debug(msg, data) })
+logger()
+logger({ log: (msg, data) => myLogger.debug(msg, data) })
 ```
 
-## Custom middleware
+## Custom plugins
 
-Use `defineMiddleware` to create reusable middleware:
+Use `definePlugin` for full type inference on all hooks:
 
 ```ts
-import { defineMiddleware } from '@routar/core'
+import { definePlugin } from '@routar/core'
 
-const withCorrelationId = defineMiddleware((opts, next) =>
-  next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
-)
-
-const withAuth = defineMiddleware(async (opts, next) => {
-  const token = await getToken()
-  return next({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${token}` } })
+const correlationPlugin = definePlugin({
+  name: 'correlation-id',
+  onRequest: (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() },
+  }),
 })
 ```
 
-The `next` function continues the chain. Always return its result.
+## Real-world examples
 
-## Error normalizer (example)
+### Auth with token refresh
 
-routar lets each transport throw its own error type. If you need a unified error across fetch and axios, add a normalizer middleware:
+Bundle header injection and 401 recovery in one plugin. This is the primary motivation for the plugin design — these two concerns belong together:
+
+```ts
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+  onError: async (err) => {
+    if (err instanceof HttpError && err.status === 401) {
+      await refreshToken()
+    }
+    throw err
+  },
+})
+```
+
+### Error normalization
+
+Different transports throw different error types. Normalize them for consistent error handling across your app:
 
 ```ts
 import { isAxiosError } from 'axios'
 import { HttpError } from '@routar/core'
 
-const withErrorNormalizer = defineMiddleware(async (opts, next) => {
-  try {
-    return await next(opts)
-  } catch (err) {
-    if (isAxiosError(err)) throw new HttpError(err.response?.status ?? 0, err.message)
+const errorNormalizerPlugin = definePlugin({
+  name: 'error-normalizer',
+  onError: async (err) => {
+    if (isAxiosError(err)) {
+      throw new HttpError(err.response?.status ?? 0, err.message, err.response?.data)
+    }
     throw err
-  }
+  },
 })
 ```
+
+### Response transformation
+
+Transform responses globally — useful for unwrapping API envelopes:
+
+```ts
+// If your API wraps responses as { data: ..., meta: ... }
+const unwrapPlugin = definePlugin({
+  onResponse: (res) => (res as { data: unknown }).data ?? res,
+})
+```
+
+## retry and timeout
+
+`retry` and `timeout` are available as options on `createFetchExecutor`:
+
+```ts
+import { createFetchExecutor } from '@routar/core'
+
+const executor = createFetchExecutor('https://api.example.com', {
+  plugins: [authPlugin, logger()],
+  retry: 3,
+  timeout: 5_000,
+})
+```
+
+`retry` accepts a number or an object with `shouldRetry`:
+
+```ts
+retry: { count: 3, shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }
+```
+
+When the timeout fires, the rejection is a `TimeoutError` (distinguishable from a user-initiated `AbortSignal`):
+
+```ts
+import { TimeoutError } from '@routar/core'
+
+try {
+  await api.getList()
+} catch (err) {
+  if (err instanceof TimeoutError) console.log(`Timed out after ${err.ms}ms`)
+}
+```
+
+For axios and ky, configure timeout and retry on the underlying instance (`axios.create({ timeout })`, `ky.create({ timeout, retry })`).

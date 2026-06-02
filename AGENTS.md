@@ -7,7 +7,7 @@ Guidelines for AI agents (Claude Code, Copilot, Cursor, etc.) working in project
 routar is a schema-first HTTP API client library. You define endpoints once with Zod schemas and get a fully-typed, runtime-validated API client — no codegen, no OpenAPI spec required.
 
 Packages:
-- `@routar/core` — endpoint, router, createApi, middleware, fetch executor
+- `@routar/core` — endpoint, router, createApi, plugin system, fetch executor
 - `@routar/axios` — Axios executor
 - `@routar/ky` — ky executor
 - `@routar/msw` — MSW v2 mock handler factory (for testing)
@@ -185,20 +185,38 @@ createMswHandlers(todoRouter, 'https://api.example.com', {
 request: z.object({ path: z.object({ id: z.coerce.number() }) }) // ✅ in MSW context
 ```
 
-## Middleware
+## Plugins
+
+Use `definePlugin` to add cross-cutting behavior. Plugins run in declaration order (first is outermost).
 
 ```ts
-import { withTimeout, withRetry, withLogger } from '@routar/core';
-import { HttpError } from '@routar/core';
+import { createExecutor, definePlugin, logger } from '@routar/core';
+
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+  onError: async (err) => {
+    if (isUnauthorized(err)) await refreshToken();
+    throw err;
+  },
+});
+
+const executor = createExecutor(transport, {
+  plugins: [authPlugin, logger()],
+});
+```
+
+`retry` and `timeout` are options on `createFetchExecutor` (not plugins):
+
+```ts
+import { createFetchExecutor, HttpError } from '@routar/core';
 
 const executor = createFetchExecutor('https://api.example.com', {
-  middlewares: [
-    withTimeout(8_000),
-    withRetry(3, {
-      shouldRetry: (err) => !(err instanceof HttpError && err.status < 500),
-    }),
-    withLogger(),
-  ],
+  retry: { count: 3, shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) },
+  timeout: 8_000,
 });
 ```
 

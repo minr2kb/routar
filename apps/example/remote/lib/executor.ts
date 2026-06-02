@@ -1,5 +1,5 @@
 import { createAxiosExecutor } from "@routar/axios";
-import { createExecutor, dispatchExecutor, withLogger } from "@routar/core";
+import { createExecutor, dispatchExecutor, logger } from "@routar/core";
 import { createFetchExecutor } from "@routar/core";
 import axios from "axios";
 
@@ -26,8 +26,8 @@ axiosClient.interceptors.response.use(
 );
 
 const _clientExecutor = createAxiosExecutor(axiosClient, {
-  middlewares: [
-    withLogger({
+  plugins: [
+    logger({
       log: (msg, data) => console.log(`[csr] ${msg}`, data),
     }),
   ],
@@ -44,8 +44,8 @@ const _fetchExecutor = createFetchExecutor(JSONPLACEHOLDER_URL, {
       return {};
     }
   },
-  middlewares: [
-    withLogger({
+  plugins: [
+    logger({
       log: (msg, data) => console.log(`[ssr] ${msg}`, data),
     }),
   ],
@@ -61,9 +61,11 @@ export const apiExecutor = dispatchExecutor(() =>
 const _localFetch = createFetchExecutor(LOCAL_API_URL);
 export const localExecutor = createExecutor(
   (opts) => _localFetch.execute(opts),
-  [
-    withLogger({
-      log: (msg, data) => console.log(`[localExecutor] ${msg}`, data),
-    }),
-  ],
+  {
+    plugins: [
+      logger({
+        log: (msg, data) => console.log(`[localExecutor] ${msg}`, data),
+      }),
+    ],
+  },
 );

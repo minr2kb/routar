@@ -1,4 +1,4 @@
-import type { Executor, ExecutorMiddleware } from "@routar/core";
+import type { CreateExecutorOptions, Executor } from "@routar/core";
 import { createExecutor } from "@routar/core";
 import type { AxiosInstance } from "axios";
 
@@ -62,9 +62,7 @@ function resolveInstance(
  */
 export function createAxiosExecutor(
   instanceOrFactory: InstanceOrFactory,
-  options?: {
-    middlewares?: ExecutorMiddleware[];
-  },
+  options?: CreateExecutorOptions,
 ): Executor {
   return createExecutor(
     async ({ method, url, params, body, headers, signal }) => {
@@ -81,6 +79,6 @@ export function createAxiosExecutor(
       });
       return data;
     },
-    options?.middlewares,
+    options,
   );
 }

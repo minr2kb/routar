@@ -1,4 +1,4 @@
-import type { Executor, ExecutorMiddleware } from "@routar/core";
+import type { CreateExecutorOptions, Executor } from "@routar/core";
 import { createExecutor, serializeParams } from "@routar/core";
 import type { KyInstance } from "ky";
 
@@ -63,9 +63,7 @@ function resolveInstance(
  */
 export function createKyExecutor(
   instanceOrFactory: InstanceOrFactory,
-  options?: {
-    middlewares?: ExecutorMiddleware[];
-  },
+  options?: CreateExecutorOptions,
 ): Executor {
   return createExecutor(
     async ({ method, url, params, body, headers, signal }) => {
@@ -82,6 +80,6 @@ export function createKyExecutor(
       const text = await response.text();
       return text === "" ? null : JSON.parse(text);
     },
-    options?.middlewares,
+    options,
   );
 }

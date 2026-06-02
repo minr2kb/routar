@@ -44,7 +44,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 - **엔드-투-엔드 타입 추론** — 요청 파라미터, 응답 형태, 어댑터 출력까지 `any` 없이 전부 추론
 - **런타임 검증** — Zod, Valibot, Yup 또는 `.parse()`를 가진 객체라면 무엇이든 요청·응답 검증에 사용 가능
 - **전송 계층 독립** — 한 줄 변경으로 `fetch`, axios, 또는 커스텀 HTTP 클라이언트로 교체
-- **조합 가능한 미들웨어** — retry, timeout, logging을 함수로 쌓아 적용
+- **플러그인 시스템** — request/response/error 훅을 가진 이름 있는 플러그인; `retry`와 `timeout`은 first-class 옵션
 - **중첩 라우터** — URL 구조를 타입 시스템에 그대로 반영
 - **경로 파라미터 강제** — `request.path.id`가 없는데 `path: '/:id'`를 쓰면 컴파일 에러
 - **SSR/CSR 지원** — 동일한 엔드포인트 스펙, 환경에 따라 다른 executor
@@ -55,7 +55,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 
 | 패키지 | 설명 |
 |--------|------|
-| `@routar/core` | 엔드포인트 정의, 라우터, API 클라이언트, 미들웨어 시스템, 네이티브 `fetch` executor |
+| `@routar/core` | 엔드포인트 정의, 라우터, API 클라이언트, 플러그인 시스템, 네이티브 `fetch` executor |
 | `@routar/axios` | Axios 기반 Executor |
 | `@routar/ky` | [ky](https://github.com/sindresorhus/ky) 기반 Executor |
 
@@ -207,7 +207,7 @@ await api.update({
 
 ---
 
-### `createExecutor(transportFn, middlewares?)`
+### `createExecutor(transport, options?)`
 
 `@routar/axios`와 `@routar/ky` 내부에서 사용하는 저수준 팩토리입니다. 임의의 HTTP 클라이언트를 연결할 때 사용하세요.
 
@@ -219,7 +219,7 @@ const executor = createExecutor(
     const res = await myClient.request({ method, url, body, headers, signal });
     return res.data;
   },
-  [withTimeout(5000), withRetry(2)],
+  { plugins: [authPlugin] },
 );
 ```
 
@@ -247,33 +247,47 @@ const executor = dispatchExecutor((opts) =>
 
 ---
 
-## 미들웨어
+## 플러그인
 
-미들웨어는 `(opts, next) => Promise<unknown>` 형태의 함수로, 선언 순서대로 적용됩니다.
-
-```ts
-import { createExecutor, withTimeout, withRetry, withLogger, defineMiddleware } from '@routar/core';
-
-const executor = createExecutor(transport, [
-  withTimeout(8_000),
-  withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }),
-  withLogger({ log: (msg, data) => logger.debug(msg, data) }),
-]);
-```
-
-**커스텀 미들웨어:**
+플러그인은 `onRequest`, `onResponse`, `onError` 훅을 가진 이름 있는 객체입니다. `createExecutor`의 `plugins` 옵션에 배열로 전달합니다. `retry`와 `timeout`은 별도 옵션입니다.
 
 ```ts
-const withCorrelationId = defineMiddleware((opts, next) =>
-  next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
-);
+import { createExecutor, definePlugin, logger } from '@routar/core';
+
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+  onError: async (err) => {
+    if (isUnauthorized(err)) await refreshToken();
+    throw err;
+  },
+});
+
+const executor = createExecutor(transport, {
+  plugins: [authPlugin, logger({ log: (msg, data) => logger.debug(msg, data) })],
+});
 ```
 
-| 미들웨어 | 시그니처 | 설명 |
-|----------|---------|------|
-| `withRetry` | `(count, { shouldRetry? })` | 실패 시 최대 `count`회 재시도 |
-| `withTimeout` | `(ms)` | `ms` 밀리초 내 응답 없으면 요청 취소 |
-| `withLogger` | `({ log? })` | 메서드, URL, 소요 시간을 로깅 |
+**커스텀 플러그인:**
+
+```ts
+const correlationPlugin = definePlugin({
+  onRequest: (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() },
+  }),
+});
+```
+
+| | 설명 |
+|--|------|
+| `plugins` | 선언 순서대로 적용되는 `ExecutorPlugin` 배열 (첫 번째가 가장 바깥쪽) |
+| `logger` | 내장 플러그인: 메서드, URL, 소요 시간 로깅 |
+
+`retry`와 `timeout`은 `createFetchExecutor`에서 사용합니다 — axios, ky는 각 라이브러리 인스턴스에서 설정합니다.
 
 ---
 
@@ -291,7 +305,8 @@ const executor = createFetchExecutor('https://api.example.com', {
     const token = await getServerToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
-  middlewares: [withTimeout(5000)],
+  retry: 2,
+  timeout: 5000,
 });
 ```
 
@@ -410,7 +425,7 @@ controller.abort();
 | 에러 | 패키지 | 발생 조건 |
 |------|--------|----------|
 | `ValidationError` | `@routar/core` | `request.parse()` 또는 `response.parse()` 실패 시 |
-| `TimeoutError` | `@routar/core` | `withTimeout` 제한 시간 초과 시 |
+| `TimeoutError` | `@routar/core` | `timeout` 옵션 제한 시간 초과 시 |
 | `HttpError` | `@routar/core` | 서버가 2xx가 아닌 상태 코드 반환 시 |
 | `AxiosError` | axios | Axios 전송 계층의 네트워크 또는 HTTP 에러 |
 

@@ -1,11 +1,11 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createExecutor, dispatchExecutor } from "./create-executor.js";
-import { defineMiddleware } from "./middleware.js";
+import { definePlugin } from "./middleware.js";
 
 const opts = { method: "GET" as const, url: "/test" };
 
 describe("createExecutor", () => {
-  it("passes through with no middlewares", async () => {
+  it("passes through with no options", async () => {
     const execute = mock(async () => "result");
     const executor = createExecutor(execute);
     const result = await executor.execute(opts);
@@ -13,38 +13,29 @@ describe("createExecutor", () => {
     expect(execute).toHaveBeenCalledWith(opts);
   });
 
-  it("applies first middleware as outermost wrapper", async () => {
+  it("applies first plugin as outermost wrapper (onRequest first, onResponse last)", async () => {
     const order: string[] = [];
-    const mw1 = defineMiddleware(async (o, next) => {
-      order.push("mw1-in");
-      const r = await next(o);
-      order.push("mw1-out");
-      return r;
+    const plugin1 = definePlugin({
+      onRequest: (o) => { order.push("p1-req"); return o; },
+      onResponse: (res) => { order.push("p1-res"); return res; },
     });
-    const mw2 = defineMiddleware(async (o, next) => {
-      order.push("mw2-in");
-      const r = await next(o);
-      order.push("mw2-out");
-      return r;
+    const plugin2 = definePlugin({
+      onRequest: (o) => { order.push("p2-req"); return o; },
+      onResponse: (res) => { order.push("p2-res"); return res; },
     });
-    const executor = createExecutor(async () => {
-      order.push("execute");
-      return "ok";
-    }, [mw1, mw2]);
+    const executor = createExecutor(
+      async () => { order.push("execute"); return "ok"; },
+      { plugins: [plugin1, plugin2] },
+    );
     await executor.execute(opts);
-    expect(order).toEqual([
-      "mw1-in",
-      "mw2-in",
-      "execute",
-      "mw2-out",
-      "mw1-out",
-    ]);
+    expect(order).toEqual(["p1-req", "p2-req", "execute", "p2-res", "p1-res"]);
   });
 
-  it("middleware can modify options passed downstream", async () => {
+  it("plugin can modify options passed downstream via onRequest", async () => {
     const execute = mock(async () => "ok");
-    const mw = defineMiddleware((o, next) => next({ ...o, url: "/modified" }));
-    const executor = createExecutor(execute, [mw]);
+    const executor = createExecutor(execute, {
+      plugins: [definePlugin({ onRequest: (o) => ({ ...o, url: "/modified" }) })],
+    });
     await executor.execute(opts);
     expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({ url: "/modified" }),

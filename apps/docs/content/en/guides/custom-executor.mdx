@@ -7,38 +7,6 @@ description: Integrate any HTTP client — ky, got, or your own — using create
 
 Any HTTP client works with routar. Use `createExecutor` to wrap it.
 
-## Dynamic Authorization header
-
-The most common custom executor use case is injecting auth tokens per request:
-
-```ts
-import { createExecutor, serializeParams } from '@routar/core'
-
-const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
-  const token = await getAccessToken() // your auth logic here
-
-  const fullURL = new URL(url)
-  if (params) {
-    serializeParams(params).forEach((v, k) => fullURL.searchParams.set(k, v))
-  }
-
-  const res = await fetch(fullURL.toString(), {
-    method,
-    body: body != null ? JSON.stringify(body) : undefined,
-    headers: {
-      ...(body != null ? { 'Content-Type': 'application/json' } : {}),
-      Authorization: `Bearer ${token}`,
-      ...headers,
-    },
-    signal,
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
-})
-```
-
-For per-request auth headers in SSR, prefer the `defaultHeaders` option on `createFetchExecutor` or the factory form of `createAxiosExecutor` — both are called on every request.
-
 ## Basic example
 
 ```ts
@@ -92,19 +60,59 @@ const executor = createExecutor(async ({ method, url, params, body, headers, sig
 })
 ```
 
-## Adding middleware
+## Adding plugins
 
-Pass middlewares as the second argument. They apply to all requests through this executor.
+Pass plugins via the `options` object. They apply to all requests through this executor.
 
 ```ts
-import { createExecutor, withRetry, withTimeout, withLogger } from '@routar/core'
+import { createExecutor, definePlugin, logger } from '@routar/core'
 
-const executor = createExecutor(transport, [
-  withTimeout(8_000),
-  withRetry(3),
-  withLogger(),
-])
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+})
+
+const executor = createExecutor(transport, {
+  plugins: [authPlugin, logger()],
+})
 ```
+
+For retry and timeout on a custom transport, configure them on the underlying HTTP client (e.g. `ky.create({ retry, timeout })`, `got({ retry, timeout })`). The built-in `retry` and `timeout` options are only available on `createFetchExecutor`.
+
+## Dynamic Authorization header
+
+The most common custom executor use case is injecting auth tokens per request:
+
+```ts
+import { createExecutor, serializeParams } from '@routar/core'
+
+const executor = createExecutor(async ({ method, url, params, body, headers, signal }) => {
+  const token = await getAccessToken()
+
+  const fullURL = new URL(url)
+  if (params) {
+    serializeParams(params).forEach((v, k) => fullURL.searchParams.set(k, v))
+  }
+
+  const res = await fetch(fullURL.toString(), {
+    method,
+    body: body != null ? JSON.stringify(body) : undefined,
+    headers: {
+      ...(body != null ? { 'Content-Type': 'application/json' } : {}),
+      Authorization: `Bearer ${token}`,
+      ...headers,
+    },
+    signal,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+})
+```
+
+For per-request auth headers in SSR, prefer the `defaultHeaders` option on `createFetchExecutor` or the factory form of `createAxiosExecutor` — both are called on every request.
 
 ## Validator compatibility
 

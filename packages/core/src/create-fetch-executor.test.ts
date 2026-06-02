@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { createFetchExecutor, HttpError } from "./create-fetch-executor.js";
+import { definePlugin } from "./middleware.js";
+import type { ExecuteOptions } from "./types.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -163,5 +165,89 @@ describe("createFetchExecutor", () => {
     await expect(
       executor.execute({ method: "GET", url: "/todos" }),
     ).rejects.toThrow("Failed to fetch");
+  });
+});
+
+describe("createFetchExecutor — plugin + retry execution order", () => {
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("plugin.onRequest runs on every retry attempt", async () => {
+    const onRequest = mock((o: ExecuteOptions) => o);
+    let calls = 0;
+    globalThis.fetch = mock(async () => {
+      if (++calls < 3) throw new TypeError("transient");
+      return { ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify("ok") } as Response;
+    }) as unknown as typeof fetch;
+
+    const executor = createFetchExecutor("https://api.example.com", {
+      retry: 3,
+      plugins: [definePlugin({ onRequest })],
+    });
+    await executor.execute({ method: "GET", url: "/test" });
+    expect(onRequest).toHaveBeenCalledTimes(3);
+  });
+
+  it("plugin.onError runs per failed attempt, not just after all retries", async () => {
+    const errors: unknown[] = [];
+    let calls = 0;
+    globalThis.fetch = mock(async () => {
+      if (++calls < 3) throw new TypeError("transient");
+      return { ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify("ok") } as Response;
+    }) as unknown as typeof fetch;
+
+    const executor = createFetchExecutor("https://api.example.com", {
+      retry: 3,
+      plugins: [definePlugin({
+        onError: (err) => { errors.push(err); throw err; },
+      })],
+    });
+    await executor.execute({ method: "GET", url: "/test" });
+    expect(errors).toHaveLength(2);
+  });
+
+  it("timeout resets per retry attempt", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    let calls = 0;
+    globalThis.fetch = mock(async (_url: any, init: any) => {
+      signals.push(init?.signal);
+      if (++calls < 2) throw new TypeError("transient");
+      return { ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify("ok") } as Response;
+    }) as unknown as typeof fetch;
+
+    const executor = createFetchExecutor("https://api.example.com", {
+      retry: 2,
+      timeout: 5000,
+    });
+    await executor.execute({ method: "GET", url: "/test" });
+    expect(signals).toHaveLength(2);
+    expect(signals[0]).not.toBe(signals[1]);
+  });
+
+  it("auth plugin can update external token store in onError for next retry", async () => {
+    let token = "old-token";
+    const seenTokens: string[] = [];
+    let calls = 0;
+    globalThis.fetch = mock(async (_url: any, init: any) => {
+      const auth = new Headers(init?.headers).get("Authorization") ?? "";
+      seenTokens.push(auth);
+      if (++calls < 2) {
+        return { ok: false, status: 401, statusText: "Unauthorized", json: async () => null } as Response;
+      }
+      return { ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify("ok") } as Response;
+    }) as unknown as typeof fetch;
+
+    const executor = createFetchExecutor("https://api.example.com", {
+      retry: { count: 1, shouldRetry: (err) => err instanceof Error && err.message.includes("401") },
+      plugins: [definePlugin({
+        onRequest: (opts) => ({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${token}` } }),
+        onError: (err) => { token = "new-token"; throw err; },
+      })],
+    });
+
+    try { await executor.execute({ method: "GET", url: "/test" }); } catch {}
+    expect(seenTokens[0]).toBe("Bearer old-token");
+    expect(seenTokens[1]).toBe("Bearer new-token");
   });
 });

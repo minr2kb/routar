@@ -5,6 +5,8 @@ description: "@routar/core에 내장된 네이티브 fetch executor."
 
 # `createFetchExecutor(baseURL, options?)` — `@routar/core`
 
+네이티브 `fetch` API를 사용합니다. 추가 패키지 설치 없이 `@routar/core`에 내장되어 있습니다.
+
 ```ts
 import { createFetchExecutor } from '@routar/core'
 
@@ -13,12 +15,32 @@ const executor = createFetchExecutor('https://api.example.com')
 
 ## 옵션
 
+```ts
+createFetchExecutor(baseURL, {
+  defaultHeaders: async () => {
+    const token = await getServerToken()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  },
+  plugins: [logger()],
+  retry: 2,
+  timeout: 5_000,
+})
+```
+
 | 옵션 | 타입 | 설명 |
-|--------|------|-------------|
-| `defaultHeaders` | `() => Promise<Record<string, string>> \| Record<string, string>` | 모든 요청에 적용, 요청별 평가 |
-| `middlewares` | `ExecutorMiddleware[]` | 미들웨어 체인 |
+|--------|------|------|
+| `defaultHeaders` | `() => Promise<Record<string, string>> \| Record<string, string>` | 모든 요청에 적용, 요청별로 평가되므로 SSR 토큰 주입에 안전 |
+| `plugins` | `ExecutorPlugin[]` | fetch 호출 전에 적용되는 플러그인 |
+| `retry` | `number \| { count, shouldRetry? }` | 실패 시 재시도 횟수 |
+| `timeout` | `number` | 요청당 타임아웃(밀리초) — 초과 시 `TimeoutError` |
+
+## 빈 응답
+
+`204`, `205`, `304` 상태의 응답은 `null`로 resolve됩니다. 빈 body의 `200` 응답도 `SyntaxError` 대신 `null`을 반환합니다.
 
 ## `HttpError`
+
+2xx가 아닌 응답은 `HttpError`를 던집니다:
 
 ```ts
 import { HttpError } from '@routar/core'
@@ -35,12 +57,16 @@ try {
 ## SSR 사용법 (Next.js)
 
 ```ts
+import { createFetchExecutor } from '@routar/core'
+
 export const serverExecutor = createFetchExecutor(process.env.API_BASE_URL!, {
   defaultHeaders: async () => {
     const { cookies } = await import('next/headers')
     const token = (await cookies()).get('access_token')?.value
     return token ? { Authorization: `Bearer ${token}` } : {}
   },
-  middlewares: [withTimeout(10_000)],
+  timeout: 10_000,
 })
 ```
+
+`defaultHeaders`는 매 요청마다 호출되므로 Server Component와 Route Handler에서 현재 요청의 쿠키를 읽을 수 있습니다.

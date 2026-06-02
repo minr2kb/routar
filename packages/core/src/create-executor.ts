@@ -1,59 +1,70 @@
-import type { ExecuteOptions, Executor, ExecutorMiddleware } from "./types.js";
+import type {
+  CreateExecutorOptions,
+  ExecuteOptions,
+  Executor,
+  ExecutorMiddleware,
+  ExecutorPlugin,
+} from "./types.js";
+
+function pluginToMiddleware(plugin: ExecutorPlugin): ExecutorMiddleware {
+  return async (opts, next) => {
+    const resolvedOpts = plugin.onRequest ? await plugin.onRequest(opts) : opts;
+    try {
+      const response = await next(resolvedOpts);
+      return plugin.onResponse
+        ? await plugin.onResponse(response, resolvedOpts)
+        : response;
+    } catch (err) {
+      if (plugin.onError) {
+        await plugin.onError(err, resolvedOpts);
+        throw err;
+      }
+      throw err;
+    }
+  };
+}
+
+export function buildChain(
+  execute: (options: ExecuteOptions) => Promise<unknown>,
+  middlewares: ExecutorMiddleware[],
+): (options: ExecuteOptions) => Promise<unknown> {
+  return middlewares.reduceRight<(options: ExecuteOptions) => Promise<unknown>>(
+    (next, mw) => (opts) => mw(opts, next),
+    execute,
+  );
+}
 
 /**
- * Creates an {@link Executor} by wrapping a transport function with an
- * optional middleware chain.
+ * Creates an {@link Executor} by wrapping a transport function with plugins.
  *
- * Middlewares are applied in declaration order — the first middleware is the
- * outermost wrapper and runs first on each request.
+ * Plugins run in declaration order (first plugin is outermost).
  *
- * @param execute - The underlying transport function (fetch, axios, etc.).
- * @param middlewares - Ordered list of middlewares to apply.
+ * For `retry` and `timeout`, use the options on {@link createFetchExecutor}
+ * or configure them via the underlying HTTP client (axios, ky).
  *
  * @example
  * ```ts
- * const executor = createExecutor(
- *   async ({ method, url, body }) => {
- *     const res = await fetch(url, { method, body: JSON.stringify(body) });
- *     return res.json();
- *   },
- *   [withTimeout(5000), withRetry(3), withLogger()],
- * );
+ * const executor = createExecutor(transport, {
+ *   plugins: [authPlugin, logger()],
+ * });
  * ```
  */
 export function createExecutor(
   execute: (options: ExecuteOptions) => Promise<unknown>,
-  middlewares: ExecutorMiddleware[] = [],
+  options: CreateExecutorOptions = {},
 ): Executor {
-  const chain = middlewares.reduceRight<
-    (options: ExecuteOptions) => Promise<unknown>
-  >((next, mw) => (opts) => mw(opts, next), execute);
-  return { execute: chain };
+  const middlewares = (options.plugins ?? []).map(pluginToMiddleware);
+  return { execute: buildChain(execute, middlewares) };
 }
 
 /**
  * Creates an {@link Executor} that selects the underlying transport at
  * request time based on the result of `resolver`.
  *
- * Use this to unify SSR and CSR behind a single API client — the resolver
- * picks the right executor per request, so `createApi` is called once and
- * works in both environments without duplicate `*ServerApi` instances.
- *
- * The resolver receives the full {@link ExecuteOptions} so it can branch on
- * environment, URL prefix, auth context, or any runtime condition.
- *
- * @param resolver - Called on every request; returns the executor to delegate to.
- *
  * @example
  * ```ts
- * // SSR vs CSR — pick transport based on environment
  * const apiExecutor = dispatchExecutor(() =>
  *   typeof window === 'undefined' ? serverExecutor : clientExecutor,
- * );
- *
- * // Route by URL prefix — internal routes use a different transport
- * const apiExecutor = dispatchExecutor((opts) =>
- *   opts.url.startsWith('/internal') ? internalExecutor : publicExecutor,
  * );
  * ```
  */

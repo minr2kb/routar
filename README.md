@@ -44,7 +44,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 - **End-to-end type inference** — request params, response shape, and adapter output, all inferred without `any`
 - **Runtime validation** — Zod, Valibot, Yup, or any object with `.parse()` validates both request and response
 - **Transport agnostic** — swap `fetch`, axios, or your own HTTP client by changing one line
-- **Composable middleware** — retry, timeout, and logging as stackable functions
+- **Plugin system** — composable named plugins with request/response/error hooks; `retry` and `timeout` as first-class options
 - **Nested routers** — mirror your URL structure in the type system
 - **Path param enforcement** — `path: '/:id'` with a missing `request.path.id` is a compile error
 - **SSR/CSR ready** — same endpoint spec, different executor per environment
@@ -55,7 +55,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 
 | Package | Description |
 |---------|-------------|
-| `@routar/core` | Endpoint definitions, router, API client, middleware system, native `fetch` executor |
+| `@routar/core` | Endpoint definitions, router, API client, plugin system, native `fetch` executor |
 | `@routar/axios` | Executor backed by Axios |
 | `@routar/ky` | Executor backed by [ky](https://github.com/sindresorhus/ky) |
 
@@ -221,7 +221,7 @@ await api.update({
 
 ---
 
-### `createExecutor(transportFn, middlewares?)`
+### `createExecutor(transport, options?)`
 
 Low-level factory used internally by `@routar/axios` and `@routar/ky`. Use this to integrate any HTTP client.
 
@@ -233,7 +233,7 @@ const executor = createExecutor(
     const res = await myClient.request({ method, url, body, headers, signal });
     return res.data;
   },
-  [withTimeout(5000), withRetry(2)],
+  { plugins: [authPlugin] },
 );
 ```
 
@@ -261,33 +261,47 @@ const executor = dispatchExecutor((opts) =>
 
 ---
 
-## Middleware
+## Plugins
 
-Middlewares are `(opts, next) => Promise<unknown>` functions applied in declaration order.
-
-```ts
-import { createExecutor, withTimeout, withRetry, withLogger, defineMiddleware } from '@routar/core';
-
-const executor = createExecutor(transport, [
-  withTimeout(8_000),
-  withRetry(3, { shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) }),
-  withLogger({ log: (msg, data) => logger.debug(msg, data) }),
-]);
-```
-
-**Custom middleware:**
+Plugins are named objects with optional lifecycle hooks — `onRequest`, `onResponse`, `onError`. Pass them via `plugins` in `createExecutor`. `retry` and `timeout` are first-class options.
 
 ```ts
-const withCorrelationId = defineMiddleware((opts, next) =>
-  next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
-);
+import { createExecutor, definePlugin, logger } from '@routar/core';
+
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+  onError: async (err) => {
+    if (isUnauthorized(err)) await refreshToken();
+    throw err;
+  },
+});
+
+const executor = createExecutor(transport, {
+  plugins: [authPlugin, logger({ log: (msg, data) => logger.debug(msg, data) })],
+});
 ```
 
-| Middleware | Signature | Description |
-|------------|-----------|-------------|
-| `withRetry` | `(count, { shouldRetry? })` | Retries on failure up to `count` times |
-| `withTimeout` | `(ms)` | Aborts if no response within `ms` milliseconds |
-| `withLogger` | `({ log? })` | Logs each request with method, URL, and duration |
+**Custom plugin:**
+
+```ts
+const correlationPlugin = definePlugin({
+  onRequest: (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() },
+  }),
+});
+```
+
+| | Description |
+|--|-------------|
+| `plugins` | Array of `ExecutorPlugin` objects, applied in declaration order (first is outermost) |
+| `logger` | Built-in plugin: logs method, URL, and duration |
+
+`retry` and `timeout` are available on `createFetchExecutor` — for axios and ky, configure them on the underlying instance instead.
 
 ---
 
@@ -305,7 +319,8 @@ const executor = createFetchExecutor('https://api.example.com', {
     const token = await getServerToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
-  middlewares: [withTimeout(5000)],
+  retry: 2,
+  timeout: 5000,
 });
 ```
 
@@ -424,7 +439,7 @@ controller.abort();
 | Error | Package | Thrown when |
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
-| `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
+| `TimeoutError` | `@routar/core` | Request exceeds the `timeout` option duration |
 | `HttpError` | `@routar/core` | Server returns a non-2xx status |
 | `AxiosError` | axios | Network or HTTP error from the Axios transport |
 

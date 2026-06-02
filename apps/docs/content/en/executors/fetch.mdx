@@ -21,14 +21,18 @@ createFetchExecutor(baseURL, {
     const token = await getServerToken()
     return token ? { Authorization: `Bearer ${token}` } : {}
   },
-  middlewares: [withTimeout(5000)],
+  plugins: [logger()],
+  retry: 2,
+  timeout: 5_000,
 })
 ```
 
 | Option | Type | Description |
 |--------|------|-------------|
 | `defaultHeaders` | `() => Promise<Record<string, string>> \| Record<string, string>` | Applied to every request. Evaluated per-request, so safe for SSR token injection. |
-| `middlewares` | `ExecutorMiddleware[]` | Middleware chain for this executor |
+| `plugins` | `ExecutorPlugin[]` | Plugins applied before the fetch call |
+| `retry` | `number \| { count, shouldRetry? }` | Number of retries on failure |
+| `timeout` | `number` | Per-attempt timeout in milliseconds — throws `TimeoutError` on expiry |
 
 ## Empty responses
 
@@ -60,7 +64,6 @@ Arrays are serialized as repeated keys: `ids=1&ids=2`. This differs from Axios's
 
 ```ts
 import { createFetchExecutor } from '@routar/core'
-import { withTimeout } from '@routar/core'
 
 export const serverExecutor = createFetchExecutor(process.env.API_BASE_URL!, {
   defaultHeaders: async () => {
@@ -68,7 +71,7 @@ export const serverExecutor = createFetchExecutor(process.env.API_BASE_URL!, {
     const token = (await cookies()).get('access_token')?.value
     return token ? { Authorization: `Bearer ${token}` } : {}
   },
-  middlewares: [withTimeout(10_000)],
+  timeout: 10_000,
 })
 ```
 
