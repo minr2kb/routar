@@ -10,6 +10,7 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 - `@routar/axios` — Axios-based executor
 - `@routar/ky` — ky-based executor
 - `@routar/msw` — MSW v2 mock handler factory (for testing)
+- `@routar/react-query` — TanStack Query bindings; derives typed queryOptions / mutationOptions from your router
 
 ## Core API
 
@@ -31,6 +32,13 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 [logger(options?)](https://routar.vercel.app/api-reference): Built-in plugin — logs method, URL, and duration. Pass `{ log }` for a custom log function.
 
 `retry` and `timeout` are options on `createFetchExecutor` (not plugins): `retry: 3`, `timeout: 5_000`.
+
+## TanStack Query
+
+[createQueries(api, router, options?)](https://routar.vercel.app/api-reference/create-queries): Derive typed `queryOptions` / `mutationOptions` factories from a routar router. GET endpoints become query accessors; non-GET endpoints become mutation accessors. From `@routar/react-query`.
+[routarMutationCache(getClient)](https://routar.vercel.app/api-reference/create-queries): `MutationCache` factory — processes declarative `invalidates` stored in `mutation.meta` after each successful mutation. Wire once at `QueryClient` creation.
+
+Key helpers: `<domain>Query.<endpoint>.queryKey(params?)`, `<domain>Query.<endpoint>.mutationKey`, `<domain>Query.$key` (domain root for broad invalidation).
 
 ## Testing
 

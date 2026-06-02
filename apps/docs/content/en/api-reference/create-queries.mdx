@@ -1,0 +1,114 @@
+---
+title: createQueries() / routarMutationCache
+description: createQueries derives typed queryOptions and mutationOptions factories from a routar router. routarMutationCache wires declarative invalidates into your QueryClient.
+---
+
+# `@routar/react-query`
+
+## `createQueries(api, router, options?)`
+
+Derives typed `queryOptions` and `mutationOptions` factories from a routar API client and router. The returned object mirrors the router's shape — GET endpoints become query accessors, non-GET endpoints become mutation accessors.
+
+```ts
+import { createQueries } from '@routar/react-query'
+import { todoApi, TodoRouter } from './todo.api'
+
+export const todoQuery = createQueries(todoApi, TodoRouter)
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `api` | `TApi` (routar API client) | The typed client produced by `createApi` |
+| `router` | `RouterDef` | The router definition passed to `createApi` |
+| `options.key` | `string \| string[]` | Override the root key segments (default: derived from router prefix) |
+
+### Query accessors (GET endpoints)
+
+Each query accessor is callable and returns a TanStack `queryOptions` object:
+
+```ts
+// signature: (params?, queryOptions?) => queryOptions
+todoQuery.getList()
+todoQuery.getList({ query: { done: true } }, { staleTime: 60_000 })
+todoQuery.getDetail({ path: { id: '1' } })
+```
+
+**`.queryKey(params?)`** — returns the branded query key for this accessor:
+
+```ts
+todoQuery.getList.queryKey()                       // ["todos", "getList"]
+todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { path: { id: "1" } }]
+```
+
+### Mutation accessors (non-GET endpoints)
+
+Each mutation accessor returns a TanStack `mutationOptions` object:
+
+```ts
+// signature: (mutationOptions?) => mutationOptions
+todoQuery.create()
+todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] })
+todoQuery.update({ onSuccess: () => { /* ... */ } })
+```
+
+**`.mutationKey`** — the branded mutation key for this accessor:
+
+```ts
+todoQuery.create.mutationKey  // ["todos", "create"]
+```
+
+### Domain key (`$key`)
+
+Every level of the accessor object exposes `$key` — the root segments for that domain or sub-domain:
+
+```ts
+todoQuery.$key         // ["todos"]
+userQuery.posts.$key   // ["api", "v1", "users", "posts"]
+
+// Invalidate the whole domain:
+qc.invalidateQueries({ queryKey: todoQuery.$key })
+```
+
+### `invalidates` option
+
+Pass an array of query keys to the `invalidates` option on a mutation accessor. They are stored in `mutation.meta` and processed by `routarMutationCache` after the mutation succeeds.
+
+```ts
+useMutation(
+  todoQuery.create({
+    invalidates: [todoQuery.getList.queryKey(), todoQuery.$key],
+  }),
+)
+```
+
+Requires `routarMutationCache` to be wired into your `QueryClient` (see below). Without it, `invalidates` is silently ignored.
+
+---
+
+## `routarMutationCache(getClient)`
+
+A `MutationCache` factory that processes `invalidates` stored in `mutation.meta`. Wire it once when creating your `QueryClient`.
+
+```ts
+import { QueryClient } from '@tanstack/react-query'
+import { routarMutationCache } from '@routar/react-query'
+
+let queryClient: QueryClient
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+})
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `getClient` | `() => QueryClient` | A getter for the `QueryClient` instance (avoids circular reference at construction time) |
+
+### Behaviour
+
+After every successful mutation, `routarMutationCache` reads `mutation.meta.invalidates` and calls `queryClient.invalidateQueries` for each entry. Mutations without `invalidates` in their `meta` are unaffected.
+
+You can still combine `invalidates` with a native `onSuccess` callback — both run.

@@ -58,6 +58,44 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 | `@routar/core` | Endpoint definitions, router, API client, plugin system, native `fetch` executor |
 | `@routar/axios` | Executor backed by Axios |
 | `@routar/ky` | Executor backed by [ky](https://github.com/sindresorhus/ky) |
+| `@routar/react-query` | TanStack Query bindings — typed `queryOptions` / `mutationOptions` factories from your router |
+
+---
+
+## TanStack Query Integration
+
+`@routar/react-query` derives typed `queryOptions` and `mutationOptions` factories directly from your routar router. No new hook API — use TanStack's own hooks as-is.
+
+```bash
+npm install @routar/react-query @tanstack/react-query
+```
+
+```ts
+// todo.queries.ts
+import { createQueries } from '@routar/react-query'
+import { todoApi, TodoRouter } from './todo.api'
+
+export const todoQuery = createQueries(todoApi, TodoRouter)
+```
+
+```tsx
+// Query — useSuspenseQuery, prefetchQuery, etc.
+const { data } = useSuspenseQuery(todoQuery.getList())
+
+// Mutation — with declarative invalidation
+const { mutate } = useMutation(
+  todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] })
+)
+```
+
+Wire `routarMutationCache` once when creating your `QueryClient` to enable declarative `invalidates`:
+
+```ts
+import { routarMutationCache } from '@routar/react-query'
+
+let queryClient: QueryClient
+queryClient = new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })
+```
 
 ---
 

@@ -38,10 +38,11 @@ This is a monorepo (Bun workspaces) with three library packages and one demo app
 
 ```
 packages/
-  core/     @routar/core     — endpoint definitions, router, API client factory, middleware system, fetch-based Executor
-  axios/    @routar/axios    — Axios-based Executor
-  msw/      @routar/msw      — MSW v2 handler factory (createMswHandlers)
-  ky/       @routar/ky       — ky-based Executor
+  core/         @routar/core         — endpoint definitions, router, API client factory, middleware system, fetch-based Executor
+  axios/        @routar/axios        — Axios-based Executor
+  msw/          @routar/msw          — MSW v2 handler factory (createMswHandlers)
+  ky/           @routar/ky           — ky-based Executor
+  react-query/  @routar/react-query  — TanStack Query bindings (createQueries, routarMutationCache)
 apps/
   example/  @routar/example  — Next.js 15 demo app consuming all packages
 ```
@@ -103,13 +104,15 @@ components/
   *Client.tsx       client components using useSuspenseQuery / useSuspenseQueries
 ```
 
-**TanStack Query patterns:**
-- `queryOptions` factory is the single source of truth for key + queryFn — no separate KEYS object
-- Server pages: `prefetchQuery(queryOptions(params))` → `HydrationBoundary` → `<Suspense>`
-- Client components: `useSuspenseQuery(queryOptions(params))` — `data` always non-nullable
+**TanStack Query patterns (`@routar/react-query`):**
+- `*.queries.ts` exports `export const <domain>Query = createQueries(<domain>Api, <Domain>Router)` — the single source of truth for keys + queryFn/mutationFn
+- Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
+- Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
+- Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
+- Server pages: `prefetchQuery(<domain>Query.<endpoint>(params))` → `HydrationBoundary` → `<Suspense>`
+- Client components: `useSuspenseQuery(<domain>Query.<endpoint>(params))` — `data` always non-nullable
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`
-- Invalidation: `queryKey: ['domain']` (prefix) or `queryOptions(id).queryKey` (specific)
-- `*.queries.ts` exports only `queryOptions` factories and mutation hooks — no `useXxx` wrappers
+- Invalidation: pure by default; opt-in `invalidates: [<domain>Query.$key]` or `[<domain>Query.<endpoint>.queryKey()]` requires `routarMutationCache` wired in `QueryClient`
 
 **Shared contract pattern (todo):** `TodoRawSchema` exported from `todo.api.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
 

@@ -1,0 +1,114 @@
+---
+title: createQueries() / routarMutationCache
+description: "createQueries는 routar 라우터에서 타입이 적용된 queryOptions / mutationOptions 팩토리를 파생합니다. routarMutationCache는 선언적 invalidates를 QueryClient에 배선합니다."
+---
+
+# `@routar/react-query`
+
+## `createQueries(api, router, options?)`
+
+routar API 클라이언트와 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 파생합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 쿼리 접근자, GET이 아닌 엔드포인트는 뮤테이션 접근자가 됩니다.
+
+```ts
+import { createQueries } from '@routar/react-query'
+import { todoApi, TodoRouter } from './todo.api'
+
+export const todoQuery = createQueries(todoApi, TodoRouter)
+```
+
+### 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `api` | `TApi` (routar API 클라이언트) | `createApi`로 생성된 타입 지정 클라이언트 |
+| `router` | `RouterDef` | `createApi`에 전달한 라우터 정의 |
+| `options.key` | `string \| string[]` | 루트 키 세그먼트 재정의 (기본값: 라우터 prefix에서 파생) |
+
+### 쿼리 접근자 (GET 엔드포인트)
+
+각 쿼리 접근자는 호출 가능하며 TanStack `queryOptions` 객체를 반환합니다:
+
+```ts
+// 시그니처: (params?, queryOptions?) => queryOptions
+todoQuery.getList()
+todoQuery.getList({ query: { done: true } }, { staleTime: 60_000 })
+todoQuery.getDetail({ path: { id: '1' } })
+```
+
+**`.queryKey(params?)`** — 해당 접근자의 브랜드 쿼리 키를 반환합니다:
+
+```ts
+todoQuery.getList.queryKey()                        // ["todos", "getList"]
+todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { path: { id: "1" } }]
+```
+
+### 뮤테이션 접근자 (GET이 아닌 엔드포인트)
+
+각 뮤테이션 접근자는 TanStack `mutationOptions` 객체를 반환합니다:
+
+```ts
+// 시그니처: (mutationOptions?) => mutationOptions
+todoQuery.create()
+todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] })
+todoQuery.update({ onSuccess: () => { /* ... */ } })
+```
+
+**`.mutationKey`** — 해당 접근자의 브랜드 뮤테이션 키:
+
+```ts
+todoQuery.create.mutationKey  // ["todos", "create"]
+```
+
+### 도메인 키 (`$key`)
+
+접근자 객체의 모든 레벨에서 `$key`를 제공합니다 — 해당 도메인 또는 하위 도메인의 루트 세그먼트입니다:
+
+```ts
+todoQuery.$key         // ["todos"]
+userQuery.posts.$key   // ["api", "v1", "users", "posts"]
+
+// 전체 도메인 무효화:
+qc.invalidateQueries({ queryKey: todoQuery.$key })
+```
+
+### `invalidates` 옵션
+
+뮤테이션 접근자의 `invalidates` 옵션에 쿼리 키 배열을 전달합니다. 이 키들은 `mutation.meta`에 저장되고 뮤테이션 성공 후 `routarMutationCache`에서 처리됩니다.
+
+```ts
+useMutation(
+  todoQuery.create({
+    invalidates: [todoQuery.getList.queryKey(), todoQuery.$key],
+  }),
+)
+```
+
+`QueryClient`에 `routarMutationCache`가 배선되어 있어야 합니다 (아래 참조). 배선 없이는 `invalidates`가 무시됩니다.
+
+---
+
+## `routarMutationCache(getClient)`
+
+`mutation.meta`에 저장된 `invalidates`를 처리하는 `MutationCache` 팩토리입니다. `QueryClient` 생성 시 한 번만 배선하세요.
+
+```ts
+import { QueryClient } from '@tanstack/react-query'
+import { routarMutationCache } from '@routar/react-query'
+
+let queryClient: QueryClient
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+})
+```
+
+### 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `getClient` | `() => QueryClient` | `QueryClient` 인스턴스 getter (생성 시점의 순환 참조 방지) |
+
+### 동작
+
+모든 뮤테이션 성공 후, `routarMutationCache`는 `mutation.meta.invalidates`를 읽고 각 항목에 대해 `queryClient.invalidateQueries`를 호출합니다. `meta`에 `invalidates`가 없는 뮤테이션은 영향을 받지 않습니다.
+
+`invalidates`와 기본 `onSuccess` 콜백을 함께 사용할 수 있으며 둘 다 실행됩니다.

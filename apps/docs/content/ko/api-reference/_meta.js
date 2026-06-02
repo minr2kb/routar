@@ -7,4 +7,5 @@ export default {
   "dispatch-executor": "dispatchExecutor()",
   middleware: "Plugin",
   "api-types": "ApiTypes<T>",
+  "create-queries": "createQueries() / routarMutationCache",
 };
