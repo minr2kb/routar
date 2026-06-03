@@ -27,12 +27,13 @@
     "build": "tsup",
     "dev": "tsup --watch"
   },
+  "dependencies": {
+    "@routar/core": "workspace:*"
+  },
   "peerDependencies": {
-    "@routar/core": "workspace:*",
     "@tanstack/react-query": ">=5.0.0"
   },
   "devDependencies": {
-    "@routar/core": "workspace:*",
     "@tanstack/react-query": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^6.0.0",
