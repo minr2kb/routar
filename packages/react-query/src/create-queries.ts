@@ -43,8 +43,8 @@ function buildQueries(
   apiNode: Record<string, unknown>,
   endpoints: RouterEndpoints,
   root: string[],
-  // Per-endpoint defaults + infinite config apply at the top level only;
-  // nested routers get none.
+  // Per-endpoint defaults + infinite config; for a nested router, the value at
+  // its key is the nested config map, recursed into the sub-tree.
   defaults: Record<string, EndpointDefault> | undefined,
   infinite: Record<string, InfiniteConfig> | undefined,
 ): Record<string, unknown> {
@@ -57,8 +57,8 @@ function buildQueries(
         apiNode[name] as Record<string, unknown>,
         entry.endpoints,
         childRoot,
-        undefined,
-        undefined,
+        defaults?.[name] as Record<string, EndpointDefault> | undefined,
+        infinite?.[name] as Record<string, InfiniteConfig> | undefined,
       );
       continue;
     }

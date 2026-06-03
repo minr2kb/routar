@@ -173,6 +173,9 @@ const NestedRouter = defineRouter("/users", {
     getList: endpoint({
       method: "GET",
       path: "/",
+      request: z.object({
+        query: z.object({ page: z.number().optional() }).optional(),
+      }),
       response: z.array(z.object({ id: z.number() })),
     }),
   }),
@@ -212,6 +215,40 @@ describe("createQueries — nested routers", () => {
       "getList",
       "infinite",
     ]);
+  });
+
+  it("applies nested infinite config + defaults to nested endpoints", async () => {
+    const nestedGetList = mock(async () => [{ id: 1 }]);
+    const api = {
+      getList: mock(async () => []),
+      todos: { getList: nestedGetList },
+      $router: NestedRouter,
+    } as unknown as ApiClientWithRouter<typeof NestedRouter.endpoints>;
+    const q = createQueries(api, {
+      defaults: { todos: { getList: { staleTime: 7000 } } },
+      infinite: {
+        todos: {
+          getList: {
+            initialPageParam: 1,
+            getNextPageParam: (last, all) =>
+              last.length ? all.length + 1 : undefined,
+            pageParam: (page) => ({ query: { page } }),
+          },
+        },
+      },
+    });
+
+    // nested default reached the nested query accessor
+    expect(q.todos.getList().staleTime).toBe(7000);
+
+    // nested infinite contract reached the nested accessor → no call options needed
+    const opts = q.todos.getList.infinite();
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ pageParam: 4, signal: undefined });
+    expect(nestedGetList).toHaveBeenCalledWith(
+      { query: { page: 4 } },
+      undefined,
+    );
   });
 
   it("nested queryFn delegates to the nested api function", async () => {

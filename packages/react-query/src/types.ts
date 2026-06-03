@@ -31,9 +31,13 @@ export type DeepPartial<T> = T extends (infer U)[]
  * routers are not matched.
  */
 export type EndpointDefaults<TEndpoints extends RouterEndpoints> = {
-  [K in keyof TEndpoints]?:
-    | QueryAccessorOptions<unknown>
-    | Omit<RoutarMutationOptions<unknown, unknown>, "invalidates">;
+  [K in keyof TEndpoints]?: TEndpoints[K] extends RouterDef<infer Nested>
+    ? EndpointDefaults<Nested>
+    : TEndpoints[K] extends EndpointSpec<any, any, any>
+      ?
+          | QueryAccessorOptions<unknown>
+          | Omit<RoutarMutationOptions<unknown, unknown>, "invalidates">
+      : never;
 };
 
 /** Options accepted by createQueries. */
@@ -130,17 +134,23 @@ export type InfiniteAccessorResult<TPage, TPageParam> = Omit<
  * contract for that endpoint. Top-level endpoints only.
  */
 export type InfiniteConfigMap<TEndpoints extends RouterEndpoints> = {
-  [K in keyof TEndpoints as TEndpoints[K] extends EndpointSpec<any, any, any>
-    ? TEndpoints[K]["method"] extends "GET"
-      ? K
-      : never
-    : never]?: TEndpoints[K] extends EndpointSpec<any, any, any>
-    ? InfiniteAccessorOptions<
-        InferResponse<TEndpoints[K]>,
-        EndpointParams<TEndpoints[K]>,
-        number
-      >
-    : never;
+  // Keep GET endpoints (their contract) and nested routers (recursed); drop
+  // non-GET endpoints.
+  [K in keyof TEndpoints as TEndpoints[K] extends RouterDef<any>
+    ? K
+    : TEndpoints[K] extends EndpointSpec<any, any, any>
+      ? TEndpoints[K]["method"] extends "GET"
+        ? K
+        : never
+      : never]?: TEndpoints[K] extends RouterDef<infer Nested>
+    ? InfiniteConfigMap<Nested>
+    : TEndpoints[K] extends EndpointSpec<any, any, any>
+      ? InfiniteAccessorOptions<
+          InferResponse<TEndpoints[K]>,
+          EndpointParams<TEndpoints[K]>,
+          number
+        >
+      : never;
 };
 
 /**
