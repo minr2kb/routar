@@ -123,5 +123,53 @@ describe("type-level", () => {
 
     // @ts-expect-error mutation accessor has no .infinite
     q.create.infinite;
+
+    // .infinite exists on GET accessors with optional (partial) options — the
+    // contract is supplied via createQueries({ infinite }) and enforced at
+    // runtime when absent. (Type-only reference; not executed.)
+    type _hasInfiniteCallable = Expect<
+      Equal<
+        typeof q.getList.infinite extends (...a: any[]) => any ? true : false,
+        true
+      >
+    >;
+  });
+
+  it("configured infinite endpoint: .infinite is callable with no options", () => {
+    const configured = createQueries(api, {
+      infinite: {
+        getList: {
+          initialPageParam: 1,
+          getNextPageParam: (last, all) =>
+            last.length ? all.length + 1 : undefined,
+          pageParam: (page) => ({ query: { _page: page } }),
+        },
+      },
+    });
+
+    // config supplies the contract → no options needed
+    configured.getList.infinite();
+    configured.getList.infinite({ query: { userId: 1 } });
+    // per-call override is a partial of the contract
+    configured.getList.infinite(
+      { query: { userId: 1 } },
+      { initialPageParam: 5 },
+    );
+
+    // data still infers as InfiniteData of the per-page response
+    configured.getList.infinite(
+      { query: { userId: 1 } },
+      {
+        select: (data) => {
+          type _data = Expect<
+            Equal<
+              typeof data,
+              InfiniteData<{ id: number; title: string }[], number>
+            >
+          >;
+          return data;
+        },
+      },
+    );
   });
 });

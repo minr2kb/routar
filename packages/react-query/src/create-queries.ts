@@ -14,6 +14,7 @@ import {
 } from "./utils/key.js";
 
 type EndpointDefault = Record<string, unknown>;
+type InfiniteConfig = Record<string, unknown>;
 
 /**
  * Derives TanStack Query accessors from a routar API client.
@@ -34,6 +35,7 @@ export function createQueries<TEndpoints extends RouterEndpoints>(
     router.endpoints,
     root,
     options?.defaults as Record<string, EndpointDefault> | undefined,
+    options?.infinite as Record<string, InfiniteConfig> | undefined,
   ) as Queries<TEndpoints>;
 }
 
@@ -41,8 +43,10 @@ function buildQueries(
   apiNode: Record<string, unknown>,
   endpoints: RouterEndpoints,
   root: string[],
-  // Per-endpoint defaults apply at the top level only; nested routers get none.
+  // Per-endpoint defaults + infinite config apply at the top level only;
+  // nested routers get none.
   defaults: Record<string, EndpointDefault> | undefined,
+  infinite: Record<string, InfiniteConfig> | undefined,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { $key: root };
 
@@ -53,6 +57,7 @@ function buildQueries(
         apiNode[name] as Record<string, unknown>,
         entry.endpoints,
         childRoot,
+        undefined,
         undefined,
       );
       continue;
@@ -65,7 +70,7 @@ function buildQueries(
     const endpointDefault = defaults?.[name];
     out[name] =
       spec.method === "GET"
-        ? makeQueryAccessor(fn, root, name, endpointDefault)
+        ? makeQueryAccessor(fn, root, name, endpointDefault, infinite?.[name])
         : makeMutationAccessor(fn, root, name, endpointDefault);
   }
 
@@ -97,6 +102,7 @@ function makeQueryAccessor(
   root: string[],
   name: string,
   endpointDefault: EndpointDefault | undefined,
+  infiniteConfig: InfiniteConfig | undefined,
 ) {
   const accessor = (params?: unknown, options?: Record<string, unknown>) =>
     queryOptions({
@@ -107,14 +113,29 @@ function makeQueryAccessor(
     });
   accessor.queryKey = (params?: unknown) => buildQueryKey(root, name, params);
 
-  const infinite = (
-    params: unknown,
-    options: {
-      pageParam: (pageParam: unknown) => Record<string, unknown>;
-      [k: string]: unknown;
-    },
-  ) => {
-    const { pageParam, ...rest } = options;
+  const infinite = (params?: unknown, override?: Record<string, unknown>) => {
+    // Contract = per-endpoint config (createQueries) overlaid with per-call opts.
+    const merged = { ...infiniteConfig, ...override };
+    const { pageParam, initialPageParam, getNextPageParam, ...rest } =
+      merged as {
+        pageParam?: (p: unknown) => Record<string, unknown>;
+        initialPageParam?: unknown;
+        getNextPageParam?: unknown;
+      } & Record<string, unknown>;
+
+    if (
+      typeof pageParam !== "function" ||
+      initialPageParam === undefined ||
+      typeof getNextPageParam !== "function"
+    ) {
+      throw new Error(
+        `[@routar/react-query] infinite query "${name}" is missing its pagination ` +
+          "contract. Declare it in createQueries({ infinite: { " +
+          `${name}: { initialPageParam, getNextPageParam, pageParam } } }) ` +
+          "or pass it at the call site.",
+      );
+    }
+
     return infiniteQueryOptions({
       queryKey: buildInfiniteKey(root, name, params),
       queryFn: ({
@@ -127,10 +148,10 @@ function makeQueryAccessor(
         const base = isPlainObject(params) ? params : {};
         return fn(deepMerge(base, pageParam(page)), signal);
       },
+      initialPageParam,
+      getNextPageParam,
       ...endpointDefault,
       ...rest,
-      // `rest` (spread) hides initialPageParam/getNextPageParam from the static
-      // type, but they are present at runtime — assert through unknown.
     } as unknown as Parameters<typeof infiniteQueryOptions>[0]);
   };
   infinite.queryKey = (params?: unknown) =>

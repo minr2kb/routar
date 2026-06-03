@@ -44,6 +44,12 @@ export interface CreateQueriesOptions<
   key?: string;
   /** Per-endpoint default options merged before each call's options. */
   defaults?: EndpointDefaults<TEndpoints>;
+  /**
+   * Per-endpoint infinite (pagination) contract, keyed by GET endpoint name.
+   * Declared once here; each `.infinite()` call may override it. See
+   * {@link InfiniteConfigMap}.
+   */
+  infinite?: InfiniteConfigMap<TEndpoints>;
 }
 
 /** The request/params type of an endpoint, or `void` when it has no `request`. */
@@ -119,16 +125,38 @@ export type InfiniteAccessorResult<TPage, TPageParam> = Omit<
 };
 
 /**
+ * Per-endpoint infinite (pagination) config, keyed by GET endpoint name —
+ * passed to `createQueries(api, { infinite })`. Each value is the full infinite
+ * contract for that endpoint. Top-level endpoints only.
+ */
+export type InfiniteConfigMap<TEndpoints extends RouterEndpoints> = {
+  [K in keyof TEndpoints as TEndpoints[K] extends EndpointSpec<any, any, any>
+    ? TEndpoints[K]["method"] extends "GET"
+      ? K
+      : never
+    : never]?: TEndpoints[K] extends EndpointSpec<any, any, any>
+    ? InfiniteAccessorOptions<
+        InferResponse<TEndpoints[K]>,
+        EndpointParams<TEndpoints[K]>,
+        number
+      >
+    : never;
+};
+
+/**
  * A GET endpoint exposed as an infinite-query-options factory.
- * `params` is the base (page-independent) request; the options object is
- * required (`initialPageParam` + `getNextPageParam` + `pageParam`). Pass
- * `undefined`/`{}` as `params` for endpoints that take no base params.
+ *
+ * The pagination contract (`initialPageParam` + `getNextPageParam` + `pageParam`)
+ * is declared once in `createQueries({ infinite })`; each call may partially
+ * override it. If no config was declared for the endpoint, the full contract
+ * must be supplied at the call site (otherwise it throws at runtime). Page param
+ * is typed as `number` — for cursor pagination, cast at the call site.
  */
 export interface InfiniteAccessor<TParams, TPage> {
-  <TPageParam = number>(
-    params: TParams,
-    options: InfiniteAccessorOptions<TPage, TParams, TPageParam>,
-  ): InfiniteAccessorResult<TPage, TPageParam>;
+  (
+    params?: TParams,
+    options?: Partial<InfiniteAccessorOptions<TPage, TParams, number>>,
+  ): InfiniteAccessorResult<TPage, number>;
   queryKey: (params?: TParams) => QueryKey;
 }
 
@@ -144,7 +172,7 @@ export type QueryAccessor<TParams, TData> =
         options?: QueryAccessorOptions<TData>,
       ) => QueryAccessorResult<TData>) & {
     queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
-    /** Infinite-query variant of this endpoint (see {@link InfiniteAccessor}). */
+    /** Infinite-query variant. Declare the contract via `createQueries({ infinite })`. */
     infinite: InfiniteAccessor<TParams, TData>;
   };
 

@@ -290,6 +290,66 @@ describe("createQueries — infinite accessor", () => {
   });
 });
 
+describe("createQueries — infinite via config (+ per-call override)", () => {
+  it("configured endpoint: .infinite(params) works with no call options", async () => {
+    const { api, getList } = makeApi([{ id: 1 }]);
+    const q = createQueries(api, {
+      infinite: {
+        getList: {
+          initialPageParam: 1,
+          getNextPageParam: (last, all) =>
+            last.length ? all.length + 1 : undefined,
+          pageParam: (page) => ({ query: { _page: page } }),
+        },
+      },
+    });
+    const opts = q.getList.infinite({ query: { userId: 1 } });
+    expect(opts.queryKey as unknown).toEqual([
+      "todos",
+      "getList",
+      "infinite",
+      { query: { userId: 1 } },
+    ]);
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ pageParam: 3, signal: undefined });
+    expect(getList).toHaveBeenCalledWith(
+      { query: { userId: 1, _page: 3 } },
+      undefined,
+    );
+  });
+
+  it("per-call override wins over the configured contract", () => {
+    const { api } = makeApi();
+    const q = createQueries(api, {
+      infinite: {
+        getList: {
+          initialPageParam: 1,
+          getNextPageParam: () => undefined,
+          pageParam: (page) => ({ query: { _page: page } }),
+        },
+      },
+    });
+    const opts = q.getList.infinite(
+      { query: { userId: 1 } },
+      {
+        initialPageParam: 5,
+      },
+    );
+    expect((opts as { initialPageParam?: unknown }).initialPageParam).toBe(5);
+  });
+
+  it("throws a clear error when no contract is supplied (config or call site)", () => {
+    const { api } = makeApi();
+    const q = createQueries(api);
+    // Unconfigured + no call-site contract is a type error; force it to verify
+    // the runtime guard message.
+    const infinite = q.getList.infinite as (params?: unknown) => unknown;
+    expect(() => infinite({ query: { userId: 1 } })).toThrow(
+      /pagination contract/,
+    );
+  });
+});
+
 describe("createQueries — per-endpoint defaults (C4)", () => {
   it("merges a query default, and a per-call option overrides it", () => {
     const { api } = makeApi();
