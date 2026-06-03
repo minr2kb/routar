@@ -1,6 +1,6 @@
 {
   "name": "@routar/react-query",
-  "version": "0.1.0",
+  "version": "1.3.0",
   "description": "TanStack Query bindings for routar — queryOptions/mutationOptions factories from a routar router",
   "keywords": ["routar", "tanstack-query", "react-query", "typescript", "api", "queryOptions"],
   "author": "Kyungbae Min",

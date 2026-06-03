@@ -1,7 +1,15 @@
 {
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [["@routar/core", "@routar/axios", "@routar/ky", "@routar/msw"]],
+  "fixed": [
+    [
+      "@routar/core",
+      "@routar/axios",
+      "@routar/ky",
+      "@routar/msw",
+      "@routar/react-query"
+    ]
+  ],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
