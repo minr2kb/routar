@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { PostInfiniteListClient } from "@/components/PostInfiniteListClient";
-import { postInfiniteList } from "@/remote/services/post";
+import { postQuery } from "@/remote/services/post";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export const dynamic = "force-dynamic";
@@ -9,9 +9,10 @@ export const dynamic = "force-dynamic";
 export default async function PostsInfinitePage() {
   const queryClient = getQueryClient();
 
-  // SSR: prefetch the first page; the shared postInfiniteList() guarantees the
-  // server key/options match the client's useSuspenseInfiniteQuery exactly.
-  await queryClient.prefetchInfiniteQuery(postInfiniteList());
+  // SSR: prefetch the first page. Same base params as the client → matching key.
+  await queryClient.prefetchInfiniteQuery(
+    postQuery.getList.infinite({ query: { _limit: 10 } }),
+  );
 
   return (
     <div>

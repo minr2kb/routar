@@ -2,11 +2,14 @@
 
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { postInfiniteList } from "@/remote/services/post";
+import { postQuery } from "@/remote/services/post";
 
 export function PostInfiniteListClient() {
+  // Contract comes from createQueries({ infinite }) — just pass base params.
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useSuspenseInfiniteQuery(postInfiniteList());
+    useSuspenseInfiniteQuery(
+      postQuery.getList.infinite({ query: { _limit: 10 } }),
+    );
 
   // data.pages is an array of pages; flatten to a single list
   const posts = data.pages.flat();
