@@ -26,6 +26,32 @@ import { todoApi } from './todo'
 export const todoQuery = createQueries(todoApi)
 ```
 
+## Per-endpoint defaults
+
+Pass a `defaults` map to `createQueries` to set default options for specific endpoints. Each key is an endpoint name; the value is merged **before** per-call options (per-call always wins).
+
+```ts
+export const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getDetail: { staleTime: 5 * 60_000 },
+    getList:   { staleTime: 60_000 },
+  },
+})
+```
+
+Top-level endpoints only — defaults for endpoints inside nested routers are not matched. For mutation endpoints, the value is mutation options (minus `invalidates`); `mutationFn` and `mutationKey` are still set by the library.
+
+## Error typing
+
+`error` in query/mutation results is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment TanStack's `Register` interface once in your project — no change to `createQueries` is needed:
+
+```ts
+import type { HttpError } from '@routar/core'
+declare module '@tanstack/react-query' {
+  interface Register { defaultError: HttpError }
+}
+```
+
 ## Queries
 
 Each query accessor is a function that returns a TanStack `queryOptions` object — pass it directly to `useSuspenseQuery`, `useQuery`, `prefetchQuery`, or any other TanStack helper.
@@ -135,14 +161,16 @@ Pass `invalidates` to declare which query keys to invalidate on success:
 useMutation(
   todoQuery.create({
     invalidates: [
-      todoQuery.getList.queryKey(),  // invalidate the specific list key
-      todoQuery.$key,                // or invalidate the whole domain
+      todoQuery.getList.queryKey(),  // prefer narrow: just the key(s) actually affected
+      // todoQuery.$key              // whole-domain: refetches ALL active lists + details — use only when truly needed
     ],
   }),
 )
 ```
 
-`invalidates` is stored in `mutation.meta` and processed by `routarMutationCache`. **Wire it once** when creating your `QueryClient`:
+Prefer narrow invalidation — target the specific key(s) affected by the mutation. Reserve `todoQuery.$key` for mutations that truly invalidate every query in the domain; it triggers a refetch of all active lists and details, which can be costly.
+
+`invalidates` is stored in `mutation.meta` and processed by `routarMutationCache`. **Wire it once** when creating your `QueryClient` — without this wiring, `invalidates` does nothing. In development, the library logs a one-time `console.warn` if a mutation declares `invalidates` while no `routarMutationCache` is wired.
 
 ```ts
 // utils/get-query-client.ts
@@ -155,7 +183,7 @@ queryClient = new QueryClient({
 })
 ```
 
-Without this wiring `invalidates` is silently ignored — you can still handle invalidation manually in a native `onSuccess` callback.
+Without this wiring `invalidates` is silently ignored — use a native `onSuccess` callback instead.
 
 ### Manual invalidation
 
@@ -174,6 +202,8 @@ useMutation(
 
 The library does not intercept optimistic update logic — pass native TanStack handlers and they are merged in:
 
+> **Adapter caveat:** if the endpoint has an `adapter`, the value stored in the query cache is the **adapted** output (e.g. `{ ...todo, label }`), not the raw response. `setQueryData` callbacks must produce that adapted shape — include any derived fields that the adapter adds.
+
 ```ts
 const qc = useQueryClient()
 
@@ -183,6 +213,7 @@ useMutation(
       const key = todoQuery.getDetail.queryKey({ path: { id: vars.path.id } })
       await qc.cancelQueries({ queryKey: key })
       const prev = qc.getQueryData(key)
+      // If the endpoint has an adapter, old already has the adapted shape — preserve derived fields
       qc.setQueryData(key, (old: any) => ({ ...old, ...vars.body }))
       return { prev, key }
     },

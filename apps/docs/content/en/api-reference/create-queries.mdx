@@ -22,6 +22,18 @@ export const todoQuery = createQueries(todoApi)
 |-----------|------|-------------|
 | `api` | `ApiClientWithRouter` (from `createApi`) | The typed client produced by `createApi`; carries its source router on `$router` |
 | `options.key` | `string \| string[]` | Override the root key segments (default: derived from router prefix) |
+| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | Per-endpoint default options keyed by endpoint name. Merged **before** per-call options (per-call wins). Top-level endpoints only; for mutation endpoints, value is mutation options minus `invalidates`. |
+
+### Error typing
+
+`error` on query/mutation results is typed as TanStack's `DefaultError`. To narrow it to `HttpError` across your project, augment TanStack's `Register` interface once — no change to `createQueries` needed:
+
+```ts
+import type { HttpError } from '@routar/core'
+declare module '@tanstack/react-query' {
+  interface Register { defaultError: HttpError }
+}
+```
 
 ### Query accessors (GET endpoints)
 
@@ -82,7 +94,9 @@ useMutation(
 )
 ```
 
-Requires `routarMutationCache` to be wired into your `QueryClient` (see below). Without it, `invalidates` is silently ignored.
+Requires `routarMutationCache` to be wired into your `QueryClient` (see below). Without it, `invalidates` does nothing. In development, the library logs a one-time `console.warn` if a mutation declares `invalidates` while no `routarMutationCache` is wired.
+
+Prefer narrow invalidation — target the specific key(s) affected (e.g. `todoQuery.getList.queryKey()`). Reserve `todoQuery.$key` for mutations that truly invalidate the whole domain; it refetches all active queries under the domain root, which can be costly.
 
 ---
 

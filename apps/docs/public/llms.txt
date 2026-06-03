@@ -36,9 +36,13 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 ## TanStack Query
 
 [createQueries(api, options?)](https://routar.vercel.app/api-reference/create-queries): Derive typed `queryOptions` / `mutationOptions` factories from a routar API client (the router is recovered from the client's `$router` — not re-passed). GET endpoints become query accessors; non-GET endpoints become mutation accessors. From `@routar/react-query`.
-[routarMutationCache(getClient)](https://routar.vercel.app/api-reference/create-queries): `MutationCache` factory — processes declarative `invalidates` stored in `mutation.meta` after each successful mutation. Wire once at `QueryClient` creation.
+[routarMutationCache(getClient)](https://routar.vercel.app/api-reference/create-queries): `MutationCache` factory — processes declarative `invalidates` stored in `mutation.meta` after each successful mutation. Wire once at `QueryClient` creation. Without wiring, `invalidates` does nothing (dev `console.warn` emitted).
 
-Key helpers: `<domain>Query.<endpoint>.queryKey(params?)`, `<domain>Query.<endpoint>.mutationKey`, `<domain>Query.$key` (domain root for broad invalidation).
+Key helpers: `<domain>Query.<endpoint>.queryKey(params?)`, `<domain>Query.<endpoint>.mutationKey`, `<domain>Query.$key` (domain root). Prefer narrow invalidation: use specific `queryKey()` over `$key` — `$key` refetches all active queries in the domain.
+
+Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options; top-level endpoints only.
+
+Error typing: augment TanStack's `Register` interface (`interface Register { defaultError: HttpError }`) to narrow `error` from `DefaultError` to `HttpError` — no `createQueries` change needed.
 
 ## Testing
 

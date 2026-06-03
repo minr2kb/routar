@@ -108,10 +108,11 @@ components/
 - Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
 - Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
 - Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
+- Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); top-level endpoints only
 - Server pages: `prefetchQuery(<domain>Query.<endpoint>(params))` → `HydrationBoundary` → `<Suspense>`
 - Client components: `useSuspenseQuery(<domain>Query.<endpoint>(params))` — `data` always non-nullable
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`
-- Invalidation: pure by default; opt-in `invalidates: [<domain>Query.$key]` or `[<domain>Query.<endpoint>.queryKey()]` requires `routarMutationCache` wired in `QueryClient`
+- Invalidation: pure by default; opt-in `invalidates: [<domain>Query.<endpoint>.queryKey()]` (prefer narrow scope) or `[<domain>Query.$key]` (whole domain — costly, use sparingly) requires `routarMutationCache` wired in `QueryClient`; without wiring, `invalidates` does nothing
 
 **Shared contract pattern (todo):** `TodoRawSchema` exported from `services/todo.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
 

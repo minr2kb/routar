@@ -509,7 +509,29 @@ create.mutate({ body: { title: 'buy milk' } });
 
 **Key helpers:** `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix — override with `createQueries(api, { key: 'todo' })`.
 
-**Invalidation — pure by default.** Mutations invalidate nothing unless you declare target keys with `invalidates` and wire `routarMutationCache(getClient)` once at `QueryClient` creation:
+**Per-endpoint defaults:** pass `defaults` to set option defaults keyed by endpoint name — merged before per-call options (per-call wins). Top-level endpoints only. For mutation endpoints, the value is mutation options minus `invalidates`.
+
+```ts
+const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getList:   { staleTime: 60_000 },
+    getDetail: { staleTime: 5 * 60_000 },
+  },
+});
+```
+
+**Error typing:** `error` is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment TanStack's `Register` interface once — no `createQueries` change needed, accessors pick it up automatically:
+
+```ts
+import type { HttpError } from '@routar/core';
+declare module '@tanstack/react-query' {
+  interface Register { defaultError: HttpError }
+}
+```
+
+**Invalidation — pure by default.** Mutations invalidate nothing unless you declare target keys with `invalidates` and wire `routarMutationCache(getClient)` once at `QueryClient` creation. Without wiring, `invalidates` does nothing; in development a one-time `console.warn` is logged.
+
+Prefer **narrow** invalidation — use `todoQuery.getList.queryKey()` (the specific key affected) rather than `todoQuery.$key` (whole domain). Reserve `$key` only when a mutation truly invalidates every query in the domain; it refetches all active lists and details, which can be costly.
 
 ```ts
 import { QueryClient } from '@tanstack/react-query';
@@ -520,13 +542,17 @@ queryClient = new QueryClient({
   mutationCache: routarMutationCache(() => queryClient),
 });
 
-// scope per call: just the list, or todoQuery.$key for the whole domain
+// prefer narrow scope
 useMutation(todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] }));
+// whole-domain only when truly needed
+useMutation(todoQuery.create({ invalidates: [todoQuery.$key] }));
 ```
 
 Without the wiring, `invalidates` is ignored — use a native `onSuccess` instead.
 
 **Optimistic updates:** accessor options are merged, so pass native `onMutate` / `onError` / `onSettled`; the key helpers make `cancelQueries` / `setQueryData` ergonomic. The library only fills `mutationFn` / `mutationKey` (+ `meta.invalidates`), so it never overwrites your handlers.
+
+**Adapter + cache shape:** if an endpoint has an `adapter`, the value stored in the query cache is the **adapted** output (e.g. `{ ...todo, label }`), not the raw response. `setQueryData` callbacks in optimistic updates must produce that adapted shape — include any derived fields that the adapter adds. Mutation responses are likewise adapted before being returned.
 
 ---
 

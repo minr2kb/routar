@@ -191,7 +191,7 @@ request: z.object({ path: z.object({ id: z.coerce.number() }) }) // ✅ in MSW c
 
 ## TanStack Query (`@routar/react-query`)
 
-`createQueries(api)` turns a routar client into TanStack Query `queryOptions`/`mutationOptions` factories. The router is **not** re-passed — it is recovered from the client (`createApi` stamps it on `$router`). There is no new hook API: you keep using TanStack's own hooks. GET endpoints become query accessors, non-GET endpoints become mutation accessors (decided at the type level).
+`createQueries(api, options?)` turns a routar client into TanStack Query `queryOptions`/`mutationOptions` factories. The router is **not** re-passed — it is recovered from the client (`createApi` stamps it on `$router`). There is no new hook API: you keep using TanStack's own hooks. GET endpoints become query accessors, non-GET endpoints become mutation accessors (decided at the type level).
 
 ```ts
 import { createQueries } from '@routar/react-query';
@@ -206,16 +206,29 @@ queryClient.prefetchQuery(todoQuery.getList()); // SSR
 
 // mutations — variables go to .mutate()
 useMutation(todoQuery.create());
-useMutation(todoQuery.update({ invalidates: [todoQuery.$key] }));
+useMutation(todoQuery.update({ invalidates: [todoQuery.getList.queryKey()] }));
 ```
 
 Signatures: query accessor `(params?, queryOptions?) => queryOptions`; mutation accessor `(options?) => mutationOptions`, where `options` also accepts `invalidates?: QueryKey[]`.
 
 Keys: `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix (override with `createQueries(api, { key })`).
 
+**Per-endpoint defaults:** pass `defaults` to set option defaults per endpoint name — merged before per-call options (per-call wins). Top-level endpoints only.
+
+```ts
+createQueries(todoApi, { defaults: { getList: { staleTime: 60_000 }, getDetail: { staleTime: 5 * 60_000 } } })
+```
+
+**Error typing:** `error` is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment `Register` once — no `createQueries` change needed:
+
+```ts
+import type { HttpError } from '@routar/core';
+declare module '@tanstack/react-query' { interface Register { defaultError: HttpError } }
+```
+
 ### Invalidation (pure by default)
 
-Mutations invalidate nothing unless you ask. Declare target keys with `invalidates`, and wire `routarMutationCache` once at `QueryClient` creation:
+Mutations invalidate nothing unless you ask. Declare target keys with `invalidates` and wire `routarMutationCache` once at `QueryClient` creation — **without this wiring `invalidates` does nothing**. In development, a one-time `console.warn` is logged if `invalidates` is declared without the wiring.
 
 ```ts
 import { QueryClient } from '@tanstack/react-query';
@@ -226,6 +239,8 @@ queryClient = new QueryClient({
   mutationCache: routarMutationCache(() => queryClient),
 });
 ```
+
+Prefer **narrow invalidation** — use `todoQuery.getList.queryKey()` (specific key) rather than `todoQuery.$key` (whole domain). Reserve `$key` only when a mutation truly invalidates every query in the domain; it refetches all active lists and details.
 
 Without this wiring, `invalidates` is ignored — handle invalidation in a native `onSuccess` instead.
 

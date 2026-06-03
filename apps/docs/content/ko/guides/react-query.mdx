@@ -26,6 +26,32 @@ import { todoApi } from './todo'
 export const todoQuery = createQueries(todoApi)
 ```
 
+## 엔드포인트별 기본 옵션
+
+`createQueries`에 `defaults` 맵을 전달하여 특정 엔드포인트의 기본 옵션을 설정합니다. 각 키는 엔드포인트 이름이며, 값은 모든 접근자 호출 시 **per-call 옵션보다 먼저** 병합됩니다(per-call 옵션이 항상 우선합니다).
+
+```ts
+export const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getDetail: { staleTime: 5 * 60_000 },
+    getList:   { staleTime: 60_000 },
+  },
+})
+```
+
+최상위 엔드포인트에만 적용됩니다 — 중첩 라우터 내의 엔드포인트 기본값은 매칭되지 않습니다. 뮤테이션 엔드포인트의 경우, 값은 뮤테이션 옵션(`invalidates` 제외)이며, `mutationFn`과 `mutationKey`는 라이브러리가 여전히 설정합니다.
+
+## 에러 타이핑
+
+쿼리/뮤테이션 결과의 `error`는 TanStack의 `DefaultError`로 타입이 지정됩니다. 프로젝트 전체에서 `HttpError`로 좁히려면, TanStack의 `Register` 인터페이스를 한 번만 확장하면 됩니다 — `createQueries` 변경 없이 접근자가 자동으로 반영합니다:
+
+```ts
+import type { HttpError } from '@routar/core'
+declare module '@tanstack/react-query' {
+  interface Register { defaultError: HttpError }
+}
+```
+
 ## 쿼리
 
 각 쿼리 접근자는 TanStack `queryOptions` 객체를 반환하는 함수입니다 — `useSuspenseQuery`, `useQuery`, `prefetchQuery` 등 TanStack 헬퍼에 직접 전달하세요.
@@ -135,14 +161,16 @@ todoQuery.create.mutationKey  // → ["todos", "create"]
 useMutation(
   todoQuery.create({
     invalidates: [
-      todoQuery.getList.queryKey(),  // 특정 목록 키 무효화
-      todoQuery.$key,                // 또는 전체 도메인 무효화
+      todoQuery.getList.queryKey(),  // 좁은 범위 권장: 실제 영향받는 키만 지정
+      // todoQuery.$key              // 전체 도메인: 모든 활성 목록 + 상세 리페치 — 정말 필요할 때만 사용
     ],
   }),
 )
 ```
 
-`invalidates`는 `mutation.meta`에 저장되고 `routarMutationCache`에서 처리됩니다. `QueryClient` 생성 시 **한 번만** 배선하세요:
+**좁은 범위의 무효화**를 권장합니다 — 뮤테이션이 실제로 영향을 미치는 특정 키를 지정하세요. `todoQuery.$key`는 도메인 내 모든 쿼리를 무효화하는 경우에만 예약하세요; 모든 활성 목록과 상세 정보를 리페치하므로 비용이 클 수 있습니다.
+
+`invalidates`는 `mutation.meta`에 저장되고 `routarMutationCache`에서 처리됩니다. `QueryClient` 생성 시 **한 번만** 배선하세요 — 이 배선 없이는 `invalidates`가 아무것도 하지 않습니다. 개발 환경에서는 `routarMutationCache`가 배선되지 않은 상태에서 뮤테이션이 `invalidates`를 선언하면 라이브러리가 일회성 `console.warn`을 출력합니다.
 
 ```ts
 // utils/get-query-client.ts
@@ -155,7 +183,7 @@ queryClient = new QueryClient({
 })
 ```
 
-이 배선 없이는 `invalidates`가 무시됩니다 — 기존 `onSuccess` 콜백에서 수동으로 무효화할 수 있습니다.
+이 배선 없이는 `invalidates`가 무시됩니다 — 대신 기본 `onSuccess` 콜백에서 수동으로 무효화하세요.
 
 ### 수동 무효화
 
@@ -174,6 +202,8 @@ useMutation(
 
 라이브러리는 낙관적 업데이트 로직을 가로채지 않습니다 — TanStack 기본 핸들러를 전달하면 병합됩니다:
 
+> **어댑터 주의사항:** 엔드포인트에 `adapter`가 있으면, 쿼리 캐시에 저장되는 값은 원본 응답이 아니라 **어댑터 출력**(예: `{ ...todo, label }`)입니다. `setQueryData` 콜백은 어댑터가 추가하는 파생 필드를 포함한 어댑터 출력 형태를 반환해야 합니다.
+
 ```ts
 const qc = useQueryClient()
 
@@ -183,6 +213,7 @@ useMutation(
       const key = todoQuery.getDetail.queryKey({ path: { id: vars.path.id } })
       await qc.cancelQueries({ queryKey: key })
       const prev = qc.getQueryData(key)
+      // 엔드포인트에 adapter가 있으면 old는 이미 어댑터 출력 형태 — 파생 필드를 보존하세요
       qc.setQueryData(key, (old: any) => ({ ...old, ...vars.body }))
       return { prev, key }
     },
