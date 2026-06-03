@@ -68,6 +68,25 @@ export const postApi = createApi(apiExecutor, PostRouter);
 
 export const postQuery = createQueries(postApi);
 
+const POSTS_PER_PAGE = 10;
+
+/**
+ * Shared infinite-list options — used by both the server prefetch and the
+ * client `useSuspenseInfiniteQuery` so the query key + options stay identical
+ * (no hydration mismatch). `pageParam` maps the page number into the request's
+ * `_page` query; it replaces writing a `queryFn` by hand.
+ */
+export const postInfiniteList = () =>
+  postQuery.getList.infinite(
+    { query: { _limit: POSTS_PER_PAGE } },
+    {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === POSTS_PER_PAGE ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }),
+    },
+  );
+
 export type PostApiTypes = ApiTypes<typeof postApi>;
 export type Post = PostApiTypes["getDetail"]["response"];
 export type Comment = PostApiTypes["getComments"]["response"][number];
