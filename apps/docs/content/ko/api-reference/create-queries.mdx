@@ -23,6 +23,7 @@ export const todoQuery = createQueries(todoApi)
 | `api` | `ApiClientWithRouter` (`createApi` 반환) | `createApi`로 생성된 타입 지정 클라이언트; 소스 라우터를 `$router`에 실고 있음 |
 | `options.key` | `string \| string[]` | 루트 키 세그먼트 재정의 (기본값: 라우터 prefix에서 파생) |
 | `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | 엔드포인트 이름을 키로 하는 per-endpoint 기본 옵션. per-call 옵션 **이전에** 병합됩니다 (per-call이 우선). 최상위 엔드포인트에만 적용; 뮤테이션 엔드포인트의 경우 값은 `invalidates`를 제외한 뮤테이션 옵션. |
+| `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | GET 엔드포인트 이름을 키로 하는 무한 쿼리 계약. `initialPageParam`, `getNextPageParam`, routar 고유의 `pageParam` 빌더를 한 번 선언하여 호출 지점에서 기본 파라미터만 전달하면 되도록 합니다. 최상위 GET 엔드포인트에만 적용. |
 
 ### 에러 타이핑
 
@@ -57,32 +58,47 @@ todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { 
 
 모든 쿼리 접근자에는 `.infinite` 호출 가능 멤버가 있으며, `useInfiniteQuery`, `useSuspenseInfiniteQuery`, `prefetchInfiniteQuery`에 사용할 TanStack `infiniteQueryOptions` 객체를 반환합니다.
 
+페이지네이션 계약을 `createQueries({ infinite })`에 한 번 선언하세요. 이후 호출 지점에서는 기본 파라미터(페이지 독립)만 전달하면 됩니다:
+
 ```ts
-// 시그니처: (params, options) => infiniteQueryOptions
-// options는 필수
-todoQuery.getList.infinite(
-  { query: { userId: 1 } },              // 기본 파라미터 (페이지 독립) — routar 요청 객체
-  {
-    initialPageParam: 1,                 // 필수 — TanStack 네이티브
-    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
-      lastPage.length ? lastPageParam + 1 : undefined,  // 필수 — TanStack 네이티브
-    pageParam: (page) => ({ query: { _page: page } }),  // 필수 — routar 고유 옵션
+// createQueries에서 계약을 한 번 선언 — 최상위 GET 엔드포인트에만 적용
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === 10 ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // routar 고유 옵션
+    },
   },
-)
+})
+
+// 호출 지점 — 기본 파라미터만; 계약은 설정에서 가져옴
+todoQuery.getList.infinite({ query: { _limit: 10 } })
+
+// SSR 프리페치
+queryClient.prefetchInfiniteQuery(todoQuery.getList.infinite())
 ```
 
-**옵션:**
+**시그니처:** `(params?, override?) => infiniteQueryOptions`
 
-| 옵션 | 타입 | 설명 |
+- `params` — 기본 routar 요청 (페이지 독립): `{ path?, query?, body? }`. 선택적; 파라미터 없는 엔드포인트는 생략 가능.
+- `override` — 설정된 계약 위에 병합되는 선택적 부분 오버라이드(호출 옵션 우선). `createQueries` 설정 없이 임시로 전체 계약을 여기서 전달하는 것도 가능하지만, `createQueries`에 선언하는 방식이 권장됩니다.
+
+`infinite` 설정이 없는 엔드포인트에서 `override`로 전체 계약을 전달하지 않고 `.infinite()`를 호출하면 라이브러리가 **명확한 런타임 오류를 던집니다**.
+
+**계약 필드** (`createQueries({ infinite: { <엔드포인트>: { ... } } })`에 선언하거나 `override`로 전달):
+
+| 필드 | 타입 | 설명 |
 |------|------|------|
-| `initialPageParam` | `TPageParam` | 시작 페이지 파라미터 값. TanStack 필수. |
-| `getNextPageParam` | `(lastPage, allPages, lastPageParam) => TPageParam \| undefined` | 다음 페이지 파라미터를 반환하거나, 종료 시 `undefined`. TanStack 필수. |
-| `pageParam` | `(page: TPageParam) => DeepPartial<TRequest>` | **routar 고유 옵션.** 현재 페이지 파라미터를 부분 요청 객체로 변환합니다. 반환값이 기본 파라미터에 깊게 병합된 후 routar 클라이언트를 호출합니다. `queryFn`을 대체하므로 함께 전달하지 마세요. |
-| `getPreviousPageParam` | `(firstPage, allPages, firstPageParam) => TPageParam \| undefined` | 선택적 TanStack 네이티브 옵션. |
+| `initialPageParam` | `number` | 시작 페이지 파라미터 값. TanStack 필수. 페이지 파라미터는 `number` 타입이며, 커서(string) 페이지네이션은 호출 지점에서 캐스팅하세요. |
+| `getNextPageParam` | `(lastPage, allPages) => number \| undefined` | 다음 페이지 파라미터를 반환하거나, 종료 시 `undefined`. TanStack 필수. |
+| `pageParam` | `(page: number) => DeepPartial<TRequest>` | **routar 고유 옵션.** 현재 페이지 파라미터를 부분 요청 객체로 변환합니다. 반환값이 기본 파라미터에 깊게 병합된 후 routar 클라이언트를 호출합니다. `queryFn`을 대체하므로 함께 전달하지 마세요. |
+| `getPreviousPageParam` | `(firstPage, allPages) => number \| undefined` | 선택적 TanStack 네이티브 옵션. |
 | `maxPages` | `number` | 선택적 TanStack 네이티브 옵션. |
 | 기타 `infiniteQueryOptions` 필드 | — | 그대로 전달됩니다 (예: `select`, `staleTime`, `enabled`). |
 
-`pageParam` 반환 타입은 엔드포인트 요청 스키마의 deep-partial입니다. `pageParam` 빌더가 쓰는 필드는 엔드포인트의 request 스키마에 존재해야 합니다 — 병합된 요청이 routar에서 검증됩니다. adapter(있는 경우)는 각 페이지마다 실행됩니다(표준 쿼리 접근자와 동일).
+`pageParam` 빌더가 쓰는 필드는 엔드포인트의 request 스키마에 존재해야 합니다 — 병합된 요청이 routar에서 검증됩니다. adapter(있는 경우)는 각 페이지마다 실행됩니다(표준 쿼리 접근자와 동일). 데이터 형태: `InfiniteData<PageType, number>`.
 
 **`.infinite.queryKey(params?)`** — 무한 쿼리 전용 브랜드 키를 반환합니다:
 
@@ -90,8 +106,8 @@ todoQuery.getList.infinite(
 todoQuery.getList.infinite.queryKey()
 // → ["todos", "getList", "infinite"]
 
-todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
-// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+todoQuery.getList.infinite.queryKey({ query: { _limit: 10 } })
+// → ["todos", "getList", "infinite", { query: { _limit: 10 } }]
 ```
 
 무한 키는 표준 키 `["todos", "getList"]`의 prefix-child이므로, 표준 키나 도메인 `$key`를 무효화하면 infinite 변형도 함께 무효화됩니다.

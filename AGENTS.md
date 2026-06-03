@@ -226,19 +226,23 @@ import type { HttpError } from '@routar/core';
 declare module '@tanstack/react-query' { interface Register { defaultError: HttpError } }
 ```
 
-**Infinite queries (GET-only):** every query accessor has a `.infinite` callable that returns `infiniteQueryOptions`. The routar-specific `pageParam` builder maps the page param to a partial request (deep-merged into base params before the routar client is called) — this replaces `queryFn`. `initialPageParam` and `getNextPageParam` are native TanStack requirements. Key: `[...root, endpointName, "infinite", params?]` — a prefix-child of the standard key, so standard-key invalidation also covers it.
+**Infinite queries (GET-only):** declare the pagination contract once in `createQueries({ infinite: { <endpoint>: { initialPageParam, getNextPageParam, pageParam } } })` — top-level GET endpoints only. The routar-specific `pageParam` builder maps the page param to a partial request (deep-merged into base params before the routar client is called) — this replaces `queryFn`. Call sites then only need base params; supply the full contract as the second arg only for ad-hoc use. Key: `[...root, endpointName, "infinite", params?]` — a prefix-child of the standard key, so standard-key invalidation also covers it.
 
 ```ts
-useSuspenseInfiniteQuery(
-  todoQuery.getList.infinite(
-    { query: { userId: 1 } },
-    {
+// Declare contract in createQueries
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
       initialPageParam: 1,
-      getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
+      getNextPageParam: (lastPage, allPages) => lastPage.length === 10 ? allPages.length + 1 : undefined,
       pageParam: (page) => ({ query: { _page: page } }),
     },
-  ),
-);
+  },
+});
+
+// Call site — base params only
+useSuspenseInfiniteQuery(todoQuery.getList.infinite({ query: { _limit: 10 } }));
+queryClient.prefetchInfiniteQuery(todoQuery.getList.infinite()); // SSR
 ```
 
 ### Invalidation (pure by default)

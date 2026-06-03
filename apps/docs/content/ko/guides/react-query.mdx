@@ -123,6 +123,22 @@ export default async function TodosPage() {
 
 `createQueries`가 생성하는 모든 GET 쿼리 접근자에는 `.infinite` 멤버가 있습니다. 이는 네이티브 TanStack `infiniteQueryOptions` 객체를 반환하며 `useInfiniteQuery`, `useSuspenseInfiniteQuery`, `prefetchInfiniteQuery`에 직접 전달할 수 있습니다.
 
+페이지네이션 계약을 `createQueries({ infinite })` 에 **한 번만** 선언하세요 (엔드포인트 이름을 키로 사용). 이후 호출 지점에서는 기본 파라미터(페이지 독립)만 전달하면 됩니다.
+
+```ts
+// remote/services/todo.ts — 계약을 한 번만 선언
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === 10 ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // 페이지 → 부분 요청으로 변환
+    },
+  },
+})
+```
+
 ```tsx
 'use client'
 import { useSuspenseInfiniteQuery } from '@tanstack/react-query'
@@ -130,15 +146,7 @@ import { todoQuery } from '@/remote/services/todo'
 
 export function InfiniteTodoList() {
   const { data, fetchNextPage, hasNextPage } = useSuspenseInfiniteQuery(
-    todoQuery.getList.infinite(
-      { query: { userId: 1 } },              // 기본 파라미터 (페이지 독립) — routar 요청 객체
-      {
-        initialPageParam: 1,
-        getNextPageParam: (lastPage, _allPages, lastPageParam) =>
-          lastPage.length ? lastPageParam + 1 : undefined,
-        pageParam: (page) => ({ query: { _page: page } }), // 페이지 → 부분 요청으로 변환
-      },
-    ),
+    todoQuery.getList.infinite({ query: { _limit: 10 } }), // 기본 파라미터만 전달
   )
   // data: InfiniteData<TodoItem[], number> — 각 페이지는 엔드포인트 응답 (adapter 적용)
 
@@ -157,18 +165,32 @@ export function InfiniteTodoList() {
 
 `pageParam`은 `.infinite`에서 routar 고유의 개념입니다. `queryFn`을 직접 작성하는 대신, 페이지 번호가 요청의 **어느 위치**에 들어가는지 기술합니다 — 반환값(엔드포인트 요청의 deep-partial)이 기본 파라미터에 깊게 병합된 후 routar 클라이언트를 호출합니다.
 
-- `initialPageParam`과 `getNextPageParam`은 TanStack의 표준 필수 옵션입니다.
+- `initialPageParam`, `getNextPageParam`, `pageParam`은 `createQueries({ infinite: { <엔드포인트>: { ... } } })`에 선언합니다.
 - `pageParam`은 `queryFn`을 대체합니다 — 함께 전달하지 마세요.
 - `pageParam` 빌더가 쓰는 필드는 엔드포인트의 request 스키마에 존재해야 합니다. 병합된 요청이 routar에서 검증되기 때문입니다.
-- 다른 네이티브 무한 옵션(`maxPages`, `getPreviousPageParam`, `select`, `staleTime` 등)은 옵션 객체를 통해 그대로 전달됩니다.
+- 페이지 파라미터 타입은 `number`입니다. 커서 기반(string) 페이지네이션은 호출 지점에서 캐스팅하세요.
+- 다른 네이티브 무한 옵션(`maxPages`, `getPreviousPageParam`, `select`, `staleTime` 등)은 그대로 전달됩니다.
+
+### Per-call 오버라이드
+
+`.infinite()`의 두 번째 인수로 부분 오버라이드를 전달할 수 있습니다 — 설정된 계약 위에 병합됩니다(호출 옵션 우선):
+
+```ts
+todoQuery.getList.infinite(
+  { query: { _limit: 10 } },
+  { staleTime: 60_000 },   // 설정 계약 위에 병합
+)
+```
+
+호출 지점에서 전체 계약을 직접 전달하는 것도 가능하지만, `createQueries`에 선언하는 방식이 권장됩니다. `infinite` 설정이 없는 엔드포인트에서 전체 계약 없이 `.infinite()`를 호출하면 라이브러리가 **명확한 런타임 오류를 던집니다**.
 
 ### 키 헬퍼
 
 `.infinite.queryKey(params?)`는 `[...root, "getList", "infinite", params?]`를 반환합니다. 이는 표준 키 `[...root, "getList"]`의 prefix-child이므로, 표준 키나 도메인 `$key`를 무효화하면 infinite 변형도 함께 무효화됩니다.
 
 ```ts
-todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
-// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+todoQuery.getList.infinite.queryKey({ query: { _limit: 10 } })
+// → ["todos", "getList", "infinite", { query: { _limit: 10 } }]
 
 // 표준 키를 무효화하면 infinite 변형도 포함됩니다:
 qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() })
@@ -184,13 +206,7 @@ import { todoQuery } from '@/remote/services/todo'
 
 export default async function TodosPage() {
   const qc = getQueryClient()
-  await qc.prefetchInfiniteQuery(
-    todoQuery.getList.infinite({ query: { userId: 1 } }, {
-      initialPageParam: 1,
-      getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
-      pageParam: (page) => ({ query: { _page: page } }),
-    }),
-  )
+  await qc.prefetchInfiniteQuery(todoQuery.getList.infinite({ query: { _limit: 10 } }))
 
   return (
     <HydrationBoundary state={dehydrate(qc)}>
@@ -204,14 +220,10 @@ export default async function TodosPage() {
 
 ### 파라미터 없는 엔드포인트
 
-첫 번째 인수로 `undefined`(또는 `{}`)를 전달합니다:
+인수 없이(또는 `undefined`를 전달하여) 호출합니다:
 
 ```ts
-todoQuery.feed.infinite(undefined, {
-  initialPageParam: 1,
-  getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
-  pageParam: (page) => ({ query: { _page: page } }),
-})
+useSuspenseInfiniteQuery(todoQuery.feed.infinite())
 ```
 
 ## 뮤테이션

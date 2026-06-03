@@ -123,6 +123,22 @@ export default async function TodosPage() {
 
 Every GET query accessor has an `.infinite` member that returns a native TanStack `infiniteQueryOptions` object — pass it directly to `useInfiniteQuery`, `useSuspenseInfiniteQuery`, or `prefetchInfiniteQuery`.
 
+Declare the pagination contract **once** in `createQueries({ infinite })`, keyed by endpoint name. The call site then only needs the base params (page-independent).
+
+```ts
+// remote/services/todo.ts — declare the contract once
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === 10 ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // maps page → partial request
+    },
+  },
+})
+```
+
 ```tsx
 'use client'
 import { useSuspenseInfiniteQuery } from '@tanstack/react-query'
@@ -130,15 +146,7 @@ import { todoQuery } from '@/remote/services/todo'
 
 export function InfiniteTodoList() {
   const { data, fetchNextPage, hasNextPage } = useSuspenseInfiniteQuery(
-    todoQuery.getList.infinite(
-      { query: { userId: 1 } },              // base params (page-independent) — the routar request
-      {
-        initialPageParam: 1,
-        getNextPageParam: (lastPage, _allPages, lastPageParam) =>
-          lastPage.length ? lastPageParam + 1 : undefined,
-        pageParam: (page) => ({ query: { _page: page } }), // maps page → partial request
-      },
-    ),
+    todoQuery.getList.infinite({ query: { _limit: 10 } }), // base params only
   )
   // data: InfiniteData<TodoItem[], number> — each page is the endpoint's response (adapter applied)
 
@@ -157,18 +165,32 @@ export function InfiniteTodoList() {
 
 `pageParam` is the one routar-specific concept in `.infinite`. Instead of writing a `queryFn`, you describe **where** the page number goes in the request — its return value (a deep-partial of the endpoint's request) is deep-merged into the base params, then the routar client is called.
 
-- `initialPageParam` and `getNextPageParam` are standard TanStack requirements.
-- `pageParam` replaces `queryFn` — do not pass `queryFn` alongside it.
+- Declare `initialPageParam`, `getNextPageParam`, and `pageParam` in `createQueries({ infinite: { <endpoint>: { ... } } })`.
+- `pageParam` replaces `queryFn` — do not pass `queryFn`.
 - The field the `pageParam` builder writes to must exist in the endpoint's request schema, since the merged request is validated by routar.
+- The page param type is `number`. For cursor-based (string) pagination, cast at the call site.
 - Other native infinite options (`maxPages`, `getPreviousPageParam`, `select`, `staleTime`, etc.) pass straight through.
+
+### Per-call override
+
+Pass a partial override as the second argument to `.infinite()` — it merges over the configured contract (call wins):
+
+```ts
+todoQuery.getList.infinite(
+  { query: { _limit: 10 } },
+  { staleTime: 60_000 },   // merged over config
+)
+```
+
+You can also supply the full contract at the call site for ad-hoc use, but declaring it in `createQueries` is the recommended pattern. If an endpoint has no `infinite` config and the full contract is not supplied as the override, the library **throws a clear runtime error**.
 
 ### Key helper
 
 `.infinite.queryKey(params?)` returns `[...root, "getList", "infinite", params?]`. Because this is a prefix-child of the standard key `[...root, "getList"]`, invalidating the standard key — or the domain `$key` — also covers the infinite variant.
 
 ```ts
-todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
-// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+todoQuery.getList.infinite.queryKey({ query: { _limit: 10 } })
+// → ["todos", "getList", "infinite", { query: { _limit: 10 } }]
 
 // Invalidating the standard key also hits the infinite variant:
 qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() })
@@ -184,13 +206,7 @@ import { todoQuery } from '@/remote/services/todo'
 
 export default async function TodosPage() {
   const qc = getQueryClient()
-  await qc.prefetchInfiniteQuery(
-    todoQuery.getList.infinite({ query: { userId: 1 } }, {
-      initialPageParam: 1,
-      getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
-      pageParam: (page) => ({ query: { _page: page } }),
-    }),
-  )
+  await qc.prefetchInfiniteQuery(todoQuery.getList.infinite({ query: { _limit: 10 } }))
 
   return (
     <HydrationBoundary state={dehydrate(qc)}>
@@ -204,14 +220,10 @@ export default async function TodosPage() {
 
 ### No-params endpoints
 
-Pass `undefined` (or `{}`) as the first argument:
+Call `.infinite()` without arguments (or pass `undefined`):
 
 ```ts
-todoQuery.feed.infinite(undefined, {
-  initialPageParam: 1,
-  getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
-  pageParam: (page) => ({ query: { _page: page } }),
-})
+useSuspenseInfiniteQuery(todoQuery.feed.infinite())
 ```
 
 ## Mutations

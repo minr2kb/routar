@@ -23,6 +23,7 @@ export const todoQuery = createQueries(todoApi)
 | `api` | `ApiClientWithRouter` (from `createApi`) | The typed client produced by `createApi`; carries its source router on `$router` |
 | `options.key` | `string \| string[]` | Override the root key segments (default: derived from router prefix) |
 | `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | Per-endpoint default options keyed by endpoint name. Merged **before** per-call options (per-call wins). Top-level endpoints only; for mutation endpoints, value is mutation options minus `invalidates`. |
+| `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | Per-endpoint infinite query contract keyed by GET endpoint name. Declares `initialPageParam`, `getNextPageParam`, and the routar-specific `pageParam` builder once so call sites only need base params. Top-level GET endpoints only. |
 
 ### Error typing
 
@@ -57,32 +58,47 @@ todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { 
 
 Every query accessor has an `.infinite` callable that returns a TanStack `infiniteQueryOptions` object for use with `useInfiniteQuery`, `useSuspenseInfiniteQuery`, or `prefetchInfiniteQuery`.
 
+Declare the pagination contract once in `createQueries({ infinite })`. Call sites then only supply base params (page-independent):
+
 ```ts
-// signature: (params, options) => infiniteQueryOptions
-// options is required
-todoQuery.getList.infinite(
-  { query: { userId: 1 } },              // base params (page-independent) — the routar request
-  {
-    initialPageParam: 1,                 // required — TanStack native
-    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
-      lastPage.length ? lastPageParam + 1 : undefined,  // required — TanStack native
-    pageParam: (page) => ({ query: { _page: page } }),  // required — routar-specific
+// Declare the contract in createQueries — top-level GET endpoints only
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === 10 ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // routar-specific
+    },
   },
-)
+})
+
+// Call site — base params only; contract comes from config
+todoQuery.getList.infinite({ query: { _limit: 10 } })
+
+// SSR prefetch
+queryClient.prefetchInfiniteQuery(todoQuery.getList.infinite())
 ```
 
-**Options:**
+**Signature:** `(params?, override?) => infiniteQueryOptions`
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `initialPageParam` | `TPageParam` | Starting page param value. Required by TanStack. |
-| `getNextPageParam` | `(lastPage, allPages, lastPageParam) => TPageParam \| undefined` | Returns the next page param, or `undefined` to stop. Required by TanStack. |
-| `pageParam` | `(page: TPageParam) => DeepPartial<TRequest>` | **routar-specific.** Maps the current page param to a partial request object. The return is deep-merged into the base params before the routar client is called. Replaces `queryFn` — do not pass `queryFn`. |
-| `getPreviousPageParam` | `(firstPage, allPages, firstPageParam) => TPageParam \| undefined` | Optional TanStack native option. |
+- `params` — base routar request (page-independent): `{ path?, query?, body? }`. Optional; omit for no-param endpoints.
+- `override` — optional partial of the contract that merges over the configured one (call wins). You can also pass the full contract here for ad-hoc use without a `createQueries` config entry, but declaring it in `createQueries` is the recommended pattern.
+
+If an endpoint has no `infinite` config and the full contract is not supplied via `override`, the library **throws a clear runtime error** at call time.
+
+**Contract fields** (declared in `createQueries({ infinite: { <endpoint>: { ... } } })` or supplied as `override`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `initialPageParam` | `number` | Starting page param value. Required by TanStack. Page param is typed as `number`; for cursor (string) pagination, cast at the call site. |
+| `getNextPageParam` | `(lastPage, allPages) => number \| undefined` | Returns the next page param, or `undefined` to stop. Required by TanStack. |
+| `pageParam` | `(page: number) => DeepPartial<TRequest>` | **routar-specific.** Maps the current page param to a partial request object. The return is deep-merged into base params before the routar client is called. Replaces `queryFn` — do not pass `queryFn`. |
+| `getPreviousPageParam` | `(firstPage, allPages) => number \| undefined` | Optional TanStack native option. |
 | `maxPages` | `number` | Optional TanStack native option. |
 | Any other `infiniteQueryOptions` field | — | Passed through as-is (e.g. `select`, `staleTime`, `enabled`). |
 
-The `pageParam` return type is a deep-partial of the endpoint's request schema. The field written by `pageParam` must exist in the endpoint's request schema — the merged request is validated by routar. The adapter (if any) runs per page, consistent with the standard query accessor.
+The field written by `pageParam` must exist in the endpoint's request schema — the merged request is validated by routar. The adapter (if any) runs per page, consistent with the standard query accessor. Data shape: `InfiniteData<PageType, number>`.
 
 **`.infinite.queryKey(params?)`** — returns the infinite-specific branded key:
 
@@ -90,8 +106,8 @@ The `pageParam` return type is a deep-partial of the endpoint's request schema. 
 todoQuery.getList.infinite.queryKey()
 // → ["todos", "getList", "infinite"]
 
-todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
-// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+todoQuery.getList.infinite.queryKey({ query: { _limit: 10 } })
+// → ["todos", "getList", "infinite", { query: { _limit: 10 } }]
 ```
 
 Because the infinite key is a prefix-child of the standard key `["todos", "getList"]`, invalidating the standard key — or the domain `$key` — also covers the infinite variant.
