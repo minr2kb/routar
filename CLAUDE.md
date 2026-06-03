@@ -112,6 +112,7 @@ components/
 - Server pages: `prefetchQuery(<domain>Query.<endpoint>(params))` → `HydrationBoundary` → `<Suspense>`
 - Client components: `useSuspenseQuery(<domain>Query.<endpoint>(params))` — `data` always non-nullable
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`
+- Infinite queries (GET-only): `<domain>Query.<endpoint>.infinite(params, opts)` → `infiniteQueryOptions`; the routar-specific `pageParam` builder `(page) => partialRequest` maps the page param to a partial request (deep-merged into base params, replaces `queryFn`); `initialPageParam` + `getNextPageParam` are native TanStack requirements; key gets an `"infinite"` segment: `[...root, endpointName, "infinite", params?]` (prefix-child of the standard key — standard-key invalidation also covers it)
 - Invalidation: pure by default; opt-in `invalidates: [<domain>Query.<endpoint>.queryKey()]` (prefer narrow scope) or `[<domain>Query.$key]` (whole domain — costly, use sparingly) requires `routarMutationCache` wired in `QueryClient`; without wiring, `invalidates` does nothing
 
 **Shared contract pattern (todo):** `TodoRawSchema` exported from `services/todo.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.

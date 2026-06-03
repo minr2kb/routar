@@ -53,6 +53,51 @@ todoQuery.getList.queryKey()                       // ["todos", "getList"]
 todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { path: { id: "1" } }]
 ```
 
+### Infinite query accessor (GET endpoints — `.infinite`)
+
+Every query accessor has an `.infinite` callable that returns a TanStack `infiniteQueryOptions` object for use with `useInfiniteQuery`, `useSuspenseInfiniteQuery`, or `prefetchInfiniteQuery`.
+
+```ts
+// signature: (params, options) => infiniteQueryOptions
+// options is required
+todoQuery.getList.infinite(
+  { query: { userId: 1 } },              // base params (page-independent) — the routar request
+  {
+    initialPageParam: 1,                 // required — TanStack native
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.length ? lastPageParam + 1 : undefined,  // required — TanStack native
+    pageParam: (page) => ({ query: { _page: page } }),  // required — routar-specific
+  },
+)
+```
+
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `initialPageParam` | `TPageParam` | Starting page param value. Required by TanStack. |
+| `getNextPageParam` | `(lastPage, allPages, lastPageParam) => TPageParam \| undefined` | Returns the next page param, or `undefined` to stop. Required by TanStack. |
+| `pageParam` | `(page: TPageParam) => DeepPartial<TRequest>` | **routar-specific.** Maps the current page param to a partial request object. The return is deep-merged into the base params before the routar client is called. Replaces `queryFn` — do not pass `queryFn`. |
+| `getPreviousPageParam` | `(firstPage, allPages, firstPageParam) => TPageParam \| undefined` | Optional TanStack native option. |
+| `maxPages` | `number` | Optional TanStack native option. |
+| Any other `infiniteQueryOptions` field | — | Passed through as-is (e.g. `select`, `staleTime`, `enabled`). |
+
+The `pageParam` return type is a deep-partial of the endpoint's request schema. The field written by `pageParam` must exist in the endpoint's request schema — the merged request is validated by routar. The adapter (if any) runs per page, consistent with the standard query accessor.
+
+**`.infinite.queryKey(params?)`** — returns the infinite-specific branded key:
+
+```ts
+todoQuery.getList.infinite.queryKey()
+// → ["todos", "getList", "infinite"]
+
+todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
+// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+```
+
+Because the infinite key is a prefix-child of the standard key `["todos", "getList"]`, invalidating the standard key — or the domain `$key` — also covers the infinite variant.
+
+Per-endpoint defaults from `createQueries(api, { defaults })` also merge into the `.infinite` accessor before per-call options.
+
 ### Mutation accessors (non-GET endpoints)
 
 Each mutation accessor returns a TanStack `mutationOptions` object:

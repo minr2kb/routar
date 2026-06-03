@@ -138,6 +138,79 @@ export default async function TodosPage() {
 }
 ```
 
+## Infinite queries
+
+Every GET query accessor produced by `createQueries` has an `.infinite` member that returns a native TanStack `infiniteQueryOptions` object — pass it directly to `useInfiniteQuery`, `useSuspenseInfiniteQuery`, or `prefetchInfiniteQuery`.
+
+```ts
+import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
+import { todoQuery } from "./todo";
+
+const { data } = useSuspenseInfiniteQuery(
+  todoQuery.getList.infinite(
+    { query: { userId: 1 } },              // base params (page-independent) — the routar request
+    {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+        lastPage.length ? lastPageParam + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // maps page → partial request
+    },
+  ),
+);
+// data: InfiniteData<TodoItem[], number> — each page is the endpoint's response (adapter applied)
+```
+
+### The `pageParam` builder
+
+`pageParam` is the one routar-specific concept in `.infinite`. Instead of writing a `queryFn`, you describe **where** the page number goes in the request — its return value (a deep-partial of the endpoint's request) is deep-merged into the base params, then the routar client is called.
+
+- `initialPageParam` and `getNextPageParam` are standard TanStack requirements.
+- `pageParam` replaces `queryFn` — do not pass `queryFn` alongside it.
+- The field the `pageParam` builder writes to must exist in the endpoint's request schema, since the merged request is validated by routar.
+- Other native infinite options (`maxPages`, `getPreviousPageParam`, `select`, `staleTime`, etc.) pass straight through the options object.
+
+### Key
+
+`.infinite.queryKey(params?)` returns `[...root, "getList", "infinite", params?]`. Because this is a prefix-child of the standard key `[...root, "getList"]`, invalidating the standard key — or the domain `$key` — also covers the infinite variant.
+
+```ts
+todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
+// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+
+// Invalidating the standard key also hits the infinite variant:
+qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() });
+```
+
+### No-params endpoints
+
+Pass `undefined` (or `{}`) as the first argument:
+
+```ts
+useSuspenseInfiniteQuery(
+  todoQuery.feed.infinite(undefined, {
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
+    pageParam: (page) => ({ query: { _page: page } }),
+  }),
+);
+```
+
+### SSR prefetch
+
+```ts
+await qc.prefetchInfiniteQuery(
+  todoQuery.getList.infinite({ query: { userId: 1 } }, {
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
+    pageParam: (page) => ({ query: { _page: page } }),
+  }),
+);
+```
+
+### Per-endpoint defaults
+
+`createQueries(api, { defaults })` entries also merge into the `.infinite` accessor before per-call options.
+
 ## Mutations
 
 Every non-GET endpoint becomes a **mutation accessor** — a function that returns a TanStack `mutationOptions` object with `mutationKey` and `mutationFn` pre-filled.

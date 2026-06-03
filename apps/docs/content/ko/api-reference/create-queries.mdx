@@ -53,6 +53,51 @@ todoQuery.getList.queryKey()                        // ["todos", "getList"]
 todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { path: { id: "1" } }]
 ```
 
+### 무한 쿼리 접근자 (GET 엔드포인트 — `.infinite`)
+
+모든 쿼리 접근자에는 `.infinite` 호출 가능 멤버가 있으며, `useInfiniteQuery`, `useSuspenseInfiniteQuery`, `prefetchInfiniteQuery`에 사용할 TanStack `infiniteQueryOptions` 객체를 반환합니다.
+
+```ts
+// 시그니처: (params, options) => infiniteQueryOptions
+// options는 필수
+todoQuery.getList.infinite(
+  { query: { userId: 1 } },              // 기본 파라미터 (페이지 독립) — routar 요청 객체
+  {
+    initialPageParam: 1,                 // 필수 — TanStack 네이티브
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.length ? lastPageParam + 1 : undefined,  // 필수 — TanStack 네이티브
+    pageParam: (page) => ({ query: { _page: page } }),  // 필수 — routar 고유 옵션
+  },
+)
+```
+
+**옵션:**
+
+| 옵션 | 타입 | 설명 |
+|------|------|------|
+| `initialPageParam` | `TPageParam` | 시작 페이지 파라미터 값. TanStack 필수. |
+| `getNextPageParam` | `(lastPage, allPages, lastPageParam) => TPageParam \| undefined` | 다음 페이지 파라미터를 반환하거나, 종료 시 `undefined`. TanStack 필수. |
+| `pageParam` | `(page: TPageParam) => DeepPartial<TRequest>` | **routar 고유 옵션.** 현재 페이지 파라미터를 부분 요청 객체로 변환합니다. 반환값이 기본 파라미터에 깊게 병합된 후 routar 클라이언트를 호출합니다. `queryFn`을 대체하므로 함께 전달하지 마세요. |
+| `getPreviousPageParam` | `(firstPage, allPages, firstPageParam) => TPageParam \| undefined` | 선택적 TanStack 네이티브 옵션. |
+| `maxPages` | `number` | 선택적 TanStack 네이티브 옵션. |
+| 기타 `infiniteQueryOptions` 필드 | — | 그대로 전달됩니다 (예: `select`, `staleTime`, `enabled`). |
+
+`pageParam` 반환 타입은 엔드포인트 요청 스키마의 deep-partial입니다. `pageParam` 빌더가 쓰는 필드는 엔드포인트의 request 스키마에 존재해야 합니다 — 병합된 요청이 routar에서 검증됩니다. adapter(있는 경우)는 각 페이지마다 실행됩니다(표준 쿼리 접근자와 동일).
+
+**`.infinite.queryKey(params?)`** — 무한 쿼리 전용 브랜드 키를 반환합니다:
+
+```ts
+todoQuery.getList.infinite.queryKey()
+// → ["todos", "getList", "infinite"]
+
+todoQuery.getList.infinite.queryKey({ query: { userId: 1 } })
+// → ["todos", "getList", "infinite", { query: { userId: 1 } }]
+```
+
+무한 키는 표준 키 `["todos", "getList"]`의 prefix-child이므로, 표준 키나 도메인 `$key`를 무효화하면 infinite 변형도 함께 무효화됩니다.
+
+`createQueries(api, { defaults })`의 per-endpoint 기본값도 per-call 옵션보다 먼저 `.infinite` 접근자에 병합됩니다.
+
 ### 뮤테이션 접근자 (GET이 아닌 엔드포인트)
 
 각 뮤테이션 접근자는 TanStack `mutationOptions` 객체를 반환합니다:

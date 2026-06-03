@@ -529,6 +529,28 @@ declare module '@tanstack/react-query' {
 }
 ```
 
+**Infinite queries (GET-only):** every query accessor has a `.infinite` callable that returns `infiniteQueryOptions` for `useInfiniteQuery` / `useSuspenseInfiniteQuery` / `prefetchInfiniteQuery`. Signature: `(params, options) => infiniteQueryOptions` — options are required.
+
+```ts
+useSuspenseInfiniteQuery(
+  todoQuery.getList.infinite(
+    { query: { userId: 1 } },              // base params (page-independent) — the routar request
+    {
+      initialPageParam: 1,                 // required — TanStack native
+      getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+        lastPage.length ? lastPageParam + 1 : undefined,  // required — TanStack native
+      pageParam: (page) => ({ query: { _page: page } }),  // required — routar-specific
+    },
+  ),
+);
+```
+
+The `pageParam` builder is the one routar-specific concept: instead of writing `queryFn`, describe where the page param goes in the request. Its return value (a deep-partial of the endpoint's request schema) is deep-merged into the base params, then the routar client is called. Do not pass `queryFn` alongside `pageParam`. Other native infinite options (`maxPages`, `getPreviousPageParam`, `select`, `staleTime`, etc.) pass through as-is.
+
+The field written by `pageParam` must exist in the endpoint's request schema — the merged request is validated by routar. The adapter (if any) runs per page. Per-endpoint defaults from `createQueries(api, { defaults })` merge into `.infinite` before per-call options.
+
+Key: `todoQuery.getList.infinite.queryKey(params?)` → `["todos", "getList", "infinite", params?]`. This is a prefix-child of the standard key `["todos", "getList"]`, so invalidating the standard key or the domain `$key` also covers the infinite variant. For no-param endpoints, pass `undefined` as the first arg.
+
 **Invalidation — pure by default.** Mutations invalidate nothing unless you declare target keys with `invalidates` and wire `routarMutationCache(getClient)` once at `QueryClient` creation. Without wiring, `invalidates` does nothing; in development a one-time `console.warn` is logged.
 
 Prefer **narrow** invalidation — use `todoQuery.getList.queryKey()` (the specific key affected) rather than `todoQuery.$key` (whole domain). Reserve `$key` only when a mutation truly invalidates every query in the domain; it refetches all active lists and details, which can be costly.

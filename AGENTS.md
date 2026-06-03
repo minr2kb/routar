@@ -226,6 +226,21 @@ import type { HttpError } from '@routar/core';
 declare module '@tanstack/react-query' { interface Register { defaultError: HttpError } }
 ```
 
+**Infinite queries (GET-only):** every query accessor has a `.infinite` callable that returns `infiniteQueryOptions`. The routar-specific `pageParam` builder maps the page param to a partial request (deep-merged into base params before the routar client is called) — this replaces `queryFn`. `initialPageParam` and `getNextPageParam` are native TanStack requirements. Key: `[...root, endpointName, "infinite", params?]` — a prefix-child of the standard key, so standard-key invalidation also covers it.
+
+```ts
+useSuspenseInfiniteQuery(
+  todoQuery.getList.infinite(
+    { query: { userId: 1 } },
+    {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, _all, p) => lastPage.length ? p + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }),
+    },
+  ),
+);
+```
+
 ### Invalidation (pure by default)
 
 Mutations invalidate nothing unless you ask. Declare target keys with `invalidates` and wire `routarMutationCache` once at `QueryClient` creation — **without this wiring `invalidates` does nothing**. In development, a one-time `console.warn` is logged if `invalidates` is declared without the wiring.
