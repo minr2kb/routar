@@ -7,11 +7,21 @@ import type {
 import type {
   DataTag,
   DefaultError,
+  GetNextPageParamFunction,
+  InfiniteData,
   QueryFunction,
   QueryKey,
+  UseInfiniteQueryOptions,
   UseMutationOptions,
   UseQueryOptions,
 } from "@tanstack/react-query";
+
+/** Recursive partial — the return type of an infinite `pageParam` builder. */
+export type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
 
 /**
  * Per-endpoint default options, keyed by endpoint name. Merged into every
@@ -68,6 +78,60 @@ type ParamsOptional<TParams> = [TParams] extends [void]
     ? true
     : false;
 
+/**
+ * Options for an infinite query accessor. Everything `useInfiniteQuery` accepts
+ * (minus the library-managed `queryKey`/`queryFn`), with `initialPageParam` and
+ * `getNextPageParam` required, plus the routar-specific `pageParam` builder that
+ * maps a page param into a partial request, deep-merged into the base params.
+ *
+ * `pageParam` replaces the native `queryFn` — you describe *where the page param
+ * goes in the request* instead of writing the fetch call yourself.
+ */
+export type InfiniteAccessorOptions<TPage, TParams, TPageParam> = Omit<
+  UseInfiniteQueryOptions<
+    TPage,
+    DefaultError,
+    InfiniteData<TPage, TPageParam>,
+    QueryKey,
+    TPageParam
+  >,
+  "queryKey" | "queryFn" | "initialPageParam" | "getNextPageParam"
+> & {
+  initialPageParam: TPageParam;
+  getNextPageParam: GetNextPageParamFunction<TPageParam, TPage>;
+  /** Maps a page param to the partial request merged into the base params. */
+  pageParam: (pageParam: TPageParam) => DeepPartial<TParams>;
+};
+
+/** The shape returned by an infinite accessor — matches `infiniteQueryOptions()`. */
+export type InfiniteAccessorResult<TPage, TPageParam> = Omit<
+  UseInfiniteQueryOptions<
+    TPage,
+    DefaultError,
+    InfiniteData<TPage, TPageParam>,
+    QueryKey,
+    TPageParam
+  >,
+  "queryFn" | "queryKey"
+> & {
+  queryFn?: QueryFunction<TPage, QueryKey, TPageParam>;
+  queryKey: DataTag<QueryKey, InfiniteData<TPage, TPageParam>, DefaultError>;
+};
+
+/**
+ * A GET endpoint exposed as an infinite-query-options factory.
+ * `params` is the base (page-independent) request; the options object is
+ * required (`initialPageParam` + `getNextPageParam` + `pageParam`). Pass
+ * `undefined`/`{}` as `params` for endpoints that take no base params.
+ */
+export interface InfiniteAccessor<TParams, TPage> {
+  <TPageParam = number>(
+    params: TParams,
+    options: InfiniteAccessorOptions<TPage, TParams, TPageParam>,
+  ): InfiniteAccessorResult<TPage, TPageParam>;
+  queryKey: (params?: TParams) => QueryKey;
+}
+
 /** A GET endpoint exposed as a query-options factory. */
 export type QueryAccessor<TParams, TData> =
   (ParamsOptional<TParams> extends true
@@ -80,6 +144,8 @@ export type QueryAccessor<TParams, TData> =
         options?: QueryAccessorOptions<TData>,
       ) => QueryAccessorResult<TData>) & {
     queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
+    /** Infinite-query variant of this endpoint (see {@link InfiniteAccessor}). */
+    infinite: InfiniteAccessor<TParams, TData>;
   };
 
 /** Mutation options plus the declarative `invalidates` sugar. */

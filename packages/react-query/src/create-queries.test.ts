@@ -8,7 +8,11 @@ const TodoRouter = defineRouter("/todos", {
   getList: endpoint({
     method: "GET",
     path: "/",
-    request: z.object({ query: z.object({ userId: z.number() }).optional() }),
+    request: z.object({
+      query: z
+        .object({ userId: z.number(), _page: z.number().optional() })
+        .optional(),
+    }),
     response: z.array(z.object({ id: z.number() })),
   }),
   getDetail: endpoint({
@@ -28,6 +32,15 @@ function makeApi(listValue: unknown = [], detailValue: unknown = { id: 1 }) {
     $router: TodoRouter,
   } as unknown as ApiClientWithRouter<typeof TodoRouter.endpoints>;
   return { api, getList, getDetail };
+}
+
+// Minimal valid infinite options for key/shape assertions.
+function infiniteOpts() {
+  return {
+    initialPageParam: 1,
+    getNextPageParam: () => undefined as number | undefined,
+    pageParam: (page: number) => ({ query: { _page: page } }),
+  };
 }
 
 describe("createQueries — queries", () => {
@@ -186,6 +199,21 @@ describe("createQueries — nested routers", () => {
     ]);
   });
 
+  it("exposes .infinite on nested GET accessors with accumulated key", () => {
+    const api = {
+      getList: mock(async () => []),
+      todos: { getList: mock(async () => []) },
+      $router: NestedRouter,
+    } as unknown as ApiClientWithRouter<typeof NestedRouter.endpoints>;
+    const q = createQueries(api);
+    expect(q.todos.getList.infinite.queryKey() as unknown).toEqual([
+      "users",
+      "todos",
+      "getList",
+      "infinite",
+    ]);
+  });
+
   it("nested queryFn delegates to the nested api function", async () => {
     const todosGetList = mock(async () => [{ id: 3 }]);
     const api = {
@@ -208,6 +236,57 @@ describe("createQueries — empty-param key normalization (A2)", () => {
     const bare = q.getList().queryKey as unknown;
     expect(q.getList({}).queryKey as unknown).toEqual(bare);
     expect(q.getList.queryKey({}) as unknown).toEqual(bare);
+  });
+});
+
+describe("createQueries — infinite accessor", () => {
+  it("builds an infinite key with the 'infinite' segment", () => {
+    const { api } = makeApi();
+    const q = createQueries(api);
+    expect(
+      q.getList.infinite({ query: { userId: 1 } }, infiniteOpts())
+        .queryKey as unknown,
+    ).toEqual(["todos", "getList", "infinite", { query: { userId: 1 } }]);
+    expect(q.getList.infinite.queryKey() as unknown).toEqual([
+      "todos",
+      "getList",
+      "infinite",
+    ]);
+  });
+
+  it("deep-merges the pageParam builder result into the base params", async () => {
+    const { api, getList } = makeApi([{ id: 1 }]);
+    const q = createQueries(api);
+    const opts = q.getList.infinite(
+      { query: { userId: 1 } },
+      {
+        initialPageParam: 2,
+        getNextPageParam: () => undefined,
+        pageParam: (page) => ({ query: { _page: page } }),
+      },
+    );
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ pageParam: 2, signal: undefined });
+    // base query.userId preserved, page param merged in
+    expect(getList).toHaveBeenCalledWith(
+      { query: { userId: 1, _page: 2 } },
+      undefined,
+    );
+  });
+
+  it("carries initialPageParam and getNextPageParam through", () => {
+    const { api } = makeApi();
+    const q = createQueries(api);
+    const getNextPageParam = () => 3;
+    const opts = q.getList.infinite(undefined as never, {
+      initialPageParam: 1,
+      getNextPageParam,
+      pageParam: (page) => ({ query: { _page: page } }),
+    });
+    expect((opts as { initialPageParam?: unknown }).initialPageParam).toBe(1);
+    expect((opts as { getNextPageParam?: unknown }).getNextPageParam).toBe(
+      getNextPageParam,
+    );
   });
 });
 

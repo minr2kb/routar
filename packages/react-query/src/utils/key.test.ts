@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildQueryKey, prefixToSegments } from "./key.js";
+import { buildInfiniteKey, buildQueryKey, prefixToSegments } from "./key.js";
 
 describe("prefixToSegments", () => {
   it("splits a prefix into non-empty segments", () => {
@@ -39,5 +39,32 @@ describe("buildQueryKey", () => {
       "getList",
       { query: {} },
     ]);
+  });
+});
+
+describe("buildInfiniteKey", () => {
+  it("inserts an 'infinite' segment before params", () => {
+    expect(buildInfiniteKey(["todos"], "getList", { query: { x: 1 } })).toEqual(
+      ["todos", "getList", "infinite", { query: { x: 1 } }],
+    );
+  });
+
+  it("drops empty params but keeps the 'infinite' segment", () => {
+    expect(buildInfiniteKey(["todos"], "getList", undefined)).toEqual([
+      "todos",
+      "getList",
+      "infinite",
+    ]);
+    expect(buildInfiniteKey(["todos"], "getList", {})).toEqual([
+      "todos",
+      "getList",
+      "infinite",
+    ]);
+  });
+
+  it("is a prefix-child of the standard key (so standard invalidation covers it)", () => {
+    const standard = buildQueryKey(["todos"], "getList", undefined);
+    const infinite = buildInfiniteKey(["todos"], "getList", undefined);
+    expect(infinite.slice(0, standard.length)).toEqual(standard);
   });
 });

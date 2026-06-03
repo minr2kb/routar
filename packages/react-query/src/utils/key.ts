@@ -33,3 +33,20 @@ export function buildQueryKey(
     ? [...root, endpointName]
     : [...root, endpointName, params];
 }
+
+/**
+ * Builds an infinite query key of shape `[...root, endpointName, "infinite", params]`.
+ * The `"infinite"` segment keeps it distinct from the standard query key while
+ * staying a prefix-child of `[...root, endpointName]`, so invalidating the
+ * standard key (or the domain `$key`) also covers the infinite variant. Empty
+ * params are normalized exactly like {@link buildQueryKey}.
+ */
+export function buildInfiniteKey(
+  root: readonly string[],
+  endpointName: string,
+  params: unknown,
+): unknown[] {
+  return isEmptyParams(params)
+    ? [...root, endpointName, "infinite"]
+    : [...root, endpointName, "infinite", params];
+}

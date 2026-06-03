@@ -4,10 +4,14 @@ import {
   isRouterDef,
   type RouterEndpoints,
 } from "@routar/core";
-import { queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { isRoutarMutationCacheWired } from "./mutation-cache.js";
 import type { CreateQueriesOptions, Queries } from "./types.js";
-import { buildQueryKey, prefixToSegments } from "./utils/key.js";
+import {
+  buildInfiniteKey,
+  buildQueryKey,
+  prefixToSegments,
+} from "./utils/key.js";
 
 type EndpointDefault = Record<string, unknown>;
 
@@ -68,6 +72,26 @@ function buildQueries(
   return out;
 }
 
+/** Recursively merges plain objects (arrays/primitives from `source` win). */
+function deepMerge(
+  base: Record<string, unknown>,
+  source: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(source)) {
+    const prev = out[key];
+    out[key] =
+      isPlainObject(prev) && isPlainObject(value)
+        ? deepMerge(prev, value)
+        : value;
+  }
+  return out;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function makeQueryAccessor(
   fn: (params?: unknown, signal?: AbortSignal) => Promise<unknown>,
   root: string[],
@@ -82,6 +106,37 @@ function makeQueryAccessor(
       ...options,
     });
   accessor.queryKey = (params?: unknown) => buildQueryKey(root, name, params);
+
+  const infinite = (
+    params: unknown,
+    options: {
+      pageParam: (pageParam: unknown) => Record<string, unknown>;
+      [k: string]: unknown;
+    },
+  ) => {
+    const { pageParam, ...rest } = options;
+    return infiniteQueryOptions({
+      queryKey: buildInfiniteKey(root, name, params),
+      queryFn: ({
+        pageParam: page,
+        signal,
+      }: {
+        pageParam: unknown;
+        signal: AbortSignal;
+      }) => {
+        const base = isPlainObject(params) ? params : {};
+        return fn(deepMerge(base, pageParam(page)), signal);
+      },
+      ...endpointDefault,
+      ...rest,
+      // `rest` (spread) hides initialPageParam/getNextPageParam from the static
+      // type, but they are present at runtime — assert through unknown.
+    } as unknown as Parameters<typeof infiniteQueryOptions>[0]);
+  };
+  infinite.queryKey = (params?: unknown) =>
+    buildInfiniteKey(root, name, params);
+  accessor.infinite = infinite;
+
   return accessor;
 }
 
