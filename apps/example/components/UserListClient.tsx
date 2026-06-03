@@ -1,10 +1,10 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { userListQueryOptions } from "@/remote/services/user/user.queries";
+import { userQuery } from "@/remote/services/user";
 
 export function UserListClient() {
-  const { data: users } = useSuspenseQuery(userListQueryOptions());
+  const { data: users } = useSuspenseQuery(userQuery.getList());
 
   return (
     <table style={{ borderCollapse: "collapse", width: "100%" }}>

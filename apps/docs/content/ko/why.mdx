@@ -109,23 +109,21 @@ const api = createApi(executor, {
 ### 5. 단방향 의존성 흐름
 
 ```
-Component → *.queries.ts → *.api.ts → executor
+Component → services/<domain>.ts (createQueries → createApi) → executor
 ```
 
 ## 실제로 어떻게 보이는가
 
 ```ts
+// remote/services/todo.ts — 스펙, 타입, TanStack Query 인터페이스를 한 파일에 배치
 export const todoApi = createApi(clientExecutor, todoRouter)
 export type TodoApiTypes = ApiTypes<typeof todoApi>
 export type TodoItem = TodoApiTypes['getDetail']['response']
 
-export const todoDetailQuery = (id: number) =>
-  queryOptions({
-    queryKey: ['todos', 'detail', id],
-    queryFn: () => todoApi.getDetail({ path: { id } }),
-  })
+export const todoQuery = createQueries(todoApi)
 
-const { data } = useQuery(todoDetailQuery(id))
+// Component — HTTP를 알지 못함
+const { data } = useSuspenseQuery(todoQuery.getDetail({ path: { id } }))
 ```
 
 ## 대안

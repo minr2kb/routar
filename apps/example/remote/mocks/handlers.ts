@@ -1,8 +1,8 @@
 import { createMswHandlers } from "@routar/msw";
 import { HttpResponse } from "msw";
-import { TodoRouter } from "../services/todo/todo.api";
-import { PostRouter } from "../services/post/post.api";
-import { UserRouter } from "../services/user/user.api";
+import { TodoRouter } from "../services/todo";
+import { PostRouter } from "../services/post";
+import { UserRouter } from "../services/user";
 import {
   getAllTodos,
   getTodoById,

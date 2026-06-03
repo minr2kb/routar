@@ -2,14 +2,14 @@
 
 import { useSuspenseQueries } from "@tanstack/react-query";
 import Link from "next/link";
-import { postListQueryOptions } from "@/remote/services/post/post.queries";
-import { userDetailQueryOptions } from "@/remote/services/user/user.queries";
+import { postQuery } from "@/remote/services/post";
+import { userQuery } from "@/remote/services/user";
 
 export function UserDetailClient({ id }: { id: number }) {
   const [{ data: user }, { data: posts }] = useSuspenseQueries({
     queries: [
-      userDetailQueryOptions(id),
-      postListQueryOptions({ query: { userId: id, _limit: 5 } }),
+      userQuery.getDetail({ path: { id } }),
+      postQuery.getList({ query: { userId: id, _limit: 5 } }),
     ],
   });
 

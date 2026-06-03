@@ -17,6 +17,7 @@
     "@routar/core": "workspace:*",
     "@routar/axios": "workspace:*",
     "@routar/msw": "workspace:*",
+    "@routar/react-query": "workspace:*",
     "msw": "^2.7.0"
   },
   "devDependencies": {

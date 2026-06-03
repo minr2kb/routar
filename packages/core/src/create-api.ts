@@ -25,7 +25,7 @@ type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
  * Fully-typed API client produced by {@link createApi}.
  * Nested {@link RouterDef} entries become nested sub-client objects.
  */
-type ApiClient<TEndpoints extends RouterEndpoints> = {
+export type ApiClient<TEndpoints extends RouterEndpoints> = {
   [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<
     infer TNestedEndpoints
   >
@@ -34,6 +34,17 @@ type ApiClient<TEndpoints extends RouterEndpoints> = {
       ? EndpointFn<TEndpoints[K]>
       : never;
 };
+
+/**
+ * An {@link ApiClient} that also carries its source {@link RouterDef} on the
+ * `$router` property. This is the actual return type of {@link createApi};
+ * downstream tools (e.g. `@routar/react-query`) recover the router (prefix +
+ * endpoint methods) from it without it being re-passed. `$router` is
+ * non-enumerable and excluded from {@link ApiTypes}; the `$` prefix keeps it
+ * from colliding with endpoint names.
+ */
+export type ApiClientWithRouter<TEndpoints extends RouterEndpoints> =
+  ApiClient<TEndpoints> & { readonly $router: RouterDef<TEndpoints> };
 
 /**
  * Builds a fully-typed API client from an {@link Executor} and a router
@@ -94,7 +105,7 @@ export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   router: RouterDef<TEndpoints>,
   options?: CreateApiOptions,
-): ApiClient<TEndpoints>;
+): ApiClientWithRouter<TEndpoints>;
 
 /**
  * @param executor - Transport to use for every HTTP call.
@@ -107,7 +118,7 @@ export function createApi<TEndpoints extends RouterEndpoints>(
   prefix: string,
   endpoints: TEndpoints,
   options?: CreateApiOptions,
-): ApiClient<TEndpoints>;
+): ApiClientWithRouter<TEndpoints>;
 
 /**
  * @param executor - Transport to use for every HTTP call.
@@ -118,7 +129,7 @@ export function createApi<TEndpoints extends RouterEndpoints>(
   executor: Executor,
   endpoints: TEndpoints,
   options?: CreateApiOptions,
-): ApiClient<TEndpoints>;
+): ApiClientWithRouter<TEndpoints>;
 
 export function createApi(
   executor: Executor,
@@ -134,7 +145,14 @@ export function createApi(
     endpointsArgOrOptions,
     optionsArg,
   );
-  return buildClient(executor, prefix, endpoints, options);
+  const client = buildClient(executor, prefix, endpoints, options);
+  // Stash the source router so downstream tools (e.g. @routar/react-query)
+  // recover prefix + endpoint methods without it being re-passed.
+  Object.defineProperty(client, "$router", {
+    value: { prefix, endpoints } satisfies RouterDef<RouterEndpoints>,
+    enumerable: false,
+  });
+  return client;
 }
 
 function resolveArgs(
@@ -189,8 +207,18 @@ function buildClient(
 
   for (const [key, entry] of Object.entries(endpoints)) {
     client[key] = isRouterDef(entry)
-      ? buildClient(executor, joinPaths(prefix, entry.prefix), entry.endpoints, options)
-      : buildEndpointFn(executor, prefix, entry as EndpointSpec<any, any, any>, options);
+      ? buildClient(
+          executor,
+          joinPaths(prefix, entry.prefix),
+          entry.endpoints,
+          options,
+        )
+      : buildEndpointFn(
+          executor,
+          prefix,
+          entry as EndpointSpec<any, any, any>,
+          options,
+        );
   }
 
   return client;
@@ -212,7 +240,10 @@ function buildEndpointFn(
       }
     }
 
-    const url = resolvePath(joinPaths(prefix, spec.path), validatedParams?.path);
+    const url = resolvePath(
+      joinPaths(prefix, spec.path),
+      validatedParams?.path,
+    );
 
     const raw = await executor.execute({
       method: spec.method,

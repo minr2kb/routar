@@ -38,10 +38,11 @@ This is a monorepo (Bun workspaces) with three library packages and one demo app
 
 ```
 packages/
-  core/     @routar/core     — endpoint definitions, router, API client factory, middleware system, fetch-based Executor
-  axios/    @routar/axios    — Axios-based Executor
-  msw/      @routar/msw      — MSW v2 handler factory (createMswHandlers)
-  ky/       @routar/ky       — ky-based Executor
+  core/         @routar/core         — endpoint definitions, router, API client factory, middleware system, fetch-based Executor
+  axios/        @routar/axios        — Axios-based Executor
+  msw/          @routar/msw          — MSW v2 handler factory (createMswHandlers)
+  ky/           @routar/ky           — ky-based Executor
+  react-query/  @routar/react-query  — TanStack Query bindings (createQueries, routarMutationCache)
 apps/
   example/  @routar/example  — Next.js 15 demo app consuming all packages
 ```
@@ -63,6 +64,7 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 - **`RouterEndpoints` uses `any` generics intentionally.** `Record<string, EndpointSpec<any, any, any> | RouterDef<any>>` — the `any`s are not a mistake; they allow adapter functions typed to specific response shapes to be assignable without contravariance issues.
 - **`endpoint()` has 4 overloads** (request×adapter). All return types have `request` and `adapter` as required (not optional) fields. This is intentional — `| undefined` in return types breaks downstream conditional type inference in `createApi`.
 - **`buildClient` is recursive.** When a `RouterEndpoints` value has `prefix` + `endpoints` keys it is treated as a nested `RouterDef` and `buildClient` recurses with `joinPaths(prefix, nested.prefix)`.
+- **`createApi` stamps the source router on the client's non-enumerable `$router` property** (return type `ApiClientWithRouter`). `@routar/react-query`'s `createQueries(api)` recovers prefix + endpoint `method`s from it, so the router is never re-passed. `$router` is `$`-prefixed (no endpoint-name collision) and excluded from `ApiTypes`; don't break this contract.
 - **DTS build requires `ignoreDeprecations: '6.0'`** in `tsup.config.ts` (not in tsconfig). tsup internally injects `baseUrl` which TypeScript 6.x treats as deprecated.
 
 ### `packages/core/src/` file map
@@ -95,23 +97,25 @@ remote/
   lib/executor.ts   clientExecutor (axios+interceptors, CSR) + fetchExecutor (fetch+cookies, SSR)
                     localClientExecutor + localFetchExecutor (→ NEXT_PUBLIC_APP_URL)
   services/
-    index.ts             re-export barrel: { todoServerApi, postServerApi, userServerApi }
-    <domain>/
-      <domain>.api.ts    defineRouter + endpoint() + createApi + ApiTypes export
-      <domain>.queries.ts  queryOptions factories + mutation hooks only (no wrapper hooks)
+    <domain>.ts          one file per domain: defineRouter + endpoint() + createApi
+                         + createQueries (TanStack Query helpers) + ApiTypes export
 components/
   *Client.tsx       client components using useSuspenseQuery / useSuspenseQueries
 ```
 
-**TanStack Query patterns:**
-- `queryOptions` factory is the single source of truth for key + queryFn — no separate KEYS object
-- Server pages: `prefetchQuery(queryOptions(params))` → `HydrationBoundary` → `<Suspense>`
-- Client components: `useSuspenseQuery(queryOptions(params))` — `data` always non-nullable
+**TanStack Query patterns (`@routar/react-query`):**
+- `services/<domain>.ts` exports `export const <domain>Query = createQueries(<domain>Api)` alongside the api client — the single source of truth for keys + queryFn/mutationFn
+- Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
+- Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
+- Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
+- Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); nested routers supported (the map mirrors the router shape)
+- Server pages: `prefetchQuery(<domain>Query.<endpoint>(params))` → `HydrationBoundary` → `<Suspense>`
+- Client components: `useSuspenseQuery(<domain>Query.<endpoint>(params))` — `data` always non-nullable
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`
-- Invalidation: `queryKey: ['domain']` (prefix) or `queryOptions(id).queryKey` (specific)
-- `*.queries.ts` exports only `queryOptions` factories and mutation hooks — no `useXxx` wrappers
+- Infinite queries (GET-only): declare the pagination contract once in `createQueries({ infinite: { <ep>: { initialPageParam, getNextPageParam, pageParam } } })` — nested routers supported (the map mirrors the router shape); call `<domain>Query.<ep>.infinite(params?)` at the call site (base params only); the routar-specific `pageParam` builder `(page) => partialRequest` maps the page param to a partial request (deep-merged into base params, replaces `queryFn`); key gets an `"infinite"` segment: `[...root, endpointName, "infinite", params?]` (prefix-child of the standard key — standard-key invalidation also covers it)
+- Invalidation: pure by default; opt-in `invalidates: [<domain>Query.<endpoint>.queryKey()]` (prefer narrow scope) or `[<domain>Query.$key]` (whole domain — costly, use sparingly) requires `routarMutationCache` wired in `QueryClient`; without wiring, `invalidates` does nothing
 
-**Shared contract pattern (todo):** `TodoRawSchema` exported from `todo.api.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
+**Shared contract pattern (todo):** `TodoRawSchema` exported from `services/todo.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
 
 ### PathParams enforcement
 

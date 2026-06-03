@@ -2,11 +2,11 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { postListQueryOptions } from "@/remote/services/post/post.queries";
+import { postQuery } from "@/remote/services/post";
 
 export function PostListClient() {
   const { data: posts } = useSuspenseQuery(
-    postListQueryOptions({ query: { _limit: 10 } }),
+    postQuery.getList({ query: { _limit: 10 } }),
   );
 
   return (

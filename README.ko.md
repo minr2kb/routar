@@ -58,6 +58,46 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 | `@routar/core` | 엔드포인트 정의, 라우터, API 클라이언트, 플러그인 시스템, 네이티브 `fetch` executor |
 | `@routar/axios` | Axios 기반 Executor |
 | `@routar/ky` | [ky](https://github.com/sindresorhus/ky) 기반 Executor |
+| `@routar/react-query` | TanStack Query 바인딩 — 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리 생성 |
+
+---
+
+## TanStack Query 통합
+
+`@routar/react-query`는 routar 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 직접 파생합니다. 새로운 훅 API가 없으며 TanStack의 기본 훅을 그대로 사용합니다.
+
+```bash
+npm install @routar/react-query @tanstack/react-query
+```
+
+```ts
+// remote/services/todo.ts
+import { createApi, defineRouter } from '@routar/core'
+import { createQueries } from '@routar/react-query'
+
+export const TodoRouter = defineRouter('/todos', { /* ... */ })
+export const todoApi = createApi(executor, TodoRouter)
+export const todoQuery = createQueries(todoApi)
+```
+
+```tsx
+// 쿼리 — useSuspenseQuery, prefetchQuery 등
+const { data } = useSuspenseQuery(todoQuery.getList())
+
+// 뮤테이션 — 선언적 무효화 포함
+const { mutate } = useMutation(
+  todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] })
+)
+```
+
+선언적 `invalidates`를 활성화하려면 `QueryClient` 생성 시 `routarMutationCache`를 한 번 배선하세요:
+
+```ts
+import { routarMutationCache } from '@routar/react-query'
+
+let queryClient: QueryClient
+queryClient = new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })
+```
 
 ---
 
@@ -362,7 +402,7 @@ export const apiExecutor = dispatchExecutor(() =>
   typeof window === 'undefined' ? serverExecutor : clientExecutor,
 );
 
-// todo.api.ts — SSR과 CSR 모두에서 동작하는 하나의 클라이언트
+// remote/services/todo.ts — SSR과 CSR 모두에서 동작하는 하나의 클라이언트
 export const todoApi = createApi(apiExecutor, todoRouter);
 ```
 

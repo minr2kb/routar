@@ -25,7 +25,7 @@ export const apiExecutor = dispatchExecutor(() =>
 ```
 
 ```ts
-// remote/services/todo/todo.api.ts
+// remote/services/todo.ts
 export const todoApi = createApi(apiExecutor, todoRouter)
 export type TodoApiTypes = ApiTypes<typeof todoApi>
 ```
@@ -39,7 +39,10 @@ export const localExecutor = createFetchExecutor(LOCAL_API_BASE)
 
 ## TanStack Query와 함께
 
+API 클라이언트와 쿼리 헬퍼는 도메인 파일 하나에 함께 배치됩니다. 컴포넌트는 서비스 파일에서만 임포트합니다.
+
 ```ts
+// remote/services/todo.ts
 export const todoListQueryOptions = () =>
   queryOptions({ queryKey: ['todos', 'list'] as const, queryFn: () => todoApi.getList({}) })
 
@@ -74,5 +77,5 @@ export function TodoListClient() {
 ## 의존성 방향
 
 ```
-Component → *.queries.ts → *.api.ts → executor.ts
+Component → services/<domain>.ts (createQueries → createApi) → executor.ts
 ```

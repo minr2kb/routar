@@ -1,7 +1,8 @@
 import type { ApiTypes } from "@routar/core";
 import { createApi, defineRouter, endpoint } from "@routar/core";
+import { createQueries } from "@routar/react-query";
 import { z } from "zod";
-import { apiExecutor } from "../../lib/executor";
+import { apiExecutor } from "../lib/executor";
 
 const PostRawSchema = z.object({
   id: z.number(),
@@ -64,6 +65,26 @@ export const PostRouter = defineRouter("/posts", {
 });
 
 export const postApi = createApi(apiExecutor, PostRouter);
+
+const POSTS_PER_PAGE = 10;
+
+/**
+ * The pagination contract is declared once here. Both the server prefetch and
+ * the client `useSuspenseInfiniteQuery` then call `postQuery.getList.infinite()`
+ * with the same base params, so the query key matches (no hydration mismatch).
+ * `pageParam` maps the page number into the request's `_page` query — it
+ * replaces writing a `queryFn` by hand.
+ */
+export const postQuery = createQueries(postApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === POSTS_PER_PAGE ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }),
+    },
+  },
+});
 
 export type PostApiTypes = ApiTypes<typeof postApi>;
 export type Post = PostApiTypes["getDetail"]["response"];

@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { TodoListClient } from "@/components/TodoListClient";
-import { todoListQueryOptions } from "@/remote/services/todo/todo.queries";
+import { todoQuery } from "@/remote/services/todo";
 import { getQueryClient } from "@/utils/get-query-client";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export default async function TodosPage() {
 
   const params = { query: { _limit: 20 } };
 
-  await queryClient.prefetchQuery(todoListQueryOptions(params));
+  await queryClient.prefetchQuery(todoQuery.getList(params));
 
   return (
     <div>

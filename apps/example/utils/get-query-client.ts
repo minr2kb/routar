@@ -1,9 +1,13 @@
 import { isServer, QueryClient } from "@tanstack/react-query";
+import { routarMutationCache } from "@routar/react-query";
 
 function makeQueryClient() {
-  return new QueryClient({
+  let queryClient: QueryClient;
+  queryClient = new QueryClient({
     defaultOptions: { queries: { staleTime: 60 * 1000 } },
+    mutationCache: routarMutationCache(() => queryClient),
   });
+  return queryClient;
 }
 
 let browserQueryClient: QueryClient | undefined;

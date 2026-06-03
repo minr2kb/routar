@@ -20,6 +20,9 @@ npm install @routar/core @routar/ky ky
 # for testing with MSW
 npm install @routar/core msw
 npm install --save-dev @routar/msw
+
+# with TanStack Query (React)
+npm install @routar/core @routar/react-query @tanstack/react-query
 ```
 
 ---
@@ -431,7 +434,7 @@ Generates MSW v2 `HttpHandler[]` from a `RouterDef` for use in tests.
 import { createMswHandlers } from '@routar/msw';
 import { HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { todoRouter } from './todo.api';
+import { todoRouter } from './todo';
 
 // Basic setup
 const server = setupServer(
@@ -474,6 +477,112 @@ createMswHandlers(apiRouter, 'https://api.example.com', {
   },
 });
 ```
+
+---
+
+## createQueries(api, options?) / routarMutationCache — @routar/react-query
+
+Derives TanStack Query `queryOptions` / `mutationOptions` factories from a `createApi` client. The router is recovered from the client (`createApi` stamps it on the non-enumerable `$router` property) — never re-passed. No new hook API: use TanStack's own hooks. GET endpoints become query accessors; non-GET endpoints become mutation accessors (decided at the type level).
+
+```ts
+import { createQueries } from '@routar/react-query';
+
+// todoApi = createApi(executor, todoRouter); createQueries reads its router automatically
+export const todoQuery = createQueries(todoApi);
+```
+
+**Query accessors (GET)** — `(params?, queryOptions?) => queryOptions`:
+
+```ts
+useSuspenseQuery(todoQuery.getList({ query: { userId: 1 } }));
+useQuery(todoQuery.getDetail({ path: { id } }, { staleTime: 60_000 }));
+queryClient.prefetchQuery(todoQuery.getList()); // SSR prefetch
+useSuspenseQueries({ queries: [todoQuery.getDetail({ path: { id } })] });
+```
+
+**Mutation accessors (non-GET)** — `(options?) => mutationOptions`; variables go to `.mutate()`:
+
+```ts
+const create = useMutation(todoQuery.create());
+create.mutate({ body: { title: 'buy milk' } });
+```
+
+**Key helpers:** `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix — override with `createQueries(api, { key: 'todo' })`.
+
+**Per-endpoint defaults:** pass `defaults` to set option defaults keyed by endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape). For mutation endpoints, the value is mutation options minus `invalidates`.
+
+```ts
+const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getList:   { staleTime: 60_000 },
+    getDetail: { staleTime: 5 * 60_000 },
+  },
+});
+```
+
+**Error typing:** `error` is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment TanStack's `Register` interface once — no `createQueries` change needed, accessors pick it up automatically:
+
+```ts
+import type { HttpError } from '@routar/core';
+declare module '@tanstack/react-query' {
+  interface Register { defaultError: HttpError }
+}
+```
+
+**Infinite queries (GET-only):** every query accessor has a `.infinite` callable that returns `infiniteQueryOptions` for `useInfiniteQuery` / `useSuspenseInfiniteQuery` / `prefetchInfiniteQuery`. Declare the pagination contract once in `createQueries({ infinite })` — nested routers supported (the map mirrors the router shape). Call sites then only supply base params (page-independent). Signature: `(params?, override?) => infiniteQueryOptions`.
+
+```ts
+// Declare the contract once in createQueries
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === 10 ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // routar-specific
+    },
+  },
+});
+
+// Call site — base params only; contract comes from config
+useSuspenseInfiniteQuery(todoQuery.getList.infinite({ query: { _limit: 10 } }));
+
+// SSR prefetch
+queryClient.prefetchInfiniteQuery(todoQuery.getList.infinite());
+```
+
+The `pageParam` builder is the one routar-specific concept: instead of writing `queryFn`, describe where the page param goes in the request. Its return value (a deep-partial of the endpoint's request schema) is deep-merged into the base params, then the routar client is called. Do not pass `queryFn` alongside `pageParam`. Page param type is `number`; for cursor (string) pagination, cast at the call site. Other native infinite options (`maxPages`, `getPreviousPageParam`, `select`, `staleTime`, etc.) pass through as-is.
+
+Pass a partial override as the second arg to `.infinite()` to merge over the configured contract (call wins). You can also supply the full contract at the call site for ad-hoc use, but declaring it in `createQueries` is recommended. If an endpoint has no `infinite` config and the full contract is not supplied, a clear runtime error is thrown.
+
+The field written by `pageParam` must exist in the endpoint's request schema — the merged request is validated by routar. The adapter (if any) runs per page. Per-endpoint defaults from `createQueries(api, { defaults })` merge into `.infinite` before per-call options. Data shape: `InfiniteData<PageType, number>`.
+
+Key: `todoQuery.getList.infinite.queryKey(params?)` → `["todos", "getList", "infinite", params?]`. This is a prefix-child of the standard key `["todos", "getList"]`, so invalidating the standard key or the domain `$key` also covers the infinite variant. For no-param endpoints, call `.infinite()` without arguments.
+
+**Invalidation — pure by default.** Mutations invalidate nothing unless you declare target keys with `invalidates` and wire `routarMutationCache(getClient)` once at `QueryClient` creation. Without wiring, `invalidates` does nothing; in development a one-time `console.warn` is logged.
+
+Prefer **narrow** invalidation — use `todoQuery.getList.queryKey()` (the specific key affected) rather than `todoQuery.$key` (whole domain). Reserve `$key` only when a mutation truly invalidates every query in the domain; it refetches all active lists and details, which can be costly.
+
+```ts
+import { QueryClient } from '@tanstack/react-query';
+import { routarMutationCache } from '@routar/react-query';
+
+let queryClient: QueryClient;
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+});
+
+// prefer narrow scope
+useMutation(todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] }));
+// whole-domain only when truly needed
+useMutation(todoQuery.create({ invalidates: [todoQuery.$key] }));
+```
+
+Without the wiring, `invalidates` is ignored — use a native `onSuccess` instead.
+
+**Optimistic updates:** accessor options are merged, so pass native `onMutate` / `onError` / `onSettled`; the key helpers make `cancelQueries` / `setQueryData` ergonomic. The library only fills `mutationFn` / `mutationKey` (+ `meta.invalidates`), so it never overwrites your handlers.
+
+**Adapter + cache shape:** if an endpoint has an `adapter`, the value stored in the query cache is the **adapted** output (e.g. `{ ...todo, label }`), not the raw response. `setQueryData` callbacks in optimistic updates must produce that adapted shape — include any derived fields that the adapter adds. Mutation responses are likewise adapted before being returned.
 
 ---
 
@@ -529,7 +638,7 @@ export const apiExecutor = dispatchExecutor(() =>
   typeof window === 'undefined' ? serverExecutor : clientExecutor,
 );
 
-// remote/services/todo/todo.api.ts
+// remote/services/todo.ts
 import { createApi } from '@routar/core';
 import { apiExecutor } from '../lib/executor';
 

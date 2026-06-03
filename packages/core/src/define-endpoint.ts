@@ -42,6 +42,10 @@ type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
  * that `request` includes a matching `path` field with those param names.
  * A mismatch or missing key is a compile-time error.
  *
+ * The literal HTTP method (`'GET'`, `'POST'`, …) is preserved on the return
+ * type — `endpoint({ method: 'GET', ... }).method` is typed `'GET'`, not the
+ * `HttpMethod` union.
+ *
  * @example Basic GET with no params
  * ```ts
  * const getList = endpoint({ method: 'GET', path: '/', response: z.array(TodoSchema) });
@@ -99,18 +103,19 @@ type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
  */
 // request O + adapter O
 export function endpoint<
+  TMethod extends HttpMethod,
   TPath extends string,
   TRequest extends RequestShape & PathConstraint<TPath>,
   TResponse extends Validator<unknown>,
   TOut,
 >(spec: {
-  method: HttpMethod;
+  method: TMethod;
   path: TPath;
   request: Validator<TRequest>;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
 }): {
-  method: HttpMethod;
+  method: TMethod;
   path: string;
   request: Validator<TRequest>;
   response: TResponse;
@@ -119,41 +124,49 @@ export function endpoint<
 
 // request O + adapter X
 export function endpoint<
+  TMethod extends HttpMethod,
   TPath extends string,
   TRequest extends RequestShape & PathConstraint<TPath>,
   TResponse extends Validator<unknown>,
 >(spec: {
-  method: HttpMethod;
+  method: TMethod;
   path: TPath;
   request: Validator<TRequest>;
   response: TResponse;
 }): {
-  method: HttpMethod;
+  method: TMethod;
   path: string;
   request: Validator<TRequest>;
   response: TResponse;
 };
 
 // request X + adapter O
-export function endpoint<TResponse extends Validator<unknown>, TOut>(spec: {
-  method: HttpMethod;
+export function endpoint<
+  TMethod extends HttpMethod,
+  TResponse extends Validator<unknown>,
+  TOut,
+>(spec: {
+  method: TMethod;
   path: string;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
 }): {
-  method: HttpMethod;
+  method: TMethod;
   path: string;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
 };
 
 // request X + adapter X
-export function endpoint<TResponse extends Validator<unknown>>(spec: {
-  method: HttpMethod;
+export function endpoint<
+  TMethod extends HttpMethod,
+  TResponse extends Validator<unknown>,
+>(spec: {
+  method: TMethod;
   path: string;
   response: TResponse;
 }): {
-  method: HttpMethod;
+  method: TMethod;
   path: string;
   response: TResponse;
 };

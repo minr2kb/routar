@@ -17,6 +17,12 @@ export default function Home() {
           </a>
         </li>
         <li>
+          <a href="/posts/infinite">
+            Posts (infinite) — SSR prefetch + useSuspenseInfiniteQuery + load
+            more
+          </a>
+        </li>
+        <li>
           <a href="/users">Users — CSR with adapter (flatten nested fields)</a>
         </li>
       </ul>

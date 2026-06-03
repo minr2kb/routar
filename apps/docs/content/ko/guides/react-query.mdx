@@ -1,0 +1,374 @@
+---
+title: TanStack Query 통합
+description: "@routar/react-query를 사용하여 routar 라우터에서 타입이 적용된 queryOptions / mutationOptions 팩토리를 직접 파생합니다."
+---
+
+# TanStack Query 통합
+
+`@routar/react-query`는 routar 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 직접 파생합니다. 새로운 훅 API가 없으며 TanStack의 기본 훅을 그대로 사용합니다.
+
+## 설치
+
+```bash
+npm install @routar/react-query @tanstack/react-query
+# peer dep: @tanstack/react-query@^5  (@routar/core is a regular dependency, installed automatically)
+```
+
+## createQueries
+
+`createApi` 클라이언트를 `createQueries`에 전달합니다 — 라우터는 클라이언트에서 자동으로 복원되므로 다시 넘기지 않습니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 **쿼리 접근자**, 나머지는 **뮤테이션 접근자**가 됩니다.
+
+```ts
+// remote/services/todo.ts (createApi 클라이언트와 같은 파일)
+import { createQueries } from '@routar/react-query'
+import { todoApi } from './todo'
+
+export const todoQuery = createQueries(todoApi)
+```
+
+## 엔드포인트별 기본 옵션
+
+`createQueries`에 `defaults` 맵을 전달하여 특정 엔드포인트의 기본 옵션을 설정합니다. 각 키는 엔드포인트 이름이며, 값은 모든 접근자 호출 시 **per-call 옵션보다 먼저** 병합됩니다(per-call 옵션이 항상 우선합니다).
+
+```ts
+export const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getDetail: { staleTime: 5 * 60_000 },
+    getList:   { staleTime: 60_000 },
+  },
+})
+```
+
+중첩 라우터도 지원됩니다 — `defaults` 맵이 라우터 구조를 그대로 따릅니다. 뮤테이션 엔드포인트의 경우, 값은 뮤테이션 옵션(`invalidates` 제외)이며, `mutationFn`과 `mutationKey`는 라이브러리가 여전히 설정합니다.
+
+## 에러 타이핑
+
+쿼리/뮤테이션 결과의 `error`는 TanStack의 `DefaultError`로 타입이 지정됩니다. 프로젝트 전체에서 `HttpError`로 좁히려면, TanStack의 `Register` 인터페이스를 한 번만 확장하면 됩니다 — `createQueries` 변경 없이 접근자가 자동으로 반영합니다:
+
+```ts
+import type { HttpError } from '@routar/core'
+declare module '@tanstack/react-query' {
+  interface Register { defaultError: HttpError }
+}
+```
+
+## 쿼리
+
+각 쿼리 접근자는 TanStack `queryOptions` 객체를 반환하는 함수입니다 — `useSuspenseQuery`, `useQuery`, `prefetchQuery` 등 TanStack 헬퍼에 직접 전달하세요.
+
+```ts
+// params: routar 요청 객체 ({ path?, query?, body? })
+// options: queryKey / queryFn을 제외한 모든 useQuery 옵션
+todoQuery.getList(params?, options?)
+todoQuery.getDetail({ path: { id } })                          // path 파라미터가 있을 때 필수
+todoQuery.getList({ query: { done: true } }, { staleTime: 60_000 })
+```
+
+```tsx
+'use client'
+import { useSuspenseQuery, useSuspenseQueries } from '@tanstack/react-query'
+import { todoQuery } from '@/remote/services/todo'
+import { userQuery } from '@/remote/services/user'
+
+// 단일 쿼리
+export function TodoList() {
+  const { data } = useSuspenseQuery(todoQuery.getList())
+  return <ul>{data.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
+}
+
+// 여러 쿼리 동시 실행
+export function Dashboard() {
+  const [todos, user] = useSuspenseQueries({
+    queries: [todoQuery.getList(), userQuery.getMe()],
+  })
+  // todos.data와 user.data는 항상 non-nullable
+}
+```
+
+### 키 헬퍼
+
+각 쿼리 접근자는 내부에서 사용하는 동일한 브랜드 키를 반환하는 `.queryKey()` 헬퍼를 제공합니다 — `getQueryData`, `setQueryData`, `invalidateQueries`에 유용합니다:
+
+```ts
+const key = todoQuery.getDetail.queryKey({ path: { id: '1' } })
+// key는 브랜드 타입 → qc.getQueryData(key)에서 올바른 반환 타입 추론
+
+qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() })
+```
+
+### SSR 프리페치
+
+```tsx
+// app/(pages)/todos/page.tsx  (Next.js 서버 컴포넌트)
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import { Suspense } from 'react'
+import { getQueryClient } from '@/utils/get-query-client'
+import { todoQuery } from '@/remote/services/todo'
+
+export default async function TodosPage() {
+  const qc = getQueryClient()
+  await qc.prefetchQuery(todoQuery.getList())
+
+  return (
+    <HydrationBoundary state={dehydrate(qc)}>
+      <Suspense fallback={<p>로딩 중…</p>}>
+        <TodoList />
+      </Suspense>
+    </HydrationBoundary>
+  )
+}
+```
+
+## 무한 쿼리
+
+`createQueries`가 생성하는 모든 GET 쿼리 접근자에는 `.infinite` 멤버가 있습니다. 이는 네이티브 TanStack `infiniteQueryOptions` 객체를 반환하며 `useInfiniteQuery`, `useSuspenseInfiniteQuery`, `prefetchInfiniteQuery`에 직접 전달할 수 있습니다.
+
+페이지네이션 계약을 `createQueries({ infinite })` 에 **한 번만** 선언하세요 (엔드포인트 이름을 키로 사용). 이후 호출 지점에서는 기본 파라미터(페이지 독립)만 전달하면 됩니다.
+
+```ts
+// remote/services/todo.ts — 계약을 한 번만 선언
+export const todoQuery = createQueries(todoApi, {
+  infinite: {
+    getList: {
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === 10 ? allPages.length + 1 : undefined,
+      pageParam: (page) => ({ query: { _page: page } }), // 페이지 → 부분 요청으로 변환
+    },
+  },
+})
+```
+
+```tsx
+'use client'
+import { useSuspenseInfiniteQuery } from '@tanstack/react-query'
+import { todoQuery } from '@/remote/services/todo'
+
+export function InfiniteTodoList() {
+  const { data, fetchNextPage, hasNextPage } = useSuspenseInfiniteQuery(
+    todoQuery.getList.infinite({ query: { _limit: 10 } }), // 기본 파라미터만 전달
+  )
+  // data: InfiniteData<TodoItem[], number> — 각 페이지는 엔드포인트 응답 (adapter 적용)
+
+  return (
+    <>
+      {data.pages.map((page, i) => (
+        <ul key={i}>{page.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
+      ))}
+      {hasNextPage && <button onClick={() => fetchNextPage()}>더 불러오기</button>}
+    </>
+  )
+}
+```
+
+### `pageParam` 빌더
+
+`pageParam`은 `.infinite`에서 routar 고유의 개념입니다. `queryFn`을 직접 작성하는 대신, 페이지 번호가 요청의 **어느 위치**에 들어가는지 기술합니다 — 반환값(엔드포인트 요청의 deep-partial)이 기본 파라미터에 깊게 병합된 후 routar 클라이언트를 호출합니다.
+
+- `initialPageParam`, `getNextPageParam`, `pageParam`은 `createQueries({ infinite: { <엔드포인트>: { ... } } })`에 선언합니다.
+- `pageParam`은 `queryFn`을 대체합니다 — 함께 전달하지 마세요.
+- `pageParam` 빌더가 쓰는 필드는 엔드포인트의 request 스키마에 존재해야 합니다. 병합된 요청이 routar에서 검증되기 때문입니다.
+- 페이지 파라미터 타입은 `number`입니다. 커서 기반(string) 페이지네이션은 호출 지점에서 캐스팅하세요.
+- 다른 네이티브 무한 옵션(`maxPages`, `getPreviousPageParam`, `select`, `staleTime` 등)은 그대로 전달됩니다.
+
+### Per-call 오버라이드
+
+`.infinite()`의 두 번째 인수로 부분 오버라이드를 전달할 수 있습니다 — 설정된 계약 위에 병합됩니다(호출 옵션 우선):
+
+```ts
+todoQuery.getList.infinite(
+  { query: { _limit: 10 } },
+  { staleTime: 60_000 },   // 설정 계약 위에 병합
+)
+```
+
+호출 지점에서 전체 계약을 직접 전달하는 것도 가능하지만, `createQueries`에 선언하는 방식이 권장됩니다. `infinite` 설정이 없는 엔드포인트에서 전체 계약 없이 `.infinite()`를 호출하면 라이브러리가 **명확한 런타임 오류를 던집니다**.
+
+### 키 헬퍼
+
+`.infinite.queryKey(params?)`는 `[...root, "getList", "infinite", params?]`를 반환합니다. 이는 표준 키 `[...root, "getList"]`의 prefix-child이므로, 표준 키나 도메인 `$key`를 무효화하면 infinite 변형도 함께 무효화됩니다.
+
+```ts
+todoQuery.getList.infinite.queryKey({ query: { _limit: 10 } })
+// → ["todos", "getList", "infinite", { query: { _limit: 10 } }]
+
+// 표준 키를 무효화하면 infinite 변형도 포함됩니다:
+qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() })
+```
+
+### SSR 프리페치
+
+```tsx
+// app/(pages)/todos/page.tsx  (Next.js 서버 컴포넌트)
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import { getQueryClient } from '@/utils/get-query-client'
+import { todoQuery } from '@/remote/services/todo'
+
+export default async function TodosPage() {
+  const qc = getQueryClient()
+  await qc.prefetchInfiniteQuery(todoQuery.getList.infinite({ query: { _limit: 10 } }))
+
+  return (
+    <HydrationBoundary state={dehydrate(qc)}>
+      <Suspense fallback={<p>로딩 중…</p>}>
+        <InfiniteTodoList />
+      </Suspense>
+    </HydrationBoundary>
+  )
+}
+```
+
+### 파라미터 없는 엔드포인트
+
+인수 없이(또는 `undefined`를 전달하여) 호출합니다:
+
+```ts
+useSuspenseInfiniteQuery(todoQuery.feed.infinite())
+```
+
+## 뮤테이션
+
+GET이 아닌 모든 엔드포인트는 **뮤테이션 접근자**가 됩니다 — `mutationKey`와 `mutationFn`이 미리 채워진 TanStack `mutationOptions` 객체를 반환합니다.
+
+```ts
+// options: mutationFn / mutationKey를 제외한 모든 useMutation 옵션, 그리고 invalidates
+todoQuery.create(options?)
+todoQuery.update(options?)
+todoQuery.remove(options?)
+```
+
+`.mutate()`에 전달하는 변수는 routar 요청 객체입니다:
+
+```ts
+import { useMutation } from '@tanstack/react-query'
+import { todoQuery } from '@/remote/services/todo'
+
+const { mutate } = useMutation(todoQuery.create())
+mutate({ body: { title: '새 할 일' } })
+
+const { mutate: update } = useMutation(todoQuery.update())
+update({ path: { id: '1' }, body: { title: '수정된 할 일' } })
+```
+
+### 뮤테이션 키 헬퍼
+
+```ts
+todoQuery.create.mutationKey  // → ["todos", "create"]
+```
+
+## 무효화
+
+기본적으로 뮤테이션은 아무것도 무효화하지 않습니다 — 완전한 제어권을 유지합니다.
+
+### `invalidates`를 사용한 선언적 무효화
+
+`invalidates`를 전달하여 성공 시 무효화할 쿼리 키를 선언합니다:
+
+```ts
+useMutation(
+  todoQuery.create({
+    invalidates: [
+      todoQuery.getList.queryKey(),  // 좁은 범위 권장: 실제 영향받는 키만 지정
+      // todoQuery.$key              // 전체 도메인: 모든 활성 목록 + 상세 리페치 — 정말 필요할 때만 사용
+    ],
+  }),
+)
+```
+
+**좁은 범위의 무효화**를 권장합니다 — 뮤테이션이 실제로 영향을 미치는 특정 키를 지정하세요. `todoQuery.$key`는 도메인 내 모든 쿼리를 무효화하는 경우에만 예약하세요; 모든 활성 목록과 상세 정보를 리페치하므로 비용이 클 수 있습니다.
+
+`invalidates`는 `mutation.meta`에 저장되고 `routarMutationCache`에서 처리됩니다. `QueryClient` 생성 시 **한 번만** 배선하세요 — 이 배선 없이는 `invalidates`가 아무것도 하지 않습니다. 개발 환경에서는 `routarMutationCache`가 배선되지 않은 상태에서 뮤테이션이 `invalidates`를 선언하면 라이브러리가 일회성 `console.warn`을 출력합니다.
+
+```ts
+// utils/get-query-client.ts
+import { QueryClient } from '@tanstack/react-query'
+import { routarMutationCache } from '@routar/react-query'
+
+let queryClient: QueryClient
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+})
+```
+
+이 배선 없이는 `invalidates`가 무시됩니다 — 대신 기본 `onSuccess` 콜백에서 수동으로 무효화하세요.
+
+### 수동 무효화
+
+```ts
+import { useQueryClient } from '@tanstack/react-query'
+
+const qc = useQueryClient()
+useMutation(
+  todoQuery.create({
+    onSuccess: () => qc.invalidateQueries({ queryKey: todoQuery.getList.queryKey() }),
+  }),
+)
+```
+
+## 낙관적 업데이트
+
+라이브러리는 낙관적 업데이트 로직을 가로채지 않습니다 — TanStack 기본 핸들러를 전달하면 병합됩니다:
+
+> **어댑터 주의사항:** 엔드포인트에 `adapter`가 있으면, 쿼리 캐시에 저장되는 값은 원본 응답이 아니라 **어댑터 출력**(예: `{ ...todo, label }`)입니다. `setQueryData` 콜백은 어댑터가 추가하는 파생 필드를 포함한 어댑터 출력 형태를 반환해야 합니다.
+
+```ts
+const qc = useQueryClient()
+
+useMutation(
+  todoQuery.update({
+    onMutate: async (vars) => {
+      const key = todoQuery.getDetail.queryKey({ path: { id: vars.path.id } })
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData(key)
+      // 엔드포인트에 adapter가 있으면 old는 이미 어댑터 출력 형태 — 파생 필드를 보존하세요
+      qc.setQueryData(key, (old: any) => ({ ...old, ...vars.body }))
+      return { prev, key }
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(ctx!.key, ctx!.prev),
+    onSettled: (_d, _e, vars) =>
+      qc.invalidateQueries({
+        queryKey: todoQuery.getDetail.queryKey({ path: { id: vars.path.id } }),
+      }),
+  }),
+)
+```
+
+## 키 구조
+
+쿼리 키는 `[...rootSegments, endpointName, params?]` 형태를 따릅니다:
+
+| 접근자 | 키 (파라미터 없음) | 키 (파라미터 있음) |
+|---|---|---|
+| `todoQuery.getList()` | `["todos", "getList"]` | `["todos", "getList", { query: { done: true } }]` |
+| `todoQuery.getDetail({ path: { id: "1" } })` | — | `["todos", "getDetail", { path: { id: "1" } }]` |
+
+### 도메인 키 (`$key`)
+
+모든 접근자 객체는 해당 도메인의 루트 세그먼트를 공유하는 `$key`를 제공합니다:
+
+```ts
+todoQuery.$key  // → ["todos"]
+
+// 도메인 전체 무효화:
+qc.invalidateQueries({ queryKey: todoQuery.$key })
+```
+
+### 중첩 라우터
+
+중첩된 `defineRouter` 호출은 세그먼트를 누적합니다:
+
+```ts
+// 라우터 prefix "/api/v1/users"
+userQuery.$key                        // → ["api", "v1", "users"]
+userQuery.posts.$key                  // → ["api", "v1", "users", "posts"]
+userQuery.posts.getList.queryKey()    // → ["api", "v1", "users", "posts", "getList"]
+```
+
+### 커스텀 루트 키
+
+생성 시점에 루트 세그먼트를 재정의합니다:
+
+```ts
+const todoQuery = createQueries(todoApi, { key: 'todo' })
+todoQuery.$key  // → ["todo"]
+```

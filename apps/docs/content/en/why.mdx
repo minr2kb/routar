@@ -154,7 +154,7 @@ Structure appears when you need it, not before.
 In a well-structured project, the data flows in one direction:
 
 ```
-Component → *.queries.ts → *.api.ts → executor
+Component → services/<domain>.ts (createQueries → createApi) → executor
 ```
 
 Components never import executors. Executors never know about components. Each layer has exactly one responsibility, and you can swap any layer without touching the others.
@@ -162,23 +162,18 @@ Components never import executors. Executors never know about components. Each l
 ## What this looks like in practice
 
 ```ts
-// todo.api.ts — spec + types
+// remote/services/todo.ts — spec, types, and TanStack Query interface colocated
 export const todoApi = createApi(clientExecutor, todoRouter)
 export type TodoApiTypes = ApiTypes<typeof todoApi>
 export type TodoItem = TodoApiTypes['getDetail']['response']
 
-// todo.queries.ts — TanStack Query interface
-export const todoDetailQuery = (id: number) =>
-  queryOptions({
-    queryKey: ['todos', 'detail', id],
-    queryFn: () => todoApi.getDetail({ path: { id } }),
-  })
+export const todoQuery = createQueries(todoApi)
 
 // Component — knows nothing about HTTP
-const { data } = useQuery(todoDetailQuery(id))
+const { data } = useSuspenseQuery(todoQuery.getDetail({ path: { id } }))
 ```
 
-Add a new endpoint: update `todo.api.ts`, done. The type flows through automatically.
+Add a new endpoint: update `todo.ts`, done. The type flows through automatically.
 
 ## The alternative
 
