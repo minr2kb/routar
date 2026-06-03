@@ -108,11 +108,11 @@ components/
 - Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
 - Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
 - Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
-- Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); top-level endpoints only
+- Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); nested routers supported (the map mirrors the router shape)
 - Server pages: `prefetchQuery(<domain>Query.<endpoint>(params))` → `HydrationBoundary` → `<Suspense>`
 - Client components: `useSuspenseQuery(<domain>Query.<endpoint>(params))` — `data` always non-nullable
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`
-- Infinite queries (GET-only): declare the pagination contract once in `createQueries({ infinite: { <ep>: { initialPageParam, getNextPageParam, pageParam } } })` — top-level GET endpoints only; call `<domain>Query.<ep>.infinite(params?)` at the call site (base params only); the routar-specific `pageParam` builder `(page) => partialRequest` maps the page param to a partial request (deep-merged into base params, replaces `queryFn`); key gets an `"infinite"` segment: `[...root, endpointName, "infinite", params?]` (prefix-child of the standard key — standard-key invalidation also covers it)
+- Infinite queries (GET-only): declare the pagination contract once in `createQueries({ infinite: { <ep>: { initialPageParam, getNextPageParam, pageParam } } })` — nested routers supported (the map mirrors the router shape); call `<domain>Query.<ep>.infinite(params?)` at the call site (base params only); the routar-specific `pageParam` builder `(page) => partialRequest` maps the page param to a partial request (deep-merged into base params, replaces `queryFn`); key gets an `"infinite"` segment: `[...root, endpointName, "infinite", params?]` (prefix-child of the standard key — standard-key invalidation also covers it)
 - Invalidation: pure by default; opt-in `invalidates: [<domain>Query.<endpoint>.queryKey()]` (prefer narrow scope) or `[<domain>Query.$key]` (whole domain — costly, use sparingly) requires `routarMutationCache` wired in `QueryClient`; without wiring, `invalidates` does nothing
 
 **Shared contract pattern (todo):** `TodoRawSchema` exported from `services/todo.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.

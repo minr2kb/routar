@@ -22,8 +22,8 @@ export const todoQuery = createQueries(todoApi)
 |-----------|------|-------------|
 | `api` | `ApiClientWithRouter` (from `createApi`) | The typed client produced by `createApi`; carries its source router on `$router` |
 | `options.key` | `string \| string[]` | Override the root key segments (default: derived from router prefix) |
-| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | Per-endpoint default options keyed by endpoint name. Merged **before** per-call options (per-call wins). Top-level endpoints only; for mutation endpoints, value is mutation options minus `invalidates`. |
-| `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | Per-endpoint infinite query contract keyed by GET endpoint name. Declares `initialPageParam`, `getNextPageParam`, and the routar-specific `pageParam` builder once so call sites only need base params. Top-level GET endpoints only. |
+| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | Per-endpoint default options keyed by endpoint name. Merged **before** per-call options (per-call wins). Nested routers supported (the map mirrors the router shape); for mutation endpoints, value is mutation options minus `invalidates`. |
+| `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | Per-endpoint infinite query contract keyed by GET endpoint name. Declares `initialPageParam`, `getNextPageParam`, and the routar-specific `pageParam` builder once so call sites only need base params. Nested routers supported — the map mirrors the router shape. |
 
 ### Error typing
 
@@ -61,7 +61,7 @@ Every query accessor has an `.infinite` callable that returns a TanStack `infini
 Declare the pagination contract once in `createQueries({ infinite })`. Call sites then only supply base params (page-independent):
 
 ```ts
-// Declare the contract in createQueries — top-level GET endpoints only
+// Declare the contract in createQueries — nested routers supported (the map mirrors the router shape)
 export const todoQuery = createQueries(todoApi, {
   infinite: {
     getList: {

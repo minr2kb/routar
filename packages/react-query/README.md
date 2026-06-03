@@ -67,7 +67,7 @@ export const todoQuery = createQueries(todoApi, {
 });
 ```
 
-- Top-level endpoints only — defaults for endpoints inside nested routers are not matched.
+- Nested routers are supported — the map mirrors the router shape (e.g. `{ users: { getPosts: { ... } } }`).
 - For mutation endpoints, the value is mutation options (minus `invalidates`); `mutationFn` and `mutationKey` are still set by the library.
 
 ## Error typing

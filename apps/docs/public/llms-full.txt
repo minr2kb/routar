@@ -509,7 +509,7 @@ create.mutate({ body: { title: 'buy milk' } });
 
 **Key helpers:** `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix — override with `createQueries(api, { key: 'todo' })`.
 
-**Per-endpoint defaults:** pass `defaults` to set option defaults keyed by endpoint name — merged before per-call options (per-call wins). Top-level endpoints only. For mutation endpoints, the value is mutation options minus `invalidates`.
+**Per-endpoint defaults:** pass `defaults` to set option defaults keyed by endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape). For mutation endpoints, the value is mutation options minus `invalidates`.
 
 ```ts
 const todoQuery = createQueries(todoApi, {
@@ -529,7 +529,7 @@ declare module '@tanstack/react-query' {
 }
 ```
 
-**Infinite queries (GET-only):** every query accessor has a `.infinite` callable that returns `infiniteQueryOptions` for `useInfiniteQuery` / `useSuspenseInfiniteQuery` / `prefetchInfiniteQuery`. Declare the pagination contract once in `createQueries({ infinite })` — top-level GET endpoints only. Call sites then only supply base params (page-independent). Signature: `(params?, override?) => infiniteQueryOptions`.
+**Infinite queries (GET-only):** every query accessor has a `.infinite` callable that returns `infiniteQueryOptions` for `useInfiniteQuery` / `useSuspenseInfiniteQuery` / `prefetchInfiniteQuery`. Declare the pagination contract once in `createQueries({ infinite })` — nested routers supported (the map mirrors the router shape). Call sites then only supply base params (page-independent). Signature: `(params?, override?) => infiniteQueryOptions`.
 
 ```ts
 // Declare the contract once in createQueries

@@ -39,7 +39,7 @@ export const todoQuery = createQueries(todoApi, {
 })
 ```
 
-최상위 엔드포인트에만 적용됩니다 — 중첩 라우터 내의 엔드포인트 기본값은 매칭되지 않습니다. 뮤테이션 엔드포인트의 경우, 값은 뮤테이션 옵션(`invalidates` 제외)이며, `mutationFn`과 `mutationKey`는 라이브러리가 여전히 설정합니다.
+중첩 라우터도 지원됩니다 — `defaults` 맵이 라우터 구조를 그대로 따릅니다. 뮤테이션 엔드포인트의 경우, 값은 뮤테이션 옵션(`invalidates` 제외)이며, `mutationFn`과 `mutationKey`는 라이브러리가 여전히 설정합니다.
 
 ## 에러 타이핑
 

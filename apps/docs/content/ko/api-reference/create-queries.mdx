@@ -22,8 +22,8 @@ export const todoQuery = createQueries(todoApi)
 |---------|------|------|
 | `api` | `ApiClientWithRouter` (`createApi` 반환) | `createApi`로 생성된 타입 지정 클라이언트; 소스 라우터를 `$router`에 실고 있음 |
 | `options.key` | `string \| string[]` | 루트 키 세그먼트 재정의 (기본값: 라우터 prefix에서 파생) |
-| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | 엔드포인트 이름을 키로 하는 per-endpoint 기본 옵션. per-call 옵션 **이전에** 병합됩니다 (per-call이 우선). 최상위 엔드포인트에만 적용; 뮤테이션 엔드포인트의 경우 값은 `invalidates`를 제외한 뮤테이션 옵션. |
-| `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | GET 엔드포인트 이름을 키로 하는 무한 쿼리 계약. `initialPageParam`, `getNextPageParam`, routar 고유의 `pageParam` 빌더를 한 번 선언하여 호출 지점에서 기본 파라미터만 전달하면 되도록 합니다. 최상위 GET 엔드포인트에만 적용. |
+| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | 엔드포인트 이름을 키로 하는 per-endpoint 기본 옵션. per-call 옵션 **이전에** 병합됩니다 (per-call이 우선). 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름); 뮤테이션 엔드포인트의 경우 값은 `invalidates`를 제외한 뮤테이션 옵션. |
+| `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | GET 엔드포인트 이름을 키로 하는 무한 쿼리 계약. `initialPageParam`, `getNextPageParam`, routar 고유의 `pageParam` 빌더를 한 번 선언하여 호출 지점에서 기본 파라미터만 전달하면 되도록 합니다. 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름). |
 
 ### 에러 타이핑
 
@@ -61,7 +61,7 @@ todoQuery.getDetail.queryKey({ path: { id: '1' } }) // ["todos", "getDetail", { 
 페이지네이션 계약을 `createQueries({ infinite })`에 한 번 선언하세요. 이후 호출 지점에서는 기본 파라미터(페이지 독립)만 전달하면 됩니다:
 
 ```ts
-// createQueries에서 계약을 한 번 선언 — 최상위 GET 엔드포인트에만 적용
+// createQueries에서 계약을 한 번 선언 — 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름)
 export const todoQuery = createQueries(todoApi, {
   infinite: {
     getList: {

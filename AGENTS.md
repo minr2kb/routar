@@ -213,7 +213,7 @@ Signatures: query accessor `(params?, queryOptions?) => queryOptions`; mutation 
 
 Keys: `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix (override with `createQueries(api, { key })`).
 
-**Per-endpoint defaults:** pass `defaults` to set option defaults per endpoint name — merged before per-call options (per-call wins). Top-level endpoints only.
+**Per-endpoint defaults:** pass `defaults` to set option defaults per endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape).
 
 ```ts
 createQueries(todoApi, { defaults: { getList: { staleTime: 60_000 }, getDetail: { staleTime: 5 * 60_000 } } })
@@ -226,7 +226,7 @@ import type { HttpError } from '@routar/core';
 declare module '@tanstack/react-query' { interface Register { defaultError: HttpError } }
 ```
 
-**Infinite queries (GET-only):** declare the pagination contract once in `createQueries({ infinite: { <endpoint>: { initialPageParam, getNextPageParam, pageParam } } })` — top-level GET endpoints only. The routar-specific `pageParam` builder maps the page param to a partial request (deep-merged into base params before the routar client is called) — this replaces `queryFn`. Call sites then only need base params; supply the full contract as the second arg only for ad-hoc use. Key: `[...root, endpointName, "infinite", params?]` — a prefix-child of the standard key, so standard-key invalidation also covers it.
+**Infinite queries (GET-only):** declare the pagination contract once in `createQueries({ infinite: { <endpoint>: { initialPageParam, getNextPageParam, pageParam } } })` — nested routers supported (the map mirrors the router shape). The routar-specific `pageParam` builder maps the page param to a partial request (deep-merged into base params before the routar client is called) — this replaces `queryFn`. Call sites then only need base params; supply the full contract as the second arg only for ad-hoc use. Key: `[...root, endpointName, "infinite", params?]` — a prefix-child of the standard key, so standard-key invalidation also covers it.
 
 ```ts
 // Declare contract in createQueries
