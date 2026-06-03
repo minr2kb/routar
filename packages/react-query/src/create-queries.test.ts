@@ -1,7 +1,8 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { type ApiClientWithRouter, defineRouter, endpoint } from "@routar/core";
 import { z } from "zod";
 import { createQueries } from "./create-queries.js";
+import { routarMutationCache } from "./mutation-cache.js";
 
 const TodoRouter = defineRouter("/todos", {
   getList: endpoint({
@@ -197,5 +198,63 @@ describe("createQueries — nested routers", () => {
     const result = await queryFn({ signal: undefined });
     expect(result).toEqual([{ id: 3 }]);
     expect(todosGetList).toHaveBeenCalled();
+  });
+});
+
+describe("createQueries — empty-param key normalization (A2)", () => {
+  it("getList() and getList({}) produce the same queryKey", () => {
+    const { api } = makeApi();
+    const q = createQueries(api);
+    const bare = q.getList().queryKey as unknown;
+    expect(q.getList({}).queryKey as unknown).toEqual(bare);
+    expect(q.getList.queryKey({}) as unknown).toEqual(bare);
+  });
+});
+
+describe("createQueries — per-endpoint defaults (C4)", () => {
+  it("merges a query default, and a per-call option overrides it", () => {
+    const { api } = makeApi();
+    const q = createQueries(api, {
+      defaults: { getList: { staleTime: 5000 } },
+    });
+    expect(q.getList().staleTime).toBe(5000);
+    // per-call wins over the endpoint default
+    expect(q.getList(undefined, { staleTime: 1000 }).staleTime).toBe(1000);
+    // a different endpoint is unaffected
+    expect(q.getDetail({ path: { id: 1 } }).staleTime).toBeUndefined();
+  });
+
+  it("merges a mutation default while keeping mutationFn/mutationKey", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries(
+      {
+        create,
+        $router: TodoMutationRouter,
+      } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>,
+      { defaults: { create: { gcTime: 1234 } } },
+    );
+    const opts = q.create();
+    expect((opts as { gcTime?: number }).gcTime).toBe(1234);
+    expect(opts.mutationKey).toEqual(["todos", "create"]);
+    expect(typeof opts.mutationFn).toBe("function");
+  });
+});
+
+describe("createQueries — unwired invalidates warning (A1)", () => {
+  it("does not warn when routarMutationCache is wired", () => {
+    // Wiring the cache flips the module flag; correctly-wired apps must stay quiet.
+    routarMutationCache(() => ({}) as never);
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const create = mock(async () => ({ id: 1 }));
+      const q = createQueries({
+        create,
+        $router: TodoMutationRouter,
+      } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>);
+      q.create({ invalidates: [["todos"]] });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

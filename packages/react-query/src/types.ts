@@ -13,10 +13,27 @@ import type {
   UseQueryOptions,
 } from "@tanstack/react-query";
 
+/**
+ * Per-endpoint default options, keyed by endpoint name. Merged into every
+ * accessor call *before* the per-call options, so a call-site option always
+ * wins. Lets you colocate per-resource policy (e.g. `getDetail: { staleTime }`)
+ * instead of repeating it at each call. Top-level endpoints only — nested
+ * routers are not matched.
+ */
+export type EndpointDefaults<TEndpoints extends RouterEndpoints> = {
+  [K in keyof TEndpoints]?:
+    | QueryAccessorOptions<unknown>
+    | Omit<RoutarMutationOptions<unknown, unknown>, "invalidates">;
+};
+
 /** Options accepted by createQueries. */
-export interface CreateQueriesOptions {
+export interface CreateQueriesOptions<
+  TEndpoints extends RouterEndpoints = RouterEndpoints,
+> {
   /** Overrides the root key segment(s); defaults to the router prefix segments. */
   key?: string;
+  /** Per-endpoint default options merged before each call's options. */
+  defaults?: EndpointDefaults<TEndpoints>;
 }
 
 /** The request/params type of an endpoint, or `void` when it has no `request`. */

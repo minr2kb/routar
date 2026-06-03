@@ -26,4 +26,18 @@ describe("buildQueryKey", () => {
       "getList",
     ]);
   });
+
+  it("normalizes empty params (null / {}) to the same key as undefined", () => {
+    const bare = buildQueryKey(["todos"], "getList", undefined);
+    expect(buildQueryKey(["todos"], "getList", null)).toEqual(bare);
+    expect(buildQueryKey(["todos"], "getList", {})).toEqual(bare);
+  });
+
+  it("keeps non-empty params (object with keys) as a trailing element", () => {
+    expect(buildQueryKey(["todos"], "getList", { query: {} })).toEqual([
+      "todos",
+      "getList",
+      { query: {} },
+    ]);
+  });
 });

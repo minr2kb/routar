@@ -5,8 +5,11 @@ import {
   type RouterEndpoints,
 } from "@routar/core";
 import { queryOptions } from "@tanstack/react-query";
+import { isRoutarMutationCacheWired } from "./mutation-cache.js";
 import type { CreateQueriesOptions, Queries } from "./types.js";
 import { buildQueryKey, prefixToSegments } from "./utils/key.js";
+
+type EndpointDefault = Record<string, unknown>;
 
 /**
  * Derives TanStack Query accessors from a routar API client.
@@ -18,7 +21,7 @@ import { buildQueryKey, prefixToSegments } from "./utils/key.js";
  */
 export function createQueries<TEndpoints extends RouterEndpoints>(
   api: ApiClientWithRouter<TEndpoints>,
-  options?: CreateQueriesOptions,
+  options?: CreateQueriesOptions<TEndpoints>,
 ): Queries<TEndpoints> {
   const router = api.$router;
   const root = options?.key ? [options.key] : prefixToSegments(router.prefix);
@@ -26,6 +29,7 @@ export function createQueries<TEndpoints extends RouterEndpoints>(
     api as unknown as Record<string, unknown>,
     router.endpoints,
     root,
+    options?.defaults as Record<string, EndpointDefault> | undefined,
   ) as Queries<TEndpoints>;
 }
 
@@ -33,6 +37,8 @@ function buildQueries(
   apiNode: Record<string, unknown>,
   endpoints: RouterEndpoints,
   root: string[],
+  // Per-endpoint defaults apply at the top level only; nested routers get none.
+  defaults: Record<string, EndpointDefault> | undefined,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { $key: root };
 
@@ -43,6 +49,7 @@ function buildQueries(
         apiNode[name] as Record<string, unknown>,
         entry.endpoints,
         childRoot,
+        undefined,
       );
       continue;
     }
@@ -51,10 +58,11 @@ function buildQueries(
       params?: unknown,
       signal?: AbortSignal,
     ) => Promise<unknown>;
+    const endpointDefault = defaults?.[name];
     out[name] =
       spec.method === "GET"
-        ? makeQueryAccessor(fn, root, name)
-        : makeMutationAccessor(fn, root, name);
+        ? makeQueryAccessor(fn, root, name, endpointDefault)
+        : makeMutationAccessor(fn, root, name, endpointDefault);
   }
 
   return out;
@@ -64,21 +72,26 @@ function makeQueryAccessor(
   fn: (params?: unknown, signal?: AbortSignal) => Promise<unknown>,
   root: string[],
   name: string,
+  endpointDefault: EndpointDefault | undefined,
 ) {
   const accessor = (params?: unknown, options?: Record<string, unknown>) =>
     queryOptions({
       queryKey: buildQueryKey(root, name, params),
       queryFn: ({ signal }) => fn(params, signal),
+      ...endpointDefault,
       ...options,
     });
   accessor.queryKey = (params?: unknown) => buildQueryKey(root, name, params);
   return accessor;
 }
 
+let warnedUnwiredInvalidates = false;
+
 function makeMutationAccessor(
   fn: (vars?: unknown) => Promise<unknown>,
   root: string[],
   name: string,
+  endpointDefault: EndpointDefault | undefined,
 ) {
   const mutationKey = [...root, name];
   const accessor = (options: Record<string, unknown> = {}) => {
@@ -89,13 +102,36 @@ function makeMutationAccessor(
     const merged: Record<string, unknown> = {
       mutationKey,
       mutationFn: (vars: unknown) => fn(vars),
+      ...endpointDefault,
       ...rest,
     };
     if (invalidates) {
+      warnUnwiredInvalidates();
       merged.meta = { ...(rest.meta ?? {}), invalidates };
     }
     return merged;
   };
   accessor.mutationKey = mutationKey;
   return accessor;
+}
+
+/**
+ * Warns once (dev only) when a mutation declares `invalidates` but no
+ * {@link routarMutationCache} is wired to process it — otherwise the
+ * invalidation silently never runs.
+ */
+function warnUnwiredInvalidates(): void {
+  if (
+    warnedUnwiredInvalidates ||
+    isRoutarMutationCacheWired() ||
+    process.env.NODE_ENV === "production"
+  ) {
+    return;
+  }
+  warnedUnwiredInvalidates = true;
+  console.warn(
+    "[@routar/react-query] a mutation declared `invalidates`, but `routarMutationCache` " +
+      "is not wired into your QueryClient — the invalidation will not run. Wire it once at " +
+      "QueryClient creation: `new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })`.",
+  );
 }
