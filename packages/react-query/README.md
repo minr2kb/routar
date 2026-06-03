@@ -6,7 +6,7 @@ TanStack Query integration for [routar](https://github.com/minr2kb/routar) — d
 
 ```bash
 bun add @routar/react-query @tanstack/react-query
-# peer deps: @routar/core @tanstack/react-query@^5
+# peer dep: @tanstack/react-query@^5  (@routar/core is a regular dependency, installed automatically)
 ```
 
 ```bash
