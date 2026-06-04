@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
@@ -7,7 +9,7 @@ const ogLocales = { en: "en_US", ko: "ko_KR" };
 
 export async function generateMetadata({ params }) {
   const { lang } = await params;
-  return {
+  const metadata: Metadata = {
     metadataBase: new URL(BASE_URL),
     title: {
       absolute: "routar",
@@ -33,7 +35,15 @@ export async function generateMetadata({ params }) {
         "Schema-first HTTP API client with end-to-end type safety and runtime validation.",
       images: ["/opengraph-image"],
     },
+    icons: {
+      icon: [
+        { url: "/favicon-32x32.png", sizes: "32x32" },
+        { url: "/favicon-16x16.png", sizes: "16x16" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    },
   };
+  return metadata;
 }
 
 export function generateStaticParams() {
