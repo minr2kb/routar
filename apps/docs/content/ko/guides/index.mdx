@@ -1,0 +1,18 @@
+---
+title: 가이드
+description: SSR/CSR, TanStack Query, 커스텀 Executor, 에러 처리, MSW 모킹 등 routar 실전 활용 가이드.
+---
+
+# 가이드
+
+엔드포인트 스키마 하나로 실제 애플리케이션 시나리오를 풀어내는 실전 가이드입니다.
+
+| 가이드 | 다루는 내용 |
+|------|-------------|
+| [SSR / CSR 패턴](/ko/guides/ssr-csr) | 동일한 엔드포인트 스키마를 서버·클라이언트에서 다른 executor로 사용 |
+| [TanStack Query](/ko/guides/react-query) | 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 파생 |
+| [커스텀 Executor](/ko/guides/custom-executor) | ky, got, 직접 만든 HTTP 클라이언트를 `createExecutor`로 통합 |
+| [에러 처리](/ko/guides/error-handling) | `ValidationError` · `HttpError` · `AxiosError` 처리와 트랜스포트 간 정규화 |
+| [MSW로 모킹하기](/ko/guides/mocking) | `RouterDef`에서 타입이 적용된 MSW v2 핸들러 생성 |
+
+API 시그니처가 필요하면 [API 레퍼런스](/ko/api-reference)를, executor 선택은 [Executor](/ko/executors)를 참조하세요.
