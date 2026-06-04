@@ -3,7 +3,8 @@ import { Image } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://routar.dev";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || "https://router.vercel.app";
 
 const ogLocales = { en: "en_US", ko: "ko_KR" };
 

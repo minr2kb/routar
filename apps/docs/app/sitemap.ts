@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://routar.dev";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || "https://routar.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
