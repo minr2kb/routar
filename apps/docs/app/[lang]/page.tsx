@@ -76,6 +76,11 @@ const t: Record<
         pkg: "@routar/msw",
         desc: "MSW v2 handler factory — generate typed mock handlers from your RouterDef for testing.",
       },
+      {
+        name: "@routar/react-query",
+        pkg: "@routar/react-query",
+        desc: "TanStack Query bindings for routar — queryOptions/mutationOptions factories from a routar router",
+      },
     ],
     navLinks: [
       { label: "Getting Started", href: "/en/getting-started" },
@@ -142,6 +147,11 @@ const t: Record<
         name: "@routar/msw",
         pkg: "@routar/msw",
         desc: "MSW v2 핸들러 팩토리 — RouterDef에서 타입이 적용된 목 핸들러를 생성합니다.",
+      },
+      {
+        name: "@routar/react-query",
+        pkg: "@routar/react-query",
+        desc: "TanStack Query 바인딩 — routar 라우터에서 타입이 적용된 queryOptions / mutationOptions 팩토리를 직접 파생합니다.",
       },
     ],
     navLinks: [
