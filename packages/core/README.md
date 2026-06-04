@@ -1,6 +1,6 @@
 # @routar/core
 
-Core package for [routar](https://github.com/kbmin1129/routar) — endpoint definitions, typed router, API client factory, and middleware system.
+Core package for [routar](https://github.com/minr2kb/routar) — endpoint definitions, typed router, API client factory, and middleware system.
 
 ## Install
 
