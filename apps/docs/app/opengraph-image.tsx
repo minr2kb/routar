@@ -1,6 +1,5 @@
 import fs from "fs";
 import { ImageResponse } from "next/og";
-import { Image } from "nextra/components";
 import path from "path";
 
 export const alt = "routar – Schema-first HTTP API client";
@@ -30,8 +29,8 @@ export default function OgImage() {
         padding: "60px",
         backgroundColor: "#101010",
         backgroundImage: `
-          radial-gradient(ellipse 60% 50% at 30% 0%, rgba(99,102,241,0.15) 0%, transparent 70%),
-          radial-gradient(ellipse 50% 40% at 75% 10%, rgba(168,85,247,0.12) 0%, transparent 70%),
+          linear-gradient(to bottom, rgba(99,102,241,0.15) 0%, transparent 70%),
+          linear-gradient(to right, rgba(168,85,247,0.12) 0%, transparent 70%),
         `,
       }}
     >
@@ -49,7 +48,7 @@ export default function OgImage() {
           style={{
             fontSize: "30px",
             fontWeight: 400,
-            color: "rgb(99,102,241)",
+            color: "rgb(132, 99, 241)",
             textAlign: "center",
           }}
         >
@@ -73,7 +72,7 @@ export default function OgImage() {
                   padding: "8px 20px",
                   fontSize: "18px",
                   fontWeight: 400,
-                  color: "rgb(99,102,241)",
+                  color: "rgb(132, 99, 241)",
                 }}
               >
                 {tag}
