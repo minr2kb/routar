@@ -135,3 +135,25 @@ This uses the `PathParams<TPath>` template literal type and `PathConstraint<TPat
 ### Validator compatibility
 
 Any object with a `.parse(data: unknown): T` method works as a `Validator<T>`. Zod, Valibot, Yup, or a hand-rolled object all satisfy the interface.
+
+---
+
+## 하네스: routar 라이브러리 개발
+
+**목표:** `@routar/*` 패키지의 기능/버그/리팩터/API 변경을 설계→구현→타입검수→문서·예제 전파→문서 동기화→릴리스 게이트까지 일관된 규율로 조율한다.
+
+**트리거:** routar 패키지 코드·타입·executor·미들웨어/플러그인·`apps/docs` 문서·`apps/example` 예제 작업을 요청하거나, 작업을 재실행·부분 수정·보완하려 할 때 `routar-harness` 스킬을 사용하라. 단순 개념·사용법 질문은 직접 응답 가능.
+
+**핵심 규율 (요약):**
+- **push 전 반드시 사용자 승인** + 로컬 CI(`scripts/local-ci.sh` = typecheck·test·build) 통과 필수. `.husky/pre-push`가 강제. (`release-gate`)
+- **작업 분할:** 작으면 subagent, 피쳐 단위면 Superset 워크스페이스 분리(`superset workspaces create --agent claude`). (`work-splitting`)
+- **모든 작업은 `docs/worklog/`에 상시 기록.** (`doc-propagation`)
+- **패키지 스펙 변경 → `apps/docs/content`(en·ko)·`apps/example` 전파 → llms.txt·llms-full.txt·AGENTS.md·CLAUDE.md·README(.ko).md 동기화.** (`doc-propagation`, `doc-sync`)
+- **타입 규율:** `any/unknown/never`는 설계 의도 있을 때만, 예외는 사유 코멘트. 깊은 추론 우선. (`type-discipline`)
+
+에이전트/스킬 상세는 `.claude/agents/`, `.claude/skills/`와 `routar-harness` 스킬에서 관리한다.
+
+**변경 이력:**
+| 날짜 | 변경 내용 | 대상 | 사유 |
+|------|----------|------|------|
+| 2026-06-03 | 초기 구성 (에이전트 6 + 스킬 6 + 로컬 CI 게이트) | 전체 | 라이브러리 개발 하네스 신규 구축 |
