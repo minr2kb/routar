@@ -84,13 +84,15 @@ const todos = await todoApi.getList({}, controller.signal)
 controller.abort()
 ```
 
-## 미들웨어 사용
+## 플러그인 사용
 
 ```ts
-import { createFetchExecutor, withTimeout, withRetry, withLogger } from '@routar/core'
+import { createFetchExecutor, logger } from '@routar/core'
 
 const executor = createFetchExecutor('https://api.example.com', {
-  middlewares: [withTimeout(8_000), withRetry(3), withLogger()],
+  plugins: [logger()],
+  retry: 3,
+  timeout: 8_000,
 })
 ```
 

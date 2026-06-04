@@ -59,7 +59,7 @@ Error typing: augment TanStack's `Register` interface (`interface Register { def
 
 - `ValidationError` — request/response schema mismatch (`@routar/core`)
 - `HttpError` — non-2xx response from `createFetchExecutor` (has `.status`, `.statusText`, `.body`)
-- `TimeoutError` — request exceeded `withTimeout` duration (has `.ms`)
+- `TimeoutError` — request exceeded the `createFetchExecutor` `timeout` (has `.ms`)
 
 ## Full Reference
 

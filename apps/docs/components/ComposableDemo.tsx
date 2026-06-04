@@ -8,13 +8,13 @@ import styles from "./ComposableDemo.module.css";
 type RouterKey = "todo" | "post" | "user";
 type Factory = "createApi" | "createMswHandlers";
 type ExecutorType = "fetch" | "axios" | "ky" | "dispatch" | "custom";
-type MiddlewareKey = "withRetry" | "withTimeout" | "withLogger" | "custom";
+type PluginKey = "logger" | "auth" | "custom";
 
 interface DemoState {
   routers: Set<RouterKey>;
   factory: Factory;
   executor: ExecutorType;
-  middlewares: Set<MiddlewareKey>;
+  plugins: Set<PluginKey>;
 }
 
 // Phase drives CSS animation via data-phase attribute
@@ -52,29 +52,36 @@ const EXECUTORS: { key: ExecutorType; label: string }[] = [
   { key: "custom", label: "custom" },
 ];
 
-const MIDDLEWARES: { key: MiddlewareKey; label: string }[] = [
-  { key: "withRetry", label: "withRetry" },
-  { key: "withTimeout", label: "withTimeout" },
-  { key: "withLogger", label: "withLogger" },
+const PLUGINS: { key: PluginKey; label: string }[] = [
+  { key: "logger", label: "logger" },
+  { key: "auth", label: "auth" },
   { key: "custom", label: "custom" },
 ];
 
+// Selected plugins → the reference used inside `plugins: [...]`
+const PLUGIN_REF: Record<PluginKey, string> = {
+  logger: "logger()",
+  auth: "authPlugin",
+  custom: "customPlugin",
+};
+
 // ── Per-section code generators ────────────────────────────────────────────
 
-function codeImports({ factory, executor, middlewares }: DemoState): string {
+function codeImports({ factory, executor, plugins }: DemoState): string {
   const isMsw = factory === "createMswHandlers";
   const isDispatch = executor === "dispatch";
   const isCustomExec = executor === "custom";
-  const stdMw = [...middlewares].filter((m) => m !== "custom");
-  const hasCustomMw = middlewares.has("custom");
+  const pluginsActive = !isMsw && !isDispatch;
+  const hasLogger = pluginsActive && plugins.has("logger");
+  const hasDefined = pluginsActive && (plugins.has("auth") || plugins.has("custom"));
 
   const core: string[] = ["endpoint", "defineRouter"];
   if (!isMsw) core.push("createApi");
   if (!isMsw && (executor === "fetch" || isDispatch)) core.push("createFetchExecutor");
   if (isDispatch) core.push("dispatchExecutor");
   if (isCustomExec) core.push("createExecutor");
-  if (!isMsw && !isDispatch && hasCustomMw) core.push("type ExecutorMiddleware");
-  for (const mw of stdMw) core.push(mw);
+  if (hasDefined) core.push("definePlugin");
+  if (hasLogger) core.push("logger");
 
   const lines = [
     `import { z } from 'zod'`,
@@ -129,35 +136,46 @@ function codeUser(): string {
   ].join("\n");
 }
 
-function codeCustomMw(): string {
-  return [
-    `const customMiddleware: ExecutorMiddleware = async (opts, next) => {`,
-    `  // add your logic here`,
-    `  return next(opts)`,
-    `}`,
-  ].join("\n");
+function codePluginDefs({ plugins }: DemoState): string {
+  const blocks: string[] = [];
+  if (plugins.has("auth")) {
+    blocks.push(
+      [
+        `const authPlugin = definePlugin({`,
+        `  name: 'auth',`,
+        `  onRequest: async (opts) => ({`,
+        `    ...opts,`,
+        "    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },",
+        `  }),`,
+        `})`,
+      ].join("\n")
+    );
+  }
+  if (plugins.has("custom")) {
+    blocks.push(
+      [
+        `const customPlugin = definePlugin({`,
+        `  name: 'custom',`,
+        `  onResponse: (res) => res, // transform responses here`,
+        `})`,
+      ].join("\n")
+    );
+  }
+  return blocks.join("\n\n");
 }
 
-function codeExecutor({ executor, middlewares }: DemoState): string {
-  const stdMw = [...middlewares].filter((m) => m !== "custom");
-  const hasCustomMw = middlewares.has("custom");
-  const mwItems: string[] = [];
-  if (stdMw.includes("withRetry")) mwItems.push("withRetry(3)");
-  if (stdMw.includes("withTimeout")) mwItems.push("withTimeout(5000)");
-  if (stdMw.includes("withLogger")) mwItems.push("withLogger()");
-  if (hasCustomMw) mwItems.push("customMiddleware");
-  const mwInline = mwItems.length > 0 ? `, [${mwItems.join(", ")}]` : "";
+function codeExecutor({ executor, plugins }: DemoState): string {
+  const refs = PLUGINS.filter(({ key }) => plugins.has(key)).map(({ key }) => PLUGIN_REF[key]);
+  const optsInline = refs.length > 0 ? `, { plugins: [${refs.join(", ")}] }` : "";
 
   if (executor === "fetch")
-    return `const executor = createFetchExecutor('https://api.example.com'${mwInline})`;
+    return `const executor = createFetchExecutor('https://api.example.com'${optsInline})`;
   if (executor === "axios") {
     const base = `axios.create({ baseURL: 'https://api.example.com' })`;
-    return mwItems.length > 0
-      ? `const executor = createAxiosExecutor(${base}, [${mwItems.join(", ")}])`
-      : `const executor = createAxiosExecutor(${base})`;
+    return `const executor = createAxiosExecutor(${base}${optsInline})`;
   }
   if (executor === "ky")
-    return `const executor = createKyExecutor('https://api.example.com'${mwInline})`;
+    return `const executor = createKyExecutor('https://api.example.com'${optsInline})`;
   if (executor === "dispatch")
     return [
       `const serverExecutor = createFetchExecutor('https://api.example.com')`,
@@ -176,7 +194,7 @@ function codeExecutor({ executor, middlewares }: DemoState): string {
     `    return res.json()`,
     `  },`,
   ];
-  if (mwItems.length > 0) lines.push(`  [${mwItems.join(", ")}]`);
+  if (refs.length > 0) lines.push(`  { plugins: [${refs.join(", ")}] },`);
   lines.push(`)`);
   return lines.join("\n");
 }
@@ -247,28 +265,29 @@ function codeFactory({ routers, factory }: DemoState): string {
 
 // ── Section ordering ───────────────────────────────────────────────────────
 
-type SectionId = "imports" | "todo" | "post" | "user" | "custom-mw" | "executor" | "factory";
+type SectionId = "imports" | "todo" | "post" | "user" | "plugin-defs" | "executor" | "factory";
 
 const GENERATORS: Record<SectionId, (s: DemoState) => string> = {
   imports: codeImports,
   todo: codeTodo,
   post: codePost,
   user: codeUser,
-  "custom-mw": codeCustomMw,
+  "plugin-defs": codePluginDefs,
   executor: codeExecutor,
   factory: codeFactory,
 };
 
 function getActiveSections(state: DemoState): SectionId[] {
-  const { routers, factory, executor, middlewares } = state;
+  const { routers, factory, executor, plugins } = state;
   const isMsw = factory === "createMswHandlers";
   const isDispatch = executor === "dispatch";
+  const hasDefinedPlugin = !isMsw && !isDispatch && (plugins.has("auth") || plugins.has("custom"));
   return [
     "imports",
     ...(routers.has("todo") ? (["todo"] as SectionId[]) : []),
     ...(routers.has("post") ? (["post"] as SectionId[]) : []),
     ...(routers.has("user") ? (["user"] as SectionId[]) : []),
-    ...(!isMsw && !isDispatch && middlewares.has("custom") ? (["custom-mw"] as SectionId[]) : []),
+    ...(hasDefinedPlugin ? (["plugin-defs"] as SectionId[]) : []),
     ...(!isMsw ? (["executor"] as SectionId[]) : []),
     "factory",
   ];
@@ -294,7 +313,7 @@ export function ComposableDemo() {
   const [routers, setRouters] = useState<Set<RouterKey>>(new Set(["todo"]));
   const [factory, setFactory] = useState<Factory>("createApi");
   const [executor, setExecutor] = useState<ExecutorType>("fetch");
-  const [middlewares, setMiddlewares] = useState<Set<MiddlewareKey>>(new Set());
+  const [plugins, setPlugins] = useState<Set<PluginKey>>(new Set());
   const [sections, setSections] = useState<SectionView[]>([]);
 
   const isMounted = useRef(false);
@@ -303,7 +322,7 @@ export function ComposableDemo() {
   const isMsw = factory === "createMswHandlers";
   const isDispatch = executor === "dispatch";
   const executorDisabled = isMsw;
-  const middlewareDisabled = isMsw || isDispatch;
+  const pluginsDisabled = isMsw || isDispatch;
 
   function schedule(key: string, fn: () => void, delay: number) {
     const existing = timers.current.get(key);
@@ -318,7 +337,7 @@ export function ComposableDemo() {
   }
 
   useEffect(() => {
-    const state: DemoState = { routers, factory, executor, middlewares };
+    const state: DemoState = { routers, factory, executor, plugins };
     const activeIds = getActiveSections(state);
     const isFirst = !isMounted.current;
 
@@ -386,7 +405,7 @@ export function ComposableDemo() {
         return next;
       });
     });
-  }, [routers, factory, executor, middlewares]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [routers, factory, executor, plugins]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleRouter(key: RouterKey) {
     setRouters((prev) => {
@@ -397,9 +416,9 @@ export function ComposableDemo() {
     });
   }
 
-  function toggleMiddleware(key: MiddlewareKey) {
-    if (middlewareDisabled) return;
-    setMiddlewares((prev) => {
+  function togglePlugin(key: PluginKey) {
+    if (pluginsDisabled) return;
+    setPlugins((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -413,7 +432,7 @@ export function ComposableDemo() {
         <p className={styles.eyebrow}>Composable by design</p>
         <h2 className={styles.title}>Mix and match anything</h2>
         <p className={styles.subtitle}>
-          Swap executors, stack middleware, combine routers.
+          Swap executors, stack plugins, combine routers.
           <br />
           The types assemble themselves.
         </p>
@@ -469,16 +488,16 @@ export function ComposableDemo() {
           </div>
         </div>
 
-        <div className={`${styles.group} ${middlewareDisabled ? styles.groupDisabled : ""}`}>
-          <span className={styles.groupLabel}>Middleware</span>
+        <div className={`${styles.group} ${pluginsDisabled ? styles.groupDisabled : ""}`}>
+          <span className={styles.groupLabel}>Plugins</span>
           <div className={styles.chips}>
-            {MIDDLEWARES.map(({ key, label }) => (
+            {PLUGINS.map(({ key, label }) => (
               <button
                 key={key}
                 type="button"
-                onClick={() => toggleMiddleware(key)}
-                className={`${styles.chip} ${middlewares.has(key) && !middlewareDisabled ? styles.chipActive : ""}`}
-                disabled={middlewareDisabled}
+                onClick={() => togglePlugin(key)}
+                className={`${styles.chip} ${plugins.has(key) && !pluginsDisabled ? styles.chipActive : ""}`}
+                disabled={pluginsDisabled}
               >
                 {label}
               </button>

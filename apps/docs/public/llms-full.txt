@@ -214,19 +214,19 @@ type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title
 
 ---
 
-## createExecutor(transportFn, middlewares?)
+## createExecutor(transportFn, options?)
 
-Low-level factory used internally by all executor packages. Use to integrate any HTTP client.
+Low-level factory used internally by all executor packages. Use to integrate any HTTP client. `options.plugins` is an array of `ExecutorPlugin` applied in declaration order (first is outermost).
 
 ```ts
-import { createExecutor, withTimeout, withRetry, withLogger } from '@routar/core';
+import { createExecutor, logger } from '@routar/core';
 
 const executor = createExecutor(
   async ({ method, url, body, headers, signal }) => {
     const res = await myHttpClient.request({ method, url, body, headers, signal });
     return res.data;
   },
-  [withTimeout(8_000), withRetry(3), withLogger()],
+  { plugins: [logger()] },
 );
 ```
 
@@ -293,7 +293,8 @@ const executor = createFetchExecutor('https://api.example.com', {
     const token = (await cookies()).get('access_token')?.value;
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
-  middlewares: [withTimeout(8_000), withRetry(2)],
+  retry: 2,
+  timeout: 8_000,
 });
 ```
 
@@ -361,61 +362,74 @@ const executor = createKyExecutor(instance);
 
 ---
 
-## Middleware
+## Plugins
 
-Middlewares are `(opts, next) => Promise<unknown>` functions applied in declaration order.
+Plugins are named objects with optional lifecycle hooks — `onRequest`, `onResponse`, `onError` — applied via `options.plugins` in declaration order (first is outermost). `onError` must always throw.
 
 ```ts
-import { createExecutor, withTimeout, withRetry, withLogger, defineMiddleware } from '@routar/core';
+import { createExecutor, definePlugin, logger } from '@routar/core';
 import { HttpError } from '@routar/core';
 
-const executor = createExecutor(transport, [
-  withTimeout(8_000),           // abort after 8s
-  withRetry(3, {                // retry up to 3 times
-    shouldRetry: (err) => !(err instanceof HttpError && err.status < 500),
-  }),
-  withLogger({ log: (msg, data) => logger.debug(msg, data) }),
-]);
+const executor = createExecutor(transport, {
+  plugins: [authPlugin, logger()],
+});
 ```
 
-### withRetry(count, options?)
+### definePlugin(plugin)
 
 ```ts
-// Retry all errors up to 3 times
-withRetry(3)
+interface ExecutorPlugin {
+  name?: string;
+  onRequest?: (opts: ExecuteOptions) => ExecuteOptions | Promise<ExecuteOptions>;
+  onResponse?: (response: unknown, opts: ExecuteOptions) => unknown | Promise<unknown>;
+  onError?: (error: unknown, opts: ExecuteOptions) => never | Promise<never>;
+}
+
+// Add a correlation ID header to every request
+const correlationPlugin = definePlugin({
+  name: 'correlation-id',
+  onRequest: (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() },
+  }),
+});
+
+// Bundle auth header injection + 401 refresh into a single plugin
+const authPlugin = definePlugin({
+  name: 'auth',
+  onRequest: async (opts) => ({
+    ...opts,
+    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },
+  }),
+  onError: async (err) => {
+    if (err instanceof HttpError && err.status === 401) await refreshToken();
+    throw err; // onError must re-throw
+  },
+});
+```
+
+### logger(options?)
+
+```ts
+logger()  // defaults to console.log
+logger({ log: (msg, data) => myLogger.debug(msg, data) })
+```
+
+### retry & timeout
+
+`retry` and `timeout` are options on `createFetchExecutor` (not plugins). For axios/ky, configure them on the underlying instance (`axios.create({ timeout })`, `ky.create({ timeout, retry })`).
+
+```ts
+import { createFetchExecutor, TimeoutError } from '@routar/core';
+
+const executor = createFetchExecutor('https://api.example.com', {
+  retry: 3,
+  timeout: 5_000, // on timeout the rejection is a TimeoutError (has `.ms`)
+});
 
 // Retry only server errors (5xx), not client errors (4xx)
-withRetry(3, {
-  shouldRetry: (err, attempt) => err instanceof HttpError && err.status >= 500,
-})
-```
-
-### withTimeout(ms)
-
-```ts
-withTimeout(5_000) // abort after 5 seconds, throws TimeoutError
-```
-
-### withLogger(options?)
-
-```ts
-withLogger()  // defaults to console.log
-
-withLogger({ log: (msg, data) => myLogger.debug(msg, data) })
-```
-
-### defineMiddleware(fn)
-
-```ts
-// Add a correlation ID header to every request
-const withCorrelationId = defineMiddleware((opts, next) =>
-  next({ ...opts, headers: { ...opts.headers, 'X-Request-Id': crypto.randomUUID() } })
-);
-
-// Add auth header from a token store
-const withAuth = defineMiddleware(async (opts, next) => {
-  const token = await tokenStore.get();
-  return next({ ...opts, headers: { ...opts.headers, Authorization: `Bearer ${token}` } });
+createFetchExecutor('https://api.example.com', {
+  retry: { count: 3, shouldRetry: (err) => !(err instanceof HttpError && err.status < 500) },
 });
 ```
 
@@ -682,7 +696,7 @@ export const todoApi = createApi(dispatchExecutor(() =>
 | Error | Package | Thrown when |
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
-| `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
+| `TimeoutError` | `@routar/core` | Request exceeds the `createFetchExecutor` `timeout` |
 | `HttpError` | `@routar/core` | `createFetchExecutor` gets a non-2xx response |
 | `AxiosError` | axios | Network or HTTP error from `@routar/axios` |
 

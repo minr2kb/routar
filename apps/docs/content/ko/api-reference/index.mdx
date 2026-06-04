@@ -12,13 +12,13 @@ description: "@routar/core, @routar/axios, @routar/ky의 완전한 API 레퍼런
 | [`endpoint()`](/ko/api-reference/endpoint) | 단일 타입 엔드포인트 정의 |
 | [`defineRouter()`](/ko/api-reference/define-router) | URL 접두사 아래 엔드포인트 그룹화 |
 | [`createApi()`](/ko/api-reference/create-api) | executor + 라우터에서 타입 API 클라이언트 빌드 |
-| [`createExecutor()`](/ko/api-reference/create-executor) | 미들웨어 체인으로 트랜스포트 함수 래핑 |
+| [`createExecutor()`](/ko/api-reference/create-executor) | 플러그인으로 트랜스포트 함수 래핑 |
+| [`dispatchExecutor()`](/ko/api-reference/dispatch-executor) | 요청 시점에 트랜스포트를 런타임 선택 |
 | [`createFetchExecutor()`](/ko/executors/fetch) | 내장 fetch executor |
 | `HttpError` | 비-2xx 응답 시 `createFetchExecutor`가 throw |
-| [`withRetry`](/ko/api-reference/middleware#withretry) | 재시도 미들웨어 |
-| [`withTimeout`](/ko/api-reference/middleware#withtimeout) | 타임아웃 미들웨어 |
-| [`withLogger`](/ko/api-reference/middleware#withlogger) | 로거 미들웨어 |
-| [`defineMiddleware`](/ko/api-reference/middleware#definemiddleware) | 커스텀 미들웨어 생성 |
+| [`definePlugin`](/ko/api-reference/plugins#커스텀-플러그인) | 커스텀 executor 플러그인 생성 |
+| [`logger`](/ko/api-reference/plugins#내장-플러그인) | 내장 로깅 플러그인 |
+| [`TimeoutError`](/ko/api-reference/plugins#retry와-timeout) | `createFetchExecutor` 타임아웃 발생 시 throw |
 | `ValidationError` | 요청/응답 검증 실패 시 throw |
 | [`ApiTypes<TApi>`](/ko/api-reference/api-types) | API 클라이언트에서 요청/응답 타입 추출 |
 | `PathParams<TPath>` | 경로에서 `:param` 이름 추출 유틸리티 |

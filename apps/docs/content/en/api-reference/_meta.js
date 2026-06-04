@@ -5,7 +5,7 @@ export default {
   "create-api": "createApi()",
   "create-executor": "createExecutor()",
   "dispatch-executor": "dispatchExecutor()",
-  middleware: "Plugins",
+  plugins: "Plugins",
   "api-types": "ApiTypes<T>",
   "create-queries": "createQueries() / routarMutationCache",
 };

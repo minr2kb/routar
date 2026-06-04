@@ -12,13 +12,13 @@ description: Complete API reference for @routar/core, @routar/axios, and @routar
 | [`endpoint()`](/en/api-reference/endpoint) | Define a single typed endpoint |
 | [`defineRouter()`](/en/api-reference/define-router) | Group endpoints under a URL prefix |
 | [`createApi()`](/en/api-reference/create-api) | Build a typed API client from executor + router |
-| [`createExecutor()`](/en/api-reference/create-executor) | Wrap a transport function with middleware |
+| [`createExecutor()`](/en/api-reference/create-executor) | Wrap a transport function with plugins |
+| [`dispatchExecutor()`](/en/api-reference/dispatch-executor) | Select a transport per request at runtime |
 | [`createFetchExecutor()`](/en/executors/fetch) | Built-in fetch executor |
 | `HttpError` | Thrown by `createFetchExecutor` on non-2xx responses |
-| [`withRetry`](/en/api-reference/middleware#withretry) | Retry middleware |
-| [`withTimeout`](/en/api-reference/middleware#withtimeout) | Timeout middleware |
-| [`withLogger`](/en/api-reference/middleware#withlogger) | Logger middleware |
-| [`defineMiddleware`](/en/api-reference/middleware#definemiddleware) | Create custom middleware |
+| [`definePlugin`](/en/api-reference/plugins#custom-plugins) | Create a custom executor plugin |
+| [`logger`](/en/api-reference/plugins#built-in-plugin) | Built-in logging plugin |
+| [`TimeoutError`](/en/api-reference/plugins#retry-and-timeout) | Thrown when a `createFetchExecutor` timeout fires |
 | `ValidationError` | Thrown when request/response validation fails |
 | [`ApiTypes<TApi>`](/en/api-reference/api-types) | Utility type to extract request/response types from an API client |
 | `PathParams<TPath>` | Utility type to extract `:param` names from a path |

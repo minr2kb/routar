@@ -32,7 +32,7 @@ const executor = createExecutor(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | The actual HTTP call |
-| `options.plugins` | `ExecutorPlugin[]` | Plugins applied in declaration order (first is outermost). See [Plugins](/en/api-reference/middleware). |
+| `options.plugins` | `ExecutorPlugin[]` | Plugins applied in declaration order (first is outermost). See [Plugins](/en/api-reference/plugins). |
 
 For `retry` and `timeout`, use the options on [`createFetchExecutor`](/en/executors/fetch). For axios and ky, configure them on the underlying instance.
 

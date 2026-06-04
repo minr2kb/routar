@@ -33,3 +33,7 @@ All implement the same `Executor` interface and are interchangeable — you can 
 ## Custom executors
 
 Any HTTP client works with routar. Wrap it with [`createExecutor`](/en/api-reference/create-executor) from `@routar/core`. See the [Custom Executor](/en/guides/custom-executor) guide.
+
+## Runtime dispatch
+
+When you need to pick one of several executors per request (e.g. SSR vs CSR, or environment-specific base URLs), wrap them with [`dispatchExecutor`](/en/api-reference/dispatch-executor).

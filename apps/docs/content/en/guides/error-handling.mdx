@@ -11,7 +11,7 @@ description: Handle ValidationError, HttpError, and AxiosError — and normalize
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | Request or response validation fails |
 | `HttpError` | `@routar/core` | Server returns a non-2xx status (fetch executor only) |
-| `TimeoutError` | `@routar/core` | Request exceeds `withTimeout` duration |
+| `TimeoutError` | `@routar/core` | Request exceeds the `createFetchExecutor` `timeout` |
 | `AxiosError` | `axios` | Network or HTTP error via Axios |
 
 ## Handling errors
@@ -67,39 +67,41 @@ try {
 
 ## Normalizing errors across transports
 
-Each transport throws its own error type. If you want a single `instanceof` check across fetch and axios, add a normalizer middleware:
+Each transport throws its own error type. If you want a single `instanceof` check across fetch and axios, add a normalizer plugin with an `onError` hook:
 
 ```ts
-import { defineMiddleware } from '@routar/core'
-import { HttpError } from '@routar/core'
+import { definePlugin, HttpError } from '@routar/core'
 import { isAxiosError } from 'axios'
 
-const withErrorNormalizer = defineMiddleware(async (opts, next) => {
-  try {
-    return await next(opts)
-  } catch (err) {
+const errorNormalizer = definePlugin({
+  name: 'error-normalizer',
+  onError: async (err) => {
     if (isAxiosError(err)) {
       throw new HttpError(err.response?.status ?? 0, err.message)
     }
     throw err
-  }
+  },
 })
 
 const executor = createAxiosExecutor(instance, {
-  middlewares: [withErrorNormalizer],
+  plugins: [errorNormalizer],
 })
 ```
 
 ## Retry only on server errors
 
-```ts
-import { withRetry } from '@routar/core'
-import { HttpError } from '@routar/core'
+`retry` is an option on `createFetchExecutor`:
 
-withRetry(3, {
-  shouldRetry: (err) => {
-    if (err instanceof HttpError) return err.status >= 500
-    return true // retry on network errors
+```ts
+import { createFetchExecutor, HttpError } from '@routar/core'
+
+createFetchExecutor('https://api.example.com', {
+  retry: {
+    count: 3,
+    shouldRetry: (err) => {
+      if (err instanceof HttpError) return err.status >= 500
+      return true // retry on network errors
+    },
   },
 })
 ```
