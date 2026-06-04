@@ -11,14 +11,18 @@
     "routar",
     "testing"
   ],
-  "author": "Kyungbae Min",
+  "author": {
+    "name": "Kyungbae Min",
+    "url": "https://github.com/minr2kb",
+    "email": "kbmin1129@gmail.com"
+  }
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/minr2kb/routar.git",
     "directory": "packages/msw"
   },
-  "homepage": "https://github.com/minr2kb/routar#readme",
+  "homepage": "https://routar.vercel.app",
   "type": "module",
   "exports": {
     ".": {

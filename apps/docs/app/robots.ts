@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://router.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL || "https://routar.vercel.app";
 
 export default function robots(): MetadataRoute.Robots {
   return {
