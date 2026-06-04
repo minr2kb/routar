@@ -1,5 +1,7 @@
 # @routar/core
 
+## 1.4.1
+
 ## 1.4.0
 
 ### Minor Changes
