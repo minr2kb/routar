@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-
+import { Image } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
@@ -42,6 +42,7 @@ export async function generateMetadata({ params }) {
       ],
       apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
     },
+    manifest: "/site.webmanifest",
   };
   return metadata;
 }
@@ -63,7 +64,14 @@ export default async function LangLayout({ children, params }) {
       ]}
       navbar={
         <Navbar
-          logo={<b>routar</b>}
+          logo={
+            <Image
+              src="/apple-touch-icon.png"
+              alt="routar"
+              width={36}
+              height={36}
+            />
+          }
           projectLink="https://github.com/minr2kb/routar"
         />
       }
