@@ -75,7 +75,7 @@ const POSTS_PER_PAGE = 10;
  * `pageParam` maps the page number into the request's `_page` query — it
  * replaces writing a `queryFn` by hand.
  */
-export const postQuery = createQueries(postApi, () => ({
+export const postQuery = createQueries(postApi, {
   infinite: {
     getList: {
       initialPageParam: 1,
@@ -84,7 +84,7 @@ export const postQuery = createQueries(postApi, () => ({
       pageParam: (page) => ({ query: { _page: page } }),
     },
   },
-}));
+});
 
 export type PostApiTypes = ApiTypes<typeof postApi>;
 export type Post = PostApiTypes["getDetail"]["response"];
