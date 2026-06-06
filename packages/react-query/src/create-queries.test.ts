@@ -414,6 +414,94 @@ describe("createQueries — per-endpoint defaults (C4)", () => {
     expect(opts.mutationKey).toEqual(["todos", "create"]);
     expect(typeof opts.mutationFn).toBe("function");
   });
+
+  it("routes invalidates from defaults into meta.invalidates", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries(
+      {
+        create,
+        $router: TodoMutationRouter,
+      } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>,
+      { defaults: { create: { invalidates: [["todos"]] } } },
+    );
+    // default invalidates must end up in meta.invalidates
+    expect((q.create() as any).meta?.invalidates).toEqual([["todos"]]);
+    // call-site invalidates overrides the default
+    expect(
+      (q.create({ invalidates: [["todos", "getList"]] }) as any).meta?.invalidates,
+    ).toEqual([["todos", "getList"]]);
+  });
+
+  it("merges meta from default and call-site for mutations", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries(
+      {
+        create,
+        $router: TodoMutationRouter,
+      } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>,
+      { defaults: { create: { meta: { source: "default" } } } },
+    );
+    const opts = q.create({ meta: { extra: "call" } } as any);
+    expect((opts.meta as any)?.source).toBe("default");
+    expect((opts.meta as any)?.extra).toBe("call");
+  });
+});
+
+describe("createQueries — options factory form", () => {
+  it("factory receives a base queries object with working key helpers", () => {
+    const { api } = makeApi();
+    let capturedQ: any;
+    createQueries(api, (q) => {
+      capturedQ = q;
+      return {};
+    });
+    expect(capturedQ.$key).toEqual(["todos"]);
+    expect(capturedQ.getList.queryKey()).toEqual(["todos", "getList"]);
+    expect(capturedQ.getDetail.queryKey({ path: { id: 1 } })).toEqual([
+      "todos",
+      "getDetail",
+      { path: { id: 1 } },
+    ]);
+  });
+
+  it("factory: defaults.invalidates referencing q.queryKey ends up in meta.invalidates", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries(
+      {
+        create,
+        $router: TodoMutationRouter,
+      } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>,
+      (q) => ({
+        defaults: {
+          create: { invalidates: [q.$key] },
+        },
+      }),
+    );
+    expect((q.create() as any).meta?.invalidates).toEqual([["todos"]]);
+  });
+
+  it("factory: infinite + defaults together", () => {
+    const { api } = makeApi();
+    const q = createQueries(api, (q) => ({
+      infinite: {
+        getList: {
+          initialPageParam: 1,
+          getNextPageParam: () => undefined,
+          pageParam: (page: number) => ({ query: { _page: page } }),
+        },
+      },
+      defaults: { getList: { staleTime: 9000 } },
+    }));
+    expect(q.getList().staleTime).toBe(9000);
+    // infinite accessor is wired (does not throw missing-contract error)
+    expect(() => q.getList.infinite()).not.toThrow();
+  });
+
+  it("factory: plain options object still works as before", () => {
+    const { api } = makeApi();
+    const q = createQueries(api, { defaults: { getList: { staleTime: 1111 } } });
+    expect(q.getList().staleTime).toBe(1111);
+  });
 });
 
 describe("createQueries — unwired invalidates warning (A1)", () => {

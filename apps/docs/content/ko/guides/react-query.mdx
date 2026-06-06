@@ -3,16 +3,17 @@ title: TanStack Query 통합
 description: "@routar/react-query를 사용하여 routar 라우터에서 타입이 적용된 queryOptions / mutationOptions 팩토리를 직접 파생합니다."
 ---
 
+import { PackageInstall } from '../../../components/PackageInstall'
+
 # TanStack Query 통합
 
 `@routar/react-query`는 routar 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 직접 파생합니다. 새로운 훅 API가 없으며 TanStack의 기본 훅을 그대로 사용합니다.
 
 ## 설치
 
-```bash
-npm install @routar/react-query @tanstack/react-query
-# peer dep: @tanstack/react-query@^5  (@routar/core is a regular dependency, installed automatically)
-```
+<PackageInstall packages={['@routar/react-query', '@tanstack/react-query']} />
+
+`@tanstack/react-query@^5`는 peer dependency입니다. `@routar/core`는 일반 dependency로 자동 설치됩니다.
 
 ## createQueries
 
@@ -39,7 +40,7 @@ export const todoQuery = createQueries(todoApi, {
 })
 ```
 
-중첩 라우터도 지원됩니다 — `defaults` 맵이 라우터 구조를 그대로 따릅니다. 뮤테이션 엔드포인트의 경우, 값은 뮤테이션 옵션(`invalidates` 제외)이며, `mutationFn`과 `mutationKey`는 라이브러리가 여전히 설정합니다.
+중첩 라우터도 지원됩니다 — `defaults` 맵이 라우터 구조를 그대로 따릅니다. 뮤테이션 엔드포인트의 경우, `invalidates`를 포함한 모든 뮤테이션 옵션을 기본값으로 설정할 수 있으며, `mutationFn`과 `mutationKey`는 라이브러리가 설정합니다. per-call 옵션이 항상 기본값보다 우선합니다.
 
 ## 에러 타이핑
 

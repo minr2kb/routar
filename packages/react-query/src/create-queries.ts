@@ -23,19 +23,57 @@ type InfiniteConfig = Record<string, unknown>;
  *
  * The router does not need to be re-passed — {@link createApi} stamps it on the
  * client's `$router` property, and it is recovered here.
+ *
+ * `options` may be a plain object **or a factory function** that receives a
+ * preliminary queries object — useful for referencing sibling key helpers inside
+ * `defaults.invalidates` without circular-variable issues:
+ *
+ * @example
+ * ```ts
+ * const todoQuery = createQueries(todoApi, (q) => ({
+ *   infinite: { getList: { initialPageParam: 1, getNextPageParam, pageParam } },
+ *   defaults: {
+ *     create: { invalidates: [q.getList.queryKey()] },
+ *   },
+ * }))
+ * ```
+ *
+ * The `q` passed to the factory has no defaults or infinite config applied yet,
+ * so use it only for key helpers (`.queryKey()`, `.$key`, `.mutationKey`).
+ * Calling `.infinite()` inside the factory throws — its contract isn't set yet.
  */
 export function createQueries<TEndpoints extends RouterEndpoints>(
   api: ApiClientWithRouter<TEndpoints>,
-  options?: CreateQueriesOptions<TEndpoints>,
+  options?:
+    | CreateQueriesOptions<TEndpoints>
+    | ((q: Queries<TEndpoints>) => CreateQueriesOptions<TEndpoints>),
 ): Queries<TEndpoints> {
   const router = api.$router;
-  const root = options?.key ? [options.key] : prefixToSegments(router.prefix);
+
+  let resolved: CreateQueriesOptions<TEndpoints> | undefined;
+  if (typeof options === "function") {
+    // Build a structural-only base (no defaults, no infinite) for the factory to
+    // reference — key helpers work, but don't call accessor fns inside the factory.
+    const baseRoot = prefixToSegments(router.prefix);
+    const base = buildQueries(
+      api as unknown as Record<string, unknown>,
+      router.endpoints,
+      baseRoot,
+      undefined,
+      undefined,
+    ) as Queries<TEndpoints>;
+    resolved = options(base);
+  } else {
+    resolved = options;
+  }
+
+  const root = resolved?.key ? [resolved.key] : prefixToSegments(router.prefix);
   return buildQueries(
     api as unknown as Record<string, unknown>,
     router.endpoints,
     root,
-    options?.defaults as Record<string, EndpointDefault> | undefined,
-    options?.infinite as Record<string, InfiniteConfig> | undefined,
+    resolved?.defaults as Record<string, EndpointDefault> | undefined,
+    resolved?.infinite as Record<string, InfiniteConfig> | undefined,
   ) as Queries<TEndpoints>;
 }
 
@@ -170,21 +208,52 @@ function makeMutationAccessor(
   endpointDefault: EndpointDefault | undefined,
 ) {
   const mutationKey = [...root, name];
+
+  // Extract invalidates and meta from defaults explicitly — spreading them as
+  // raw keys would leave invalidates at the top level where routarMutationCache
+  // never looks (it reads meta.invalidates only).
+  const {
+    invalidates: defaultInvalidates,
+    meta: defaultMeta,
+    ...restDefault
+  } = (endpointDefault ?? {}) as {
+    invalidates?: unknown[];
+    meta?: Record<string, unknown>;
+  } & Record<string, unknown>;
+
   const accessor = (options: Record<string, unknown> = {}) => {
-    const { invalidates, ...rest } = options as {
+    const {
+      invalidates: callInvalidates,
+      meta: callMeta,
+      ...rest
+    } = options as {
       invalidates?: unknown[];
       meta?: Record<string, unknown>;
-    };
+    } & Record<string, unknown>;
+
+    // Call-site invalidates wins; fall back to default.
+    const invalidates = callInvalidates ?? defaultInvalidates;
+
     const merged: Record<string, unknown> = {
       mutationKey,
       mutationFn: (vars: unknown) => fn(vars),
-      ...endpointDefault,
+      ...restDefault,
       ...rest,
+    };
+
+    // Merge meta: default < call-site, then attach invalidates.
+    const mergedMeta: Record<string, unknown> = {
+      ...(defaultMeta ?? {}),
+      ...(callMeta ?? {}),
     };
     if (invalidates) {
       warnUnwiredInvalidates();
-      merged.meta = { ...(rest.meta ?? {}), invalidates };
+      mergedMeta.invalidates = invalidates;
     }
+    if (Object.keys(mergedMeta).length > 0) {
+      merged.meta = mergedMeta;
+    }
+
     return merged;
   };
   accessor.mutationKey = mutationKey;

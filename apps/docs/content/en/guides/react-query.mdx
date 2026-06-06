@@ -3,16 +3,17 @@ title: TanStack Query Integration
 description: Use @routar/react-query to derive typed queryOptions and mutationOptions factories directly from your routar router.
 ---
 
+import { PackageInstall } from '../../../components/PackageInstall'
+
 # TanStack Query Integration
 
 `@routar/react-query` derives typed `queryOptions` and `mutationOptions` factories directly from your routar router. No new hook API — use TanStack's own hooks as-is.
 
 ## Installation
 
-```bash
-npm install @routar/react-query @tanstack/react-query
-# peer dep: @tanstack/react-query@^5  (@routar/core is a regular dependency, installed automatically)
-```
+<PackageInstall packages={['@routar/react-query', '@tanstack/react-query']} />
+
+`@tanstack/react-query@^5` is a peer dependency. `@routar/core` is a regular dependency — installed automatically.
 
 ## createQueries
 
@@ -39,7 +40,7 @@ export const todoQuery = createQueries(todoApi, {
 })
 ```
 
-Nested routers are supported — the map mirrors the router shape (e.g. `{ users: { getPosts: { ... } } }`). For mutation endpoints, the value is mutation options (minus `invalidates`); `mutationFn` and `mutationKey` are still set by the library.
+Nested routers are supported — the map mirrors the router shape (e.g. `{ users: { getPosts: { ... } } }`). For mutation endpoints, the value is any mutation option including `invalidates`; `mutationFn` and `mutationKey` are still set by the library. A call-site option always wins over the default.
 
 ## Error typing
 

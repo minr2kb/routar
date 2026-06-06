@@ -36,7 +36,7 @@ export type EndpointDefaults<TEndpoints extends RouterEndpoints> = {
     : TEndpoints[K] extends EndpointSpec<any, any, any>
       ?
           | QueryAccessorOptions<unknown>
-          | Omit<RoutarMutationOptions<unknown, unknown>, "invalidates">
+          | RoutarMutationOptions<unknown, unknown>
       : never;
 };
 
