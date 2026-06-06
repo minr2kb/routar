@@ -42,6 +42,19 @@ export const todoQuery = createQueries(todoApi, {
 
 중첩 라우터도 지원됩니다 — `defaults` 맵이 라우터 구조를 그대로 따릅니다. 뮤테이션 엔드포인트의 경우, `invalidates`를 포함한 모든 뮤테이션 옵션을 기본값으로 설정할 수 있으며, `mutationFn`과 `mutationKey`는 라이브러리가 설정합니다. per-call 옵션이 항상 기본값보다 우선합니다.
 
+`defaults.invalidates`에서 형제 쿼리 키를 참조해야 한다면, 일반 객체 대신 팩토리 함수를 전달하세요. 팩토리는 `createQueries`가 반환하는 `queries` 객체를 그대로 받아, 변수 순환 참조 없이 키 헬퍼를 사용할 수 있습니다:
+
+```ts
+export const todoQuery = createQueries(todoApi, (q) => ({
+  defaults: {
+    create: { invalidates: [q.getList.queryKey()] },
+    update: { invalidates: [q.getList.queryKey(), q.getDetail.queryKey()] },
+  },
+}))
+```
+
+팩토리가 받는 `q`는 `defaults`/`infinite`가 적용되기 전의 예비 객체입니다 — 키 헬퍼(`.queryKey()`, `.mutationKey`, `.$key`) 용도로만 사용하세요. 그 외에는 일반 객체 형태를 사용하면 됩니다.
+
 ## 에러 타이핑
 
 쿼리/뮤테이션 결과의 `error`는 TanStack의 `DefaultError`로 타입이 지정됩니다. 프로젝트 전체에서 `HttpError`로 좁히려면, TanStack의 `Register` 인터페이스를 한 번만 확장하면 됩니다 — `createQueries` 변경 없이 접근자가 자동으로 반영합니다:

@@ -42,6 +42,19 @@ export const todoQuery = createQueries(todoApi, {
 
 Nested routers are supported — the map mirrors the router shape (e.g. `{ users: { getPosts: { ... } } }`). For mutation endpoints, the value is any mutation option including `invalidates`; `mutationFn` and `mutationKey` are still set by the library. A call-site option always wins over the default.
 
+If `defaults.invalidates` needs to reference a sibling query key, pass a factory function instead of a plain object — it receives the same `queries` object that `createQueries` returns, so key helpers are available without circular-variable issues:
+
+```ts
+export const todoQuery = createQueries(todoApi, (q) => ({
+  defaults: {
+    create: { invalidates: [q.getList.queryKey()] },
+    update: { invalidates: [q.getList.queryKey(), q.getDetail.queryKey()] },
+  },
+}))
+```
+
+The factory receives a preliminary `q` built without `defaults`/`infinite` applied — use it only for key helpers (`.queryKey()`, `.mutationKey`, `.$key`). For everything else, use the plain-object form.
+
 ## Error typing
 
 `error` in query/mutation results is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment TanStack's `Register` interface once in your project — no change to `createQueries` is needed:
