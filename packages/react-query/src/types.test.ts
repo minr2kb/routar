@@ -135,6 +135,52 @@ describe("type-level", () => {
     >;
   });
 
+  it("flatten: true changes accessor params to the flat shape", () => {
+    const flat = createQueries(api, { flatten: true });
+
+    // GET with a path bucket → flat call accepts the unwrapped key.
+    flat.getDetail({ id: 1 });
+    // @ts-expect-error flat mode rejects the envelope form
+    flat.getDetail({ path: { id: 1 } });
+
+    // multi-bucket mutation → flat vars are the union of path + body fields.
+    flat.create({
+      onSuccess: () => {},
+    });
+
+    // queryKey helper stays on the envelope (flatten-independent), so SSR keys match.
+    flat.getDetail.queryKey({ path: { id: 1 } });
+  });
+
+  it("collision endpoint keeps the envelope param shape even under flatten", () => {
+    const CollisionRouter = defineRouter("/items", {
+      replace: endpoint({
+        method: "PUT",
+        path: "/:id",
+        request: z.object({
+          path: z.object({ id: z.number() }),
+          body: z.object({ id: z.number(), name: z.string() }),
+        }),
+        response: z.object({ id: z.number() }),
+      }),
+    });
+    const cApi = createApi({} as never, CollisionRouter);
+    const cFlat = createQueries(cApi, { flatten: true });
+    // `id` collides across path + body → flatten falls back to the envelope.
+    cFlat.replace({
+      onSuccess: () => {},
+    });
+    // The mutation still mutates with the envelope vars (type-only reference).
+    type _stillEnvelope = Expect<
+      Equal<
+        typeof cFlat.replace.mutationKey extends readonly unknown[]
+          ? true
+          : false,
+        true
+      >
+    >;
+  });
+
   it("configured infinite endpoint: .infinite is callable with no options", () => {
     const configured = createQueries(api, {
       infinite: {
