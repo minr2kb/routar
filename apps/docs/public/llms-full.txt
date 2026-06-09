@@ -717,8 +717,9 @@ export const todoApi = createApi(dispatchExecutor(() =>
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
 | `TimeoutError` | `@routar/core` | Request exceeds the `createFetchExecutor` `timeout` |
-| `HttpError` | `@routar/core` | `createFetchExecutor` gets a non-2xx response |
-| `AxiosError` | axios | Network or HTTP error from `@routar/axios` |
+| `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) gets a non-2xx response |
+
+All transports normalize HTTP failures to `HttpError`. The Axios and ky executors catch their native errors (`AxiosError`, ky `HTTPError`) and re-throw an `HttpError` with `status`/`statusText`/`body` populated from the response; the original transport error is preserved on `err.cause`. So a single `instanceof HttpError` check (and `onError` plugins) stay transport-agnostic. Network failures / cancellations (no response) are re-thrown unchanged.
 
 ```ts
 import { TimeoutError, ValidationError, HttpError } from '@routar/core';
@@ -727,7 +728,7 @@ try {
   await todoApi.create({ body: { title: '' } });
 } catch (err) {
   if (err instanceof ValidationError) console.log(err.message);
-  if (err instanceof HttpError)       console.log(err.status, err.body);
+  if (err instanceof HttpError)       console.log(err.status, err.body, err.cause);
   if (err instanceof TimeoutError)    console.log(`timed out after ${err.ms}ms`);
 }
 ```

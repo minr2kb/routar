@@ -401,7 +401,7 @@ const executor = createAxiosExecutor(async () => {
 });
 ```
 
-Axios errors propagate as `AxiosError` — all Axios-specific fields (`err.response`, `err.config`) are preserved.
+HTTP failures are normalized to `HttpError` (same as the fetch executor); the original `AxiosError` is preserved on `err.cause`, so Axios-specific fields (`err.cause.config`, `err.cause.code`) remain available.
 
 ---
 
@@ -490,8 +490,7 @@ controller.abort();
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
 | `TimeoutError` | `@routar/core` | Request exceeds the `timeout` option duration |
-| `HttpError` | `@routar/core` | Server returns a non-2xx status |
-| `AxiosError` | axios | Network or HTTP error from the Axios transport |
+| `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) returns a non-2xx status — the original transport error is on `err.cause` |
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

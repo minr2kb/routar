@@ -88,19 +88,20 @@ const authPlugin = definePlugin({
 })
 ```
 
-### Error normalization
+### Error mapping
 
-Different transports throw different error types. Normalize them for consistent error handling across your app:
+HTTP failures are already normalized to `HttpError` by every executor (fetch, Axios, ky), so `onError` sees the same error type regardless of transport — you do **not** need a plugin just to normalize transport errors. Use `onError` to map normalized errors to your own domain errors, or to trigger side effects (the original transport error is on `err.cause`):
 
 ```ts
-import { isAxiosError } from 'axios'
 import { HttpError } from '@routar/core'
 
-const errorNormalizerPlugin = definePlugin({
-  name: 'error-normalizer',
+class SessionExpiredError extends Error {}
+
+const errorMapperPlugin = definePlugin({
+  name: 'error-mapper',
   onError: async (err) => {
-    if (isAxiosError(err)) {
-      throw new HttpError(err.response?.status ?? 0, err.message, err.response?.data)
+    if (err instanceof HttpError && err.status === 401) {
+      throw new SessionExpiredError('Please sign in again')
     }
     throw err
   },

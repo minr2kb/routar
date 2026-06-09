@@ -88,19 +88,20 @@ const authPlugin = definePlugin({
 })
 ```
 
-### 에러 정규화
+### 에러 매핑
 
-transport마다 다른 에러 타입을 앱 전체에서 일관되게 처리할 수 있도록 정규화합니다:
+HTTP 실패는 모든 executor(fetch, Axios, ky)에서 이미 `HttpError`로 정규화되므로, `onError`는 트랜스포트와 무관하게 동일한 에러 타입을 받습니다. 트랜스포트 에러를 정규화하기 위한 플러그인은 **필요 없습니다**. `onError`는 정규화된 에러를 도메인 에러로 매핑하거나 부수 효과를 트리거하는 데 사용하세요 (원본 트랜스포트 에러는 `err.cause`에 있습니다):
 
 ```ts
-import { isAxiosError } from 'axios'
 import { HttpError } from '@routar/core'
 
-const errorNormalizerPlugin = definePlugin({
-  name: 'error-normalizer',
+class SessionExpiredError extends Error {}
+
+const errorMapperPlugin = definePlugin({
+  name: 'error-mapper',
   onError: async (err) => {
-    if (isAxiosError(err)) {
-      throw new HttpError(err.response?.status ?? 0, err.message, err.response?.data)
+    if (err instanceof HttpError && err.status === 401) {
+      throw new SessionExpiredError('다시 로그인해 주세요')
     }
     throw err
   },

@@ -137,7 +137,11 @@ export function createFetchExecutor(
 
 /**
  * Thrown by {@link createFetchExecutor} when the server returns a non-2xx
- * status code.
+ * status code. The Axios and ky executors also normalize their transport
+ * errors to `HttpError`, so `onError` plugins and callers can branch on a
+ * single error type regardless of the underlying transport. The original
+ * transport error (e.g. an `AxiosError` or ky `HTTPError`) is preserved on
+ * the `cause` property.
  *
  * @example
  * ```ts
@@ -155,8 +159,9 @@ export class HttpError extends Error {
     public readonly status: number,
     public readonly statusText: string,
     public readonly body: unknown = null,
+    public readonly cause?: unknown,
   ) {
-    super(`HTTP ${status}: ${statusText}`);
+    super(`HTTP ${status}: ${statusText}`, { cause });
     this.name = "HttpError";
   }
 }

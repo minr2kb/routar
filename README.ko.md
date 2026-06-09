@@ -386,7 +386,7 @@ const executor = createAxiosExecutor(async () => {
 });
 ```
 
-Axios 에러는 `AxiosError`로 전파되며 Axios 고유 필드(`err.response`, `err.config`)가 모두 보존됩니다.
+HTTP 실패는 (fetch executor와 동일하게) `HttpError`로 정규화됩니다. 원본 `AxiosError`는 `err.cause`에 보존되므로 Axios 고유 필드(`err.cause.config`, `err.cause.code`)에 계속 접근할 수 있습니다.
 
 ---
 
@@ -475,8 +475,7 @@ controller.abort();
 |------|--------|----------|
 | `ValidationError` | `@routar/core` | `request.parse()` 또는 `response.parse()` 실패 시 |
 | `TimeoutError` | `@routar/core` | `timeout` 옵션 제한 시간 초과 시 |
-| `HttpError` | `@routar/core` | 서버가 2xx가 아닌 상태 코드 반환 시 |
-| `AxiosError` | axios | Axios 전송 계층의 네트워크 또는 HTTP 에러 |
+| `HttpError` | `@routar/core` | 모든 executor(fetch, Axios, ky)가 2xx가 아닌 상태 코드 반환 시 — 원본 트랜스포트 에러는 `err.cause`에 보존 |
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

@@ -1,6 +1,7 @@
 import type { CreateExecutorOptions, Executor } from "@routar/core";
-import { createExecutor } from "@routar/core";
+import { createExecutor, HttpError } from "@routar/core";
 import type { AxiosInstance } from "axios";
+import { isAxiosError } from "axios";
 
 /** Zero-argument factory that returns an Axios instance (optionally async). */
 type InstanceFactory = () => AxiosInstance | Promise<AxiosInstance>;
@@ -40,9 +41,14 @@ function resolveInstance(
  * interceptor-friendly). Also supports SSR via a factory that produces a
  * fresh instance per request, allowing dynamic per-request auth headers.
  *
- * Axios error objects (`AxiosError`) propagate unchanged through the executor
- * so you can inspect `err.response`, `err.code`, etc. in middleware or
- * callers — use `withRetry`'s `shouldRetry` option to skip retries on 4xx.
+ * Transport errors are normalized: an `AxiosError` carrying a response is
+ * re-thrown as an {@link HttpError} (with `status`, `statusText`, and `body`
+ * populated from the response, and the original `AxiosError` preserved on
+ * `cause`). This keeps `onError` plugins and callers transport-agnostic — they
+ * can branch on `instanceof HttpError` regardless of the underlying client.
+ * Errors without a response (network failures, request cancellations) are
+ * re-thrown unchanged so you can still inspect `err.code`. Use `withRetry`'s
+ * `shouldRetry` option to skip retries on 4xx.
  *
  * @param instanceOrFactory - A pre-built `AxiosInstance` (CSR) or a factory
  *   function that returns one (SSR / per-request config).
@@ -68,16 +74,28 @@ export function createAxiosExecutor(
     async ({ method, url, params, body, headers, signal }) => {
       const instance = await resolveInstance(instanceOrFactory);
       const base = (instance.defaults.baseURL ?? "").replace(/\/$/, "");
-      const { data } = await instance.request({
-        method,
-        url: base + url,
-        baseURL: "",
-        params,
-        data: body,
-        headers,
-        signal,
-      });
-      return data;
+      try {
+        const { data } = await instance.request({
+          method,
+          url: base + url,
+          baseURL: "",
+          params,
+          data: body,
+          headers,
+          signal,
+        });
+        return data;
+      } catch (err) {
+        if (isAxiosError(err) && err.response) {
+          throw new HttpError(
+            err.response.status,
+            err.response.statusText ?? String(err.response.status),
+            err.response.data,
+            err,
+          );
+        }
+        throw err;
+      }
     },
     options,
   );

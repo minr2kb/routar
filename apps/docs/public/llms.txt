@@ -60,7 +60,7 @@ Error typing: augment TanStack's `Register` interface (`interface Register { def
 ## Errors
 
 - `ValidationError` — request/response schema mismatch (`@routar/core`)
-- `HttpError` — non-2xx response from `createFetchExecutor` (has `.status`, `.statusText`, `.body`)
+- `HttpError` — non-2xx response from any executor (fetch, Axios, ky; has `.status`, `.statusText`, `.body`, `.cause`). Axios/ky native errors are normalized to `HttpError`, original on `.cause`
 - `TimeoutError` — request exceeded the `createFetchExecutor` `timeout` (has `.ms`)
 
 ## Full Reference

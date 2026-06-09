@@ -82,7 +82,17 @@ export interface ExecutorPlugin {
     response: unknown,
     opts: ExecuteOptions,
   ) => unknown | Promise<unknown>;
-  /** Runs when the request throws. Must re-throw (or throw a different error). */
+  /**
+   * Runs when the request throws.
+   *
+   * The return value is ignored — this hook MUST always throw. To transform
+   * the error, throw a new error from within the hook (the original error is
+   * not automatically re-thrown for you).
+   *
+   * Transport errors reaching this hook are normalized to `HttpError` across
+   * all executors (fetch, Axios, ky), so you can branch on `instanceof
+   * HttpError` without depending on the underlying client.
+   */
   onError?: (error: unknown, opts: ExecuteOptions) => never | Promise<never>;
 }
 

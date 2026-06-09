@@ -41,21 +41,30 @@ The factory form is called on every request, making it safe for per-request auth
 
 ## Errors
 
-Axios errors propagate as `AxiosError`. All Axios-specific fields are preserved:
+HTTP failures are normalized to `HttpError` (from `@routar/core`), the same type the fetch executor throws — so callers and `onError` plugins stay transport-agnostic. The original `AxiosError` is preserved on `err.cause`:
 
 ```ts
+import { HttpError } from '@routar/core'
 import { isAxiosError } from 'axios'
 
 try {
   await todoApi.getDetail({ path: { id: 999 } })
 } catch (err) {
-  if (isAxiosError(err)) {
-    console.log(err.response?.status)  // 404
-    console.log(err.response?.data)    // server error body
-    console.log(err.config)            // request config
+  if (err instanceof HttpError) {
+    console.log(err.status)     // 404
+    console.log(err.statusText) // 'Not Found'
+    console.log(err.body)       // server error body
+
+    // Axios-specific fields remain available via `cause`
+    if (isAxiosError(err.cause)) {
+      console.log(err.cause.config) // request config
+      console.log(err.cause.code)   // e.g. 'ERR_BAD_REQUEST'
+    }
   }
 }
 ```
+
+Errors without a response (network failures, request cancellations) are re-thrown unchanged as the original `AxiosError`, since there is no HTTP status to normalize.
 
 ## Query parameter serialization
 
