@@ -182,6 +182,17 @@ describe("createFetchExecutor", () => {
     expect(headers.get("X-Auth")).toBe("token-123");
   });
 
+  it("applies unwrap to the parsed response body", async () => {
+    mockFetch({
+      text: async () => JSON.stringify({ data: { id: 1, title: "todo" } }),
+    });
+    const executor = createFetchExecutor("https://api.example.com", {
+      unwrap: (raw) => (raw as { data: unknown }).data,
+    });
+    const result = await executor.execute({ method: "GET", url: "/todos/1" });
+    expect(result).toEqual({ id: 1, title: "todo" });
+  });
+
   it("propagates network errors (non-HTTP) unchanged", async () => {
     globalThis.fetch = mock(async () => {
       throw new TypeError("Failed to fetch");

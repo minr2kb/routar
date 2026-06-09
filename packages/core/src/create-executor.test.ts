@@ -41,6 +41,39 @@ describe("createExecutor", () => {
       expect.objectContaining({ url: "/modified" }),
     );
   });
+
+  it("unwrap transforms the raw response before it is returned", async () => {
+    const executor = createExecutor(async () => ({ data: { id: 1 } }), {
+      unwrap: (raw) => (raw as { data: unknown }).data,
+    });
+    const result = await executor.execute(opts);
+    expect(result).toEqual({ id: 1 });
+  });
+
+  it("unwrap runs innermost — user plugin onResponse sees the unwrapped value", async () => {
+    const seen: unknown[] = [];
+    const executor = createExecutor(async () => ({ data: "payload" }), {
+      plugins: [
+        definePlugin({
+          onResponse: (res) => {
+            seen.push(res);
+            return res;
+          },
+        }),
+      ],
+      unwrap: (raw) => (raw as { data: unknown }).data,
+    });
+    const result = await executor.execute(opts);
+    // unwrap runs before the plugin's onResponse, so the plugin sees "payload".
+    expect(seen).toEqual(["payload"]);
+    expect(result).toBe("payload");
+  });
+
+  it("unwrap is not applied when omitted", async () => {
+    const executor = createExecutor(async () => ({ data: { id: 1 } }));
+    const result = await executor.execute(opts);
+    expect(result).toEqual({ data: { id: 1 } });
+  });
 });
 
 describe("dispatchExecutor", () => {

@@ -33,8 +33,21 @@ const executor = createExecutor(
 |-----------|------|------|
 | `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | 실제 HTTP 호출 |
 | `options.plugins` | `ExecutorPlugin[]` | 선언 순서대로 적용되는 플러그인 (첫 번째가 가장 바깥쪽). [Plugin](/ko/api-reference/plugins) 참고. |
+| `options.unwrap` | `(raw: unknown) => unknown` | 스키마 검증 전에 원본 응답을 변환합니다. `{ data: T }` 같은 envelope 형태를 벗겨낼 때 사용합니다. |
 
 `retry`와 `timeout`은 [`createFetchExecutor`](/ko/executors/fetch) 옵션을 사용하세요. axios와 ky는 각 라이브러리 인스턴스에서 설정합니다.
+
+## envelope 응답 벗겨내기
+
+많은 API가 페이로드를 `{ data: T }` 같은 envelope로 감쌉니다. `unwrap`을 넘기면 `response` 스키마가 실행되기 전에 envelope를 벗겨낼 수 있습니다 — 별도의 플러그인 보일러플레이트가 필요 없습니다:
+
+```ts
+const executor = createExecutor(transport, {
+  unwrap: (raw) => (raw as { data: unknown }).data,
+})
+```
+
+`unwrap`은 가장 안쪽 `onResponse` 훅으로 실행됩니다: transport가 반환된 직후, 모든 플러그인의 `onResponse` 훅보다 먼저, 그리고 `createApi`가 응답을 검증하기 전에 실행됩니다. `createExecutor`, `createFetchExecutor`, `@routar/axios`, `@routar/ky`에서 모두 사용할 수 있습니다.
 
 ## `ExecuteOptions`
 

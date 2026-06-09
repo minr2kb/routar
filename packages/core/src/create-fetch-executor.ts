@@ -131,7 +131,7 @@ export function createFetchExecutor(
     return text === "" ? null : JSON.parse(text);
   };
 
-  const executor = createExecutor(transport, { plugins: options?.plugins });
+  const executor = createExecutor(transport, { plugins: options?.plugins, unwrap: options?.unwrap });
   return { execute: buildFetchChain(executor.execute, options?.retry, options?.timeout) };
 }
 

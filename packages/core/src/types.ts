@@ -109,6 +109,21 @@ export interface ExecutorPlugin {
 export interface CreateExecutorOptions {
   /** Plugins applied in declaration order (first plugin is outermost). */
   plugins?: ExecutorPlugin[];
+  /**
+   * Transforms the raw response immediately after the transport returns,
+   * before any plugin `onResponse` hooks and before schema validation in
+   * `createApi`. Use to unwrap envelope shapes like `{ data: T }`.
+   *
+   * Equivalent to an innermost `onResponse` plugin, but declarative.
+   *
+   * @example
+   * ```ts
+   * const executor = createExecutor(transport, {
+   *   unwrap: (raw) => (raw as { data: unknown })?.data ?? raw,
+   * });
+   * ```
+   */
+  unwrap?: (raw: unknown) => unknown;
 }
 
 /**

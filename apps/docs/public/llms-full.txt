@@ -216,7 +216,7 @@ type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title
 
 ## createExecutor(transportFn, options?)
 
-Low-level factory used internally by all executor packages. Use to integrate any HTTP client. `options.plugins` is an array of `ExecutorPlugin` applied in declaration order (first is outermost).
+Low-level factory used internally by all executor packages. Use to integrate any HTTP client. `options.plugins` is an array of `ExecutorPlugin` applied in declaration order (first is outermost). `options.unwrap` is `(raw: unknown) => unknown` — transforms the raw response before schema validation, useful for unwrapping envelope shapes like `{ data: T }`. It runs as the innermost `onResponse` hook (after the transport returns, before any plugin `onResponse` and before `createApi` validation), and is inherited by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`.
 
 ```ts
 import { createExecutor, logger } from '@routar/core';
@@ -226,7 +226,10 @@ const executor = createExecutor(
     const res = await myHttpClient.request({ method, url, body, headers, signal });
     return res.data;
   },
-  { plugins: [logger()] },
+  {
+    plugins: [logger()],
+    unwrap: (raw) => (raw as { data: unknown }).data, // unwrap `{ data: T }` envelopes
+  },
 );
 ```
 
