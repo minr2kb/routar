@@ -34,6 +34,20 @@ createFetchExecutor(baseURL, {
 | `retry` | `number \| { count, shouldRetry? }` | 실패 시 재시도 횟수 |
 | `timeout` | `number` | 요청당 타임아웃(밀리초) — 초과 시 `TimeoutError` |
 
+## 동적 base URL
+
+`baseURL`은 정적 문자열뿐 아니라 매 요청마다 호출되는 동기/비동기 팩토리 함수도 받습니다. origin이 런타임 환경에 따라 달라질 때 유용합니다 — 예를 들어 서버(SSR)에서는 절대 URL을, 클라이언트(CSR)에서는 상대 경로를 사용하는 경우, executor를 둘로 나누지 않고 하나로 처리할 수 있습니다:
+
+```ts
+import { createFetchExecutor } from '@routar/core'
+
+const executor = createFetchExecutor(
+  () => (typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api'),
+)
+```
+
+팩토리는 요청마다 평가되므로 항상 현재 환경을 반영합니다. 비동기 팩토리도 동작합니다(예: 비동기 설정 소스에서 origin을 해석).
+
 ## 빈 응답
 
 `204`, `205`, `304` 상태의 응답은 `null`로 resolve됩니다. 빈 body의 `200` 응답도 `SyntaxError` 대신 `null`을 반환합니다.

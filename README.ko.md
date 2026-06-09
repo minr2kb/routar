@@ -338,6 +338,14 @@ const correlationPlugin = definePlugin({
 
 네이티브 `fetch` API를 사용합니다. 요청마다 동적 헤더가 필요한 SSR 환경에 적합합니다.
 
+`baseURL`은 정적 문자열뿐 아니라 매 요청마다 호출되는 동기/비동기 팩토리도 받습니다 — origin이 런타임 환경에 따라 달라질 때(예: 서버에서는 절대 URL, 클라이언트에서는 상대 경로) 유용합니다:
+
+```ts
+const executor = createFetchExecutor(
+  () => (typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api'),
+);
+```
+
 ```ts
 import { createFetchExecutor } from '@routar/core';
 

@@ -45,6 +45,8 @@ function buildFetchChain(
  * - Non-2xx responses throw an {@link HttpError}.
  *
  * @param baseURL - Absolute base URL prepended to every endpoint path.
+ *   Accepts a static string or a sync/async factory called on every request —
+ *   useful when the origin depends on runtime environment (e.g. SSR vs CSR).
  * @param options.defaultHeaders - Async factory called on every request to
  *   produce headers (e.g. reading cookies in a Next.js server component).
  * @param options.plugins - Plugins applied around the fetch call. Each retry
@@ -58,6 +60,13 @@ function buildFetchChain(
  * @example Minimal — no options needed
  * ```ts
  * const executor = createFetchExecutor('https://api.example.com');
+ * ```
+ *
+ * @example Dynamic base URL for SSR/CSR
+ * ```ts
+ * const executor = createFetchExecutor(
+ *   () => typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api',
+ * );
  * ```
  *
  * @example SSR with bearer token
@@ -79,7 +88,7 @@ function buildFetchChain(
  * ```
  */
 export function createFetchExecutor(
-  baseURL: string,
+  baseURL: string | (() => string | Promise<string>),
   options?: FetchExecutorOptions,
 ): Executor {
   const transport = async ({
@@ -90,7 +99,8 @@ export function createFetchExecutor(
     headers,
     signal,
   }: ExecuteOptions) => {
-    const fullURL = new URL(baseURL.replace(/\/$/, "") + url);
+    const resolvedBase = typeof baseURL === "function" ? await baseURL() : baseURL;
+    const fullURL = new URL(resolvedBase.replace(/\/$/, "") + url);
     if (params) {
       serializeParams(params).forEach((v, k) => {
         fullURL.searchParams.set(k, v);

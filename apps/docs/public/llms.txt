@@ -22,7 +22,7 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 
 ## Executors
 
-[createFetchExecutor(baseURL, options?)](https://routar.vercel.app/executors): Native fetch — ideal for SSR with per-request dynamic headers. Built into `@routar/core`.
+[createFetchExecutor(baseURL, options?)](https://routar.vercel.app/executors): Native fetch — ideal for SSR with per-request dynamic headers. `baseURL` accepts a static string or a sync/async factory called per request (SSR vs CSR origins). Built into `@routar/core`.
 [createAxiosExecutor(instanceOrFactory, options?)](https://routar.vercel.app/executors): Axios instance or async factory — great for CSR with interceptors. From `@routar/axios`.
 [createKyExecutor(instanceOrFactory, options?)](https://routar.vercel.app/executors): ky instance or factory. From `@routar/ky`.
 

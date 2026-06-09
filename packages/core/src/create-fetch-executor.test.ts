@@ -57,6 +57,31 @@ describe("createFetchExecutor", () => {
     );
   });
 
+  it("resolves a sync baseURL factory per request", async () => {
+    mockFetch({});
+    const baseURL = mock(() => "https://factory.example.com");
+    const executor = createFetchExecutor(baseURL);
+    await executor.execute({ method: "GET", url: "/todos" });
+    expect(baseURL).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://factory.example.com/todos",
+      expect.anything(),
+    );
+  });
+
+  it("resolves an async baseURL factory per request", async () => {
+    mockFetch({});
+    const baseURL = mock(async () => "https://async.example.com/api/");
+    const executor = createFetchExecutor(baseURL);
+    await executor.execute({ method: "GET", url: "/todos" });
+    await executor.execute({ method: "GET", url: "/users" });
+    expect(baseURL).toHaveBeenCalledTimes(2);
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      "https://async.example.com/api/users",
+      expect.anything(),
+    );
+  });
+
   it("appends query params to URL", async () => {
     const m = mockFetch({});
     const executor = createFetchExecutor("https://api.example.com");

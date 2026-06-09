@@ -353,6 +353,14 @@ const correlationPlugin = definePlugin({
 
 Uses the native `fetch` API. Ideal for SSR where per-request dynamic headers are needed.
 
+`baseURL` accepts a static string or a sync/async factory called on every request — useful when the origin depends on the runtime environment (e.g. an absolute URL on the server vs a relative path on the client):
+
+```ts
+const executor = createFetchExecutor(
+  () => (typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api'),
+);
+```
+
 ```ts
 import { createFetchExecutor } from '@routar/core';
 
