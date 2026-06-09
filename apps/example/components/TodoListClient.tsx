@@ -9,10 +9,12 @@ export function TodoListClient() {
   const [showCompleted, setShowCompleted] = useState<boolean | undefined>(
     undefined,
   );
+  // flatten: true → flat params (no `query` envelope). The query key is still
+  // built from the envelope, so this matches the SSR prefetch key in page.tsx.
   const params =
     showCompleted !== undefined
-      ? { query: { completed: showCompleted, _limit: 20 } }
-      : { query: { _limit: 20 } };
+      ? { completed: showCompleted, _limit: 20 }
+      : { _limit: 20 };
   const { data } = useSuspenseQuery(todoQuery.getList(params));
 
   return (

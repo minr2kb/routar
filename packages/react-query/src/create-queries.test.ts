@@ -447,60 +447,203 @@ describe("createQueries — per-endpoint defaults (C4)", () => {
   });
 });
 
-describe("createQueries — options factory form", () => {
-  it("factory receives a base queries object with working key helpers", () => {
+describe("createQueries — dynamic defaults (function form)", () => {
+  it("evaluates a `(params) => options` default with the call params", () => {
     const { api } = makeApi();
-    let capturedQ: any;
-    createQueries(api, (q) => {
-      capturedQ = q;
-      return {};
+    const seen: unknown[] = [];
+    const q = createQueries(api, {
+      defaults: {
+        getList: (params) => {
+          seen.push(params);
+          return { staleTime: 4321 };
+        },
+      },
     });
-    expect(capturedQ.$key).toEqual(["todos"]);
-    expect(capturedQ.getList.queryKey()).toEqual(["todos", "getList"]);
-    expect(capturedQ.getDetail.queryKey({ path: { id: 1 } })).toEqual([
-      "todos",
-      "getDetail",
-      { path: { id: 1 } },
-    ]);
+    const opts = q.getList({ query: { userId: 1 } });
+    expect(opts.staleTime).toBe(4321);
+    expect(seen).toEqual([{ query: { userId: 1 } }]);
   });
 
-  it("factory: defaults.invalidates referencing q.queryKey ends up in meta.invalidates", () => {
+  it("`(_, q)` receives a fully-built q whose key helpers work", () => {
     const create = mock(async () => ({ id: 1 }));
+    let capturedQ: any;
     const q = createQueries(
       {
         create,
         $router: TodoMutationRouter,
       } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>,
-      (q) => ({
+      {
         defaults: {
-          create: { invalidates: [q.$key] },
-        },
-      }),
-    );
-    expect((q.create() as any).meta?.invalidates).toEqual([["todos"]]);
-  });
-
-  it("factory: infinite + defaults together", () => {
-    const { api } = makeApi();
-    const q = createQueries(api, (q) => ({
-      infinite: {
-        getList: {
-          initialPageParam: 1,
-          getNextPageParam: () => undefined,
-          pageParam: (page: number) => ({ query: { _page: page } }),
+          create: (_, qref) => {
+            capturedQ = qref;
+            return { invalidates: [qref.$key] };
+          },
         },
       },
-      defaults: { getList: { staleTime: 9000 } },
-    }));
-    expect(q.getList().staleTime).toBe(9000);
-    // infinite accessor is wired (does not throw missing-contract error)
-    expect(() => q.getList.infinite()).not.toThrow();
+    );
+    // dynamic default routes invalidates into meta.invalidates, using q.$key
+    expect((q.create() as any).meta?.invalidates).toEqual([["todos"]]);
+    // q passed to the default is the fully-built object (same key helpers)
+    expect(capturedQ.create.mutationKey).toEqual(["todos", "create"]);
+    expect(capturedQ.$key).toEqual(["todos"]);
   });
 
-  it("factory: plain options object still works as before", () => {
+  it("mutation dynamic default is invoked with params = undefined", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const seen: unknown[] = [];
+    const q = createQueries(
+      {
+        create,
+        $router: TodoMutationRouter,
+      } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>,
+      {
+        defaults: {
+          create: (params) => {
+            seen.push(params);
+            return { gcTime: 99 };
+          },
+        },
+      },
+    );
+    expect((q.create() as { gcTime?: number }).gcTime).toBe(99);
+    expect(seen).toEqual([undefined]);
+  });
+
+  it("mixes static and dynamic defaults across endpoints", () => {
     const { api } = makeApi();
-    const q = createQueries(api, { defaults: { getList: { staleTime: 1111 } } });
-    expect(q.getList().staleTime).toBe(1111);
+    const q = createQueries(api, {
+      defaults: {
+        getList: { staleTime: 1000 }, // static
+        getDetail: () => ({ staleTime: 2000 }), // dynamic
+      },
+    });
+    expect(q.getList().staleTime).toBe(1000);
+    expect(q.getDetail({ path: { id: 1 } }).staleTime).toBe(2000);
+  });
+
+  it("per-call options override a dynamic default", () => {
+    const { api } = makeApi();
+    const q = createQueries(api, {
+      defaults: { getList: () => ({ staleTime: 5000 }) },
+    });
+    expect(q.getList(undefined, { staleTime: 10 }).staleTime).toBe(10);
+  });
+});
+
+const FlattenRouter = defineRouter("/todos", {
+  getDetail: endpoint({
+    method: "GET",
+    path: "/:id",
+    request: z.object({ path: z.object({ id: z.number() }) }),
+    response: z.object({ id: z.number() }),
+  }),
+  update: endpoint({
+    method: "PATCH",
+    path: "/:id",
+    request: z.object({
+      path: z.object({ id: z.number() }),
+      body: z.object({ title: z.string() }),
+    }),
+    response: z.object({ id: z.number() }),
+  }),
+  // collision: `id` lives in both path and body → not flattenable.
+  collide: endpoint({
+    method: "POST",
+    path: "/:id",
+    request: z.object({
+      path: z.object({ id: z.number() }),
+      body: z.object({ id: z.number(), title: z.string() }),
+    }),
+    response: z.object({ id: z.number() }),
+  }),
+  // non-object body (array) → not flattenable.
+  bulk: endpoint({
+    method: "POST",
+    path: "/",
+    request: z.object({ body: z.array(z.object({ title: z.string() })) }),
+    response: z.array(z.object({ id: z.number() })),
+  }),
+});
+
+function makeFlattenApi() {
+  const getDetail = mock(async () => ({ id: 1 }));
+  const update = mock(async () => ({ id: 1 }));
+  const collide = mock(async () => ({ id: 1 }));
+  const bulk = mock(async () => [{ id: 1 }]);
+  const api = {
+    getDetail,
+    update,
+    collide,
+    bulk,
+    $router: FlattenRouter,
+  } as unknown as ApiClientWithRouter<typeof FlattenRouter.endpoints>;
+  return { api, getDetail, update, collide, bulk };
+}
+
+describe("createQueries — flatten", () => {
+  it("flatten: true → getDetail({ id }) calls the api with { path: { id } }", async () => {
+    const { api, getDetail } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const opts = q.getDetail({ id: 5 } as never);
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ signal: undefined });
+    expect(getDetail).toHaveBeenCalledWith({ path: { id: 5 } }, undefined);
+  });
+
+  it("flatten queryKey is built from the envelope, not the flat params", () => {
+    const { api } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    expect(q.getDetail({ id: 5 } as never).queryKey as unknown).toEqual([
+      "todos",
+      "getDetail",
+      { path: { id: 5 } },
+    ]);
+  });
+
+  it("flatten multi-bucket: update({ id, title }) → { path: { id }, body: { title } }", async () => {
+    const { api, update } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const opts = q.update();
+    const mutationFn = opts.mutationFn as (vars: any) => Promise<unknown>;
+    await mutationFn({ id: 7, title: "x" });
+    expect(update).toHaveBeenCalledWith({
+      path: { id: 7 },
+      body: { title: "x" },
+    });
+  });
+
+  it("flatten: false (default) leaves the envelope call style unchanged", async () => {
+    const { api, getDetail } = makeFlattenApi();
+    const q = createQueries(api);
+    const opts = q.getDetail({ path: { id: 9 } });
+    expect(opts.queryKey as unknown).toEqual([
+      "todos",
+      "getDetail",
+      { path: { id: 9 } },
+    ]);
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ signal: undefined });
+    expect(getDetail).toHaveBeenCalledWith({ path: { id: 9 } }, undefined);
+  });
+
+  it("collision endpoint (path.id + body.id) keeps the envelope even under flatten", async () => {
+    const { api, collide } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const opts = q.collide();
+    const mutationFn = opts.mutationFn as (vars: any) => Promise<unknown>;
+    const envelope = { path: { id: 1 }, body: { id: 1, title: "x" } };
+    await mutationFn(envelope);
+    expect(collide).toHaveBeenCalledWith(envelope);
+  });
+
+  it("non-object body endpoint keeps the envelope even under flatten", async () => {
+    const { api, bulk } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const opts = q.bulk();
+    const mutationFn = opts.mutationFn as (vars: any) => Promise<unknown>;
+    const envelope = { body: [{ title: "x" }] };
+    await mutationFn(envelope);
+    expect(bulk).toHaveBeenCalledWith(envelope);
   });
 });
 

@@ -213,12 +213,22 @@ Signatures: query accessor `(params?, queryOptions?) => queryOptions`; mutation 
 
 Keys: `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix (override with `createQueries(api, { key })`).
 
-**Per-endpoint defaults:** pass `defaults` to set option defaults per endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape). Mutation endpoints support all mutation options including `invalidates`. The second argument may be a factory `(q) => options` to reference sibling key helpers inside defaults:
+**Per-endpoint defaults:** pass `defaults` to set option defaults per endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape). Mutation endpoints support all mutation options including `invalidates`. Each default value may be a **static object** or a **function** `(params, q) => options`, evaluated lazily per call — `q` is the fully-built queries object (use its key helpers for `invalidates`), `params` is the call params for a query accessor or `undefined` for a mutation accessor:
 
 ```ts
 createQueries(todoApi, { defaults: { getList: { staleTime: 60_000 }, getDetail: { staleTime: 5 * 60_000 } } })
-// factory form — use when defaults.invalidates references sibling queryKeys
-createQueries(todoApi, (q) => ({ defaults: { create: { invalidates: [q.getList.queryKey()] } } }))
+// dynamic form — reference sibling queryKeys via the built q; params is undefined for mutations
+createQueries(todoApi, { defaults: { create: (_, q) => ({ invalidates: [q.getList.queryKey()] }) } })
+```
+
+The previous external factory form `createQueries(api, (q) => options)` has been **removed** — use the `(params, q) => options` default form above.
+
+**Flatten:** pass `flatten: true` so accessors take **flat** params (the union of the request's `path`/`query`/`body` fields) instead of the `{ path, query, body }` envelope. Call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope. Endpoints whose buckets collide on a key or whose `body` is not a plain object fall back to the envelope (types enforce this); keys are always envelope-based so SSR/CSR keys match.
+
+```ts
+const todoQuery = createQueries(todoApi, { flatten: true })
+todoQuery.getDetail({ id: '1' })   // instead of { path: { id: '1' } }
+todoQuery.update({ id, title })    // instead of { path: { id }, body: { title } }
 ```
 
 **Error typing:** `error` is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment `Register` once — no `createQueries` change needed:

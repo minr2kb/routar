@@ -84,7 +84,25 @@ export const TodoRouter = defineRouter("/todos", {
 
 export const todoApi = createApi(localExecutor, TodoRouter);
 
-export const todoQuery = createQueries(todoApi);
+// `flatten: true` lets accessors take flat params (the union of the request's
+// path/query/body fields) instead of the nested `{ path, query, body }` envelope.
+// Every todo endpoint flattens cleanly — no key collides across buckets and each
+// body is a plain object — so e.g. `update({ id, completed })` replaces
+// `update({ path: { id }, body: { completed } })`. The query key is always built
+// from the envelope, so SSR/CSR keys still match across call styles.
+//
+// `defaults` uses the dynamic `(params, q) => options` form: `q` is the fully
+// built queries object, so its key helpers are available for `invalidates`
+// without circular-variable issues. `params` is the call params for queries, or
+// `undefined` for mutations.
+export const todoQuery = createQueries(todoApi, {
+  flatten: true,
+  defaults: {
+    // dynamic default — reference sibling key helpers off the completed `q`
+    create: (_, q) => ({ invalidates: [q.getList.queryKey()] }),
+    remove: (_, q) => ({ invalidates: [q.getList.queryKey()] }),
+  },
+});
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>;
 export type TodoItem = TodoApiTypes["getDetail"]["response"];

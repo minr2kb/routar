@@ -108,7 +108,8 @@ components/
 - Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
 - Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
 - Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
-- Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); nested routers supported (the map mirrors the router shape)
+- Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); nested routers supported (the map mirrors the router shape). Each default value may be a static object or a function `(params, q) => options` (dynamic defaults) — `q` is the fully-built queries object (use its key helpers for `invalidates`), `params` is the call params for a query accessor or `undefined` for a mutation accessor. The old external factory form `createQueries(api, (q) => options)` was removed in favor of this `(params, q)` default form
+- Flatten: `createQueries(api, { flatten: true })` — accessors take flat params (union of the request's `path`/`query`/`body` fields) instead of the `{ path, query, body }` envelope; call-site convenience only (HTTP contract + keys stay envelope-based, so SSR/CSR keys match); endpoints with colliding buckets or non-object `body` fall back to the envelope
 - Server pages: `prefetchQuery(<domain>Query.<endpoint>(params))` → `HydrationBoundary` → `<Suspense>`
 - Client components: `useSuspenseQuery(<domain>Query.<endpoint>(params))` — `data` always non-nullable
 - Multiple queries: `useSuspenseQueries({ queries: [...] })`

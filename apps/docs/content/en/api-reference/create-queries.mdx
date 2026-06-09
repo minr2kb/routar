@@ -22,8 +22,45 @@ export const todoQuery = createQueries(todoApi)
 |-----------|------|-------------|
 | `api` | `ApiClientWithRouter` (from `createApi`) | The typed client produced by `createApi`; carries its source router on `$router` |
 | `options.key` | `string \| string[]` | Override the root key segments (default: derived from router prefix) |
-| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | Per-endpoint default options keyed by endpoint name. Merged **before** per-call options (per-call wins). Nested routers supported (the map mirrors the router shape); for mutation endpoints, value is mutation options minus `invalidates`. |
+| `options.defaults` | `Record<string, Options \| ((params, q) => Options)>` | Per-endpoint default options keyed by endpoint name. Each value is a **static options object** or a **function** `(params, q) => options` (see [Dynamic defaults](#dynamic-defaults)). Merged **before** per-call options (per-call wins). Nested routers supported (the map mirrors the router shape); for mutation endpoints, the value is mutation options including `invalidates`. |
 | `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | Per-endpoint infinite query contract keyed by GET endpoint name. Declares `initialPageParam`, `getNextPageParam`, and the routar-specific `pageParam` builder once so call sites only need base params. Nested routers supported — the map mirrors the router shape. |
+| `options.flatten` | `boolean` (default `false`) | When `true`, accessors accept **flat** params (the union of the request's `path`/`query`/`body` fields) instead of the nested envelope. See [Flatten](#flatten). |
+
+> The previous external factory form `createQueries(api, (q) => options)` has been **removed**. To reference sibling key helpers, use the function form of `defaults` (`(params, q) => options`) below.
+
+### Dynamic defaults
+
+Each `defaults` value may be a static object or a function `(params, q) => options`, evaluated lazily on each accessor call:
+
+- `q` — the **fully-built** queries object that `createQueries` returns. Every key helper (`.queryKey()`, `.mutationKey`, `.$key`) is available, with no circular-reference issues — use it for `invalidates`.
+- `params` — the call params for a query accessor, or `undefined` for a mutation accessor.
+
+The resolved default is merged **before** the per-call options, so a per-call option always wins.
+
+```ts
+export const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getDetail: { staleTime: 5 * 60_000 },                  // static
+    getList: (params, _q) => ({ staleTime: params?.query?.done ? 60_000 : 0 }),
+    create: (_, q) => ({ invalidates: [q.getList.queryKey()] }),  // mutation: params is undefined
+  },
+})
+```
+
+### Flatten
+
+With `flatten: true`, every accessor (query, mutation, and `.infinite`) accepts flat params — the union of the request's `path`/`query`/`body` fields — instead of the `{ path, query, body }` envelope:
+
+```ts
+const todoQuery = createQueries(todoApi, { flatten: true })
+
+todoQuery.getDetail({ id: '1' })          // instead of { path: { id: '1' } }
+todoQuery.update({ id, title })           // instead of { path: { id }, body: { title } }
+todoQuery.getList({ done: true })         // instead of { query: { done: true } }
+```
+
+- **Fallback to envelope:** an endpoint whose buckets collide on a key (e.g. `path.id` + `body.id`) or whose `body` is not a plain object (`z.array`, `z.string`, …) keeps the envelope shape. The types enforce this per endpoint.
+- **Keys are always envelope-based:** `.queryKey()`, `.mutationKey`, and `.infinite.queryKey()` are flatten-independent, so SSR and CSR keys match regardless of call style. `flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope.
 
 ### Error typing
 
