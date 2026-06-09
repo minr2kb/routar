@@ -7,15 +7,16 @@ import { todoQuery } from "@/remote/services/todo";
 
 export function CreateTodoForm() {
   const [title, setTitle] = useState("");
-  const create = useMutation(
-    todoQuery.create({ invalidates: [todoQuery.$key] }),
-  );
+  // `invalidates` comes from the dynamic default in createQueries — no need to
+  // repeat it here.
+  const create = useMutation(todoQuery.create());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    // flatten: true → flat vars (no `body` envelope)
     create.mutate(
-      { body: { title, completed: false, userId: 1 } },
+      { title, completed: false, userId: 1 },
       { onSuccess: () => setTitle("") },
     );
   };
@@ -40,12 +41,12 @@ export function CreateTodoForm() {
 }
 
 export function TodoRow({ todo }: { todo: TodoItem }) {
+  // `update` invalidates a narrow key explicitly (per-call wins over any default);
+  // `remove` relies on the dynamic default declared in createQueries.
   const update = useMutation(
-    todoQuery.update({ invalidates: [todoQuery.$key] }),
+    todoQuery.update({ invalidates: [todoQuery.getList.queryKey()] }),
   );
-  const remove = useMutation(
-    todoQuery.remove({ invalidates: [todoQuery.$key] }),
-  );
+  const remove = useMutation(todoQuery.remove());
 
   return (
     <li
@@ -60,10 +61,8 @@ export function TodoRow({ todo }: { todo: TodoItem }) {
         type="checkbox"
         checked={todo.completed}
         onChange={() =>
-          update.mutate({
-            path: { id: todo.id },
-            body: { completed: !todo.completed },
-          })
+          // flatten: true → flat vars; `id` (path) + `completed` (body) merged
+          update.mutate({ id: todo.id, completed: !todo.completed })
         }
       />
       <span
@@ -77,7 +76,7 @@ export function TodoRow({ todo }: { todo: TodoItem }) {
       <small style={{ color: "#999" }}>user {todo.userId}</small>
       <button
         type="button"
-        onClick={() => remove.mutate({ path: { id: todo.id } })}
+        onClick={() => remove.mutate({ id: todo.id })}
         disabled={remove.isPending}
         style={{
           color: "red",

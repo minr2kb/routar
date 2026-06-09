@@ -22,8 +22,45 @@ export const todoQuery = createQueries(todoApi)
 |---------|------|------|
 | `api` | `ApiClientWithRouter` (`createApi` 반환) | `createApi`로 생성된 타입 지정 클라이언트; 소스 라우터를 `$router`에 실고 있음 |
 | `options.key` | `string \| string[]` | 루트 키 세그먼트 재정의 (기본값: 라우터 prefix에서 파생) |
-| `options.defaults` | `Record<string, QueryOptions \| MutationOptions>` | 엔드포인트 이름을 키로 하는 per-endpoint 기본 옵션. per-call 옵션 **이전에** 병합됩니다 (per-call이 우선). 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름); 뮤테이션 엔드포인트의 경우 값은 `invalidates`를 제외한 뮤테이션 옵션. |
+| `options.defaults` | `Record<string, Options \| ((params, q) => Options)>` | 엔드포인트 이름을 키로 하는 per-endpoint 기본 옵션. 각 값은 **정적 옵션 객체** 또는 **함수** `(params, q) => options`입니다 ([동적 기본값](#동적-기본값) 참조). per-call 옵션 **이전에** 병합됩니다 (per-call이 우선). 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름); 뮤테이션 엔드포인트의 경우 값은 `invalidates`를 포함한 뮤테이션 옵션. |
 | `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | GET 엔드포인트 이름을 키로 하는 무한 쿼리 계약. `initialPageParam`, `getNextPageParam`, routar 고유의 `pageParam` 빌더를 한 번 선언하여 호출 지점에서 기본 파라미터만 전달하면 되도록 합니다. 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름). |
+| `options.flatten` | `boolean` (기본값 `false`) | `true`이면 접근자가 중첩 envelope 대신 **flat** 파라미터(request의 `path`/`query`/`body` 필드 합집합)를 받습니다. [Flatten](#flatten) 참조. |
+
+> 기존의 외부 팩토리 형태 `createQueries(api, (q) => options)`는 **제거되었습니다**. 형제 키 헬퍼를 참조하려면 아래의 `defaults` 함수 형태(`(params, q) => options`)를 사용하세요.
+
+### 동적 기본값
+
+각 `defaults` 값은 정적 객체이거나 함수 `(params, q) => options`일 수 있으며, 접근자 호출마다 지연 평가됩니다:
+
+- `q` — `createQueries`가 반환하는 **완전히 구성된** queries 객체. 모든 키 헬퍼(`.queryKey()`, `.mutationKey`, `.$key`)를 순환 참조 문제 없이 사용 가능 — `invalidates`에 사용하세요.
+- `params` — 쿼리 접근자의 호출 파라미터이거나, 뮤테이션 접근자의 경우 `undefined`.
+
+해석된 기본값은 per-call 옵션 **이전에** 병합되므로, per-call 옵션이 항상 우선합니다.
+
+```ts
+export const todoQuery = createQueries(todoApi, {
+  defaults: {
+    getDetail: { staleTime: 5 * 60_000 },                  // 정적
+    getList: (params, _q) => ({ staleTime: params?.query?.done ? 60_000 : 0 }),
+    create: (_, q) => ({ invalidates: [q.getList.queryKey()] }),  // 뮤테이션: params는 undefined
+  },
+})
+```
+
+### Flatten
+
+`flatten: true`이면 모든 접근자(쿼리, 뮤테이션, `.infinite`)가 `{ path, query, body }` envelope 대신 flat 파라미터 — request의 `path`/`query`/`body` 필드 합집합 — 를 받습니다:
+
+```ts
+const todoQuery = createQueries(todoApi, { flatten: true })
+
+todoQuery.getDetail({ id: '1' })          // { path: { id: '1' } } 대신
+todoQuery.update({ id, title })           // { path: { id }, body: { title } } 대신
+todoQuery.getList({ done: true })         // { query: { done: true } } 대신
+```
+
+- **envelope 폴백:** 버킷이 같은 키로 충돌하거나(예: `path.id` + `body.id`) `body`가 plain object가 아닌(`z.array`, `z.string` 등) 엔드포인트는 envelope 형태를 유지합니다. 타입이 엔드포인트별로 이를 강제합니다.
+- **키는 항상 envelope 기준:** `.queryKey()`, `.mutationKey`, `.infinite.queryKey()`는 flatten과 무관하므로, 호출 방식과 상관없이 SSR과 CSR 키가 일치합니다. `flatten`은 `createQueries`에만 있는 호출 편의 옵션 — routar 클라이언트와 HTTP 계약은 항상 envelope를 사용합니다.
 
 ### 에러 타이핑
 

@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 export default async function TodosPage() {
   const queryClient = getQueryClient();
 
-  const params = { query: { _limit: 20 } };
+  // flatten: true → flat params. The query key is built from the envelope, so
+  // this prefetch key matches the CSR key in TodoListClient.
+  const params = { _limit: 20 };
 
   await queryClient.prefetchQuery(todoQuery.getList(params));
 

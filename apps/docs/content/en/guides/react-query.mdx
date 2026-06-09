@@ -42,18 +42,55 @@ export const todoQuery = createQueries(todoApi, {
 
 Nested routers are supported — the map mirrors the router shape (e.g. `{ users: { getPosts: { ... } } }`). For mutation endpoints, the value is any mutation option including `invalidates`; `mutationFn` and `mutationKey` are still set by the library. A call-site option always wins over the default.
 
-If `defaults.invalidates` needs to reference a sibling query key, pass a factory function instead of a plain object — it receives the same `queries` object that `createQueries` returns, so key helpers are available without circular-variable issues:
+### Dynamic defaults
+
+Each default value may be a **static object** or a **function** `(params, q) => options`, evaluated lazily per call. The function form receives:
+
+- `q` — the **fully-built** `queries` object that `createQueries` returns, so every key helper (`.queryKey()`, `.mutationKey`, `.$key`) is available without circular-variable issues. Use it for `invalidates`.
+- `params` — the call params for a query accessor, or `undefined` for a mutation accessor (mutations have no fixed call params).
 
 ```ts
-export const todoQuery = createQueries(todoApi, (q) => ({
+export const todoQuery = createQueries(todoApi, {
   defaults: {
-    create: { invalidates: [q.getList.queryKey()] },
-    update: { invalidates: [q.getList.queryKey(), q.getDetail.queryKey()] },
+    // static object
+    getDetail: { staleTime: 5 * 60_000 },
+
+    // (params, q) => options — depends on the call params
+    getList: (params, _q) => ({
+      staleTime: params?.query?.done ? 60_000 : 0,
+    }),
+
+    // (_, q) => options — mutation: reference sibling key helpers off the built q
+    create: (_, q) => ({ invalidates: [q.getList.queryKey()] }),
+    update: (_, q) => ({
+      invalidates: [q.getList.queryKey(), q.getDetail.queryKey()],
+    }),
   },
-}))
+})
 ```
 
-The factory receives a preliminary `q` built without `defaults`/`infinite` applied — use it only for key helpers (`.queryKey()`, `.mutationKey`, `.$key`). For everything else, use the plain-object form.
+Unlike the previous top-level factory form (`createQueries(api, (q) => ({ ... }))`, **removed**), `q` here is the completed object — its key helpers are always safe to call. A per-call option still wins over whatever the default produces.
+
+## Flatten
+
+By default, accessors take the nested **envelope** params — `{ path?, query?, body? }`. Pass `flatten: true` to call them with **flat** params instead: the union of the request's `path`, `query`, and `body` fields.
+
+```ts
+export const todoQuery = createQueries(todoApi, { flatten: true })
+```
+
+```ts
+// envelope (default)                       // flatten: true
+todoQuery.getDetail({ path: { id: '1' } })  todoQuery.getDetail({ id: '1' })
+todoQuery.update({ path: { id }, body: { title } })  todoQuery.update({ id, title })
+todoQuery.getList({ query: { done: true } })         todoQuery.getList({ done: true })
+```
+
+This is purely a **call-site convenience** — `flatten` lives on `createQueries`, not `createApi`. The routar client and HTTP contract always use the envelope.
+
+- **Off by default** — opt in per `createQueries`.
+- **Endpoints that can't flatten fall back to the envelope automatically.** If two buckets collide on a key (e.g. both `path.id` and `body.id` exist) or the `body` is not a plain object (`z.array`, `z.string`, …), that accessor keeps the envelope shape — the types enforce this, so you can't accidentally write an ambiguous flat call.
+- **The query key is always built from the envelope.** `.queryKey()` / `.mutationKey` / `.infinite.queryKey()` are flatten-independent, so SSR and CSR keys match no matter which call style each side uses. You can prefetch on the server with flat params and read on the client with flat params and the keys still converge.
 
 ## Error typing
 
