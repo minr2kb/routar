@@ -1,5 +1,12 @@
 # @routar/react-query
 
+## 1.6.0
+
+### Patch Changes
+
+- Updated dependencies [b0925cb]
+  - @routar/core@1.6.0
+
 ## 1.5.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@routar/core",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Schema-first HTTP API client — endpoint definitions, typed router, API client factory, and plugin system",
   "keywords": [
     "api",

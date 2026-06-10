@@ -1,6 +1,6 @@
 {
   "name": "@routar/react-query",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "TanStack Query bindings for routar — queryOptions/mutationOptions factories from a routar router",
   "keywords": [
     "routar",
@@ -43,7 +43,7 @@
     "dev": "tsup --watch"
   },
   "dependencies": {
-    "@routar/core": "^1.5.0"
+    "@routar/core": "^1.6.0"
   },
   "peerDependencies": {
     "@tanstack/react-query": ">=5.0.0"
