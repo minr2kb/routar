@@ -1,5 +1,5 @@
 export { createQueries } from "./create-queries.js";
-export { routarMutationCache } from "./mutation-cache.js";
+export { routarMutationCache, routarQueryClient } from "./mutation-cache.js";
 export type {
   CreateQueriesOptions,
   DeepPartial,
@@ -12,5 +12,6 @@ export type {
   QueryAccessor,
   QueryAccessorOptions,
   QueryAccessorResult,
+  QueryEndpointsMap,
   RoutarMutationOptions,
 } from "./types.js";

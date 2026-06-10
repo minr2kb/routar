@@ -140,21 +140,81 @@ export type EndpointDefaults<
       : never;
 };
 
+/**
+ * Marks non-GET endpoints to expose as **query** accessors instead of mutation
+ * accessors (SE-9). The common case is a POST search/filter endpoint that is
+ * semantically a read: it belongs in `useSuspenseQuery` and benefits from query
+ * key caching (the request body is part of the key, like any param).
+ *
+ * The map mirrors the router shape (like `infinite`/`defaults`): set an
+ * endpoint's value to `true`, and nest for sub-routers. GET endpoints are
+ * already queries and are excluded from the map.
+ */
+export type QueryEndpointsMap<TEndpoints extends RouterEndpoints> = {
+  [K in keyof TEndpoints as TEndpoints[K] extends RouterDef<any>
+    ? K
+    : TEndpoints[K] extends EndpointSpec<any, any, any>
+      ? TEndpoints[K]["method"] extends "GET"
+        ? never
+        : K
+      : never]?: TEndpoints[K] extends RouterDef<infer Nested>
+    ? QueryEndpointsMap<Nested>
+    : true;
+};
+
+/** True when endpoint `K` is marked as a query override in `TQO`. */
+export type IsQueryOverride<TQO, K extends PropertyKey> = TQO extends object
+  ? K extends keyof TQO
+    ? TQO[K] extends true
+      ? true
+      : false
+    : false
+  : false;
+
+/** The override sub-map for a nested router key `K`. */
+type QueryOverrideChild<TQO, K extends PropertyKey> = TQO extends object
+  ? K extends keyof TQO
+    ? TQO[K]
+    : {}
+  : {};
+
+/** True when endpoint spec `TSpec` (named `K`) should be a query accessor. */
+type IsQuery<TSpec, TQO, K extends PropertyKey> = TSpec extends EndpointSpec<
+  any,
+  any,
+  any
+>
+  ? TSpec["method"] extends "GET"
+    ? true
+    : IsQueryOverride<TQO, K>
+  : false;
+
 /** Options accepted by createQueries. */
 export interface CreateQueriesOptions<
   TEndpoints extends RouterEndpoints = RouterEndpoints,
   TFlatten extends boolean = false,
+  TQO = {},
 > {
   /** Overrides the root key segment(s); defaults to the router prefix segments. */
   key?: string;
   /** Per-endpoint default options merged before each call's options. */
-  defaults?: EndpointDefaults<TEndpoints, Queries<TEndpoints, TFlatten>>;
+  defaults?: EndpointDefaults<TEndpoints, Queries<TEndpoints, TFlatten, TQO>>;
   /**
-   * Per-endpoint infinite (pagination) contract, keyed by GET endpoint name.
+   * Per-endpoint infinite (pagination) contract, keyed by GET endpoint name (or
+   * a non-GET endpoint promoted via {@link CreateQueriesOptions.queryEndpoints}).
    * Declared once here; each `.infinite()` call may override it. See
    * {@link InfiniteConfigMap}.
    */
-  infinite?: InfiniteConfigMap<TEndpoints>;
+  infinite?: InfiniteConfigMap<TEndpoints, TQO>;
+  /**
+   * Promote non-GET endpoints to query accessors (SE-9) — e.g. a POST search
+   * that is semantically a read. Mirrors the router shape. See
+   * {@link QueryEndpointsMap}. Inferred as a `const` type parameter by
+   * {@link createQueries}, so nested `true` literals are preserved; the value's
+   * shape is validated against {@link QueryEndpointsMap} via that generic
+   * constraint.
+   */
+  queryEndpoints?: TQO;
   /**
    * When `true`, accessors accept *flat* params — the union of the request's
    * `path`/`query`/`body` fields (`getDetail({ id })`) instead of the nested
@@ -242,17 +302,17 @@ export type InfiniteAccessorResult<TPage, TPageParam> = Omit<
  * passed to `createQueries(api, { infinite })`. Each value is the full infinite
  * contract for that endpoint. Top-level endpoints only.
  */
-export type InfiniteConfigMap<TEndpoints extends RouterEndpoints> = {
-  // Keep GET endpoints (their contract) and nested routers (recursed); drop
-  // non-GET endpoints.
+export type InfiniteConfigMap<TEndpoints extends RouterEndpoints, TQO = {}> = {
+  // Keep query endpoints (GET, or non-GET promoted via `queryEndpoints`) and
+  // nested routers (recursed); drop plain mutation endpoints.
   [K in keyof TEndpoints as TEndpoints[K] extends RouterDef<any>
     ? K
     : TEndpoints[K] extends EndpointSpec<any, any, any>
-      ? TEndpoints[K]["method"] extends "GET"
+      ? IsQuery<TEndpoints[K], TQO, K> extends true
         ? K
         : never
       : never]?: TEndpoints[K] extends RouterDef<infer Nested>
-    ? InfiniteConfigMap<Nested>
+    ? InfiniteConfigMap<Nested, QueryOverrideChild<TQO, K>>
     : TEndpoints[K] extends EndpointSpec<any, any, any>
       ? InfiniteAccessorOptions<
           InferResponse<TEndpoints[K]>,
@@ -326,11 +386,12 @@ export type MutationAccessor<TVars, TData, TFlatten extends boolean = false> = (
 export type Queries<
   TEndpoints extends RouterEndpoints,
   TFlatten extends boolean = false,
+  TQO = {},
 > = {
   [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<infer Nested>
-    ? Queries<Nested, TFlatten>
+    ? Queries<Nested, TFlatten, QueryOverrideChild<TQO, K>>
     : TEndpoints[K] extends EndpointSpec<any, any, any>
-      ? TEndpoints[K]["method"] extends "GET"
+      ? IsQuery<TEndpoints[K], TQO, K> extends true
         ? QueryAccessor<
             EndpointParams<TEndpoints[K]>,
             InferResponse<TEndpoints[K]>,

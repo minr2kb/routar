@@ -1,6 +1,32 @@
 import { describe, expect, it, mock } from "bun:test";
 import { z } from "zod";
-import { createApi, defineRouter, endpoint, ValidationError } from "./index.js";
+import {
+  createApi,
+  defineRouter,
+  endpoint,
+  type StandardSchemaV1,
+  StandardSchemaError,
+  TimeoutError,
+  ValidationError,
+} from "./index.js";
+
+/** A minimal Standard Schema validator (no `.parse`, only `~standard`). */
+const standardValidator = <T>(opts: {
+  value?: T;
+  issues?: { message: string }[];
+  async?: boolean;
+}): StandardSchemaV1<unknown, T> => ({
+  "~standard": {
+    version: 1,
+    vendor: "test",
+    validate: (data: unknown) => {
+      const result = opts.issues
+        ? { issues: opts.issues }
+        : { value: (opts.value ?? data) as T };
+      return opts.async ? Promise.resolve(result) : result;
+    },
+  },
+});
 
 const makeValidator = <T>(value: T) => ({
   parse: (data: unknown) => data as T,
@@ -243,6 +269,270 @@ describe("createApi", () => {
       const api = createApi(executor, { users: inner }, { validate: false });
       await api.users.list({});
       expect(responseValidator.parse).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("validate: 'warn' mode", () => {
+    it("passes raw response through instead of throwing on failure", async () => {
+      const executor = mockExecutor({ bad: "data" });
+      const api = createApi(
+        executor,
+        "/todos",
+        { get: { method: "GET" as const, path: "/", response: failValidator } },
+        { validate: "warn" },
+      );
+      const result = await api.get({});
+      expect(result).toEqual({ bad: "data" });
+    });
+
+    it("calls onValidationError with response context on response drift", async () => {
+      const onValidationError = mock(() => {});
+      const executor = mockExecutor({ bad: "data" });
+      const api = createApi(
+        executor,
+        "/todos",
+        { get: { method: "GET" as const, path: "/", response: failValidator } },
+        { validate: { response: "warn" }, onValidationError },
+      );
+      await api.get({});
+      expect(onValidationError).toHaveBeenCalledTimes(1);
+      const [error, ctx] = onValidationError.mock.calls[0] as unknown as [
+        ValidationError,
+        { kind: string; method: string; url: string; data: unknown },
+      ];
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(ctx.kind).toBe("response");
+      expect(ctx.method).toBe("GET");
+      expect(ctx.url).toBe("/todos");
+      expect(ctx.data).toEqual({ bad: "data" });
+    });
+
+    it("passes raw params through and reports on request drift", async () => {
+      const onValidationError = mock(() => {});
+      const executor = mockExecutor({ ok: true });
+      const api = createApi(
+        executor,
+        "/todos",
+        {
+          create: {
+            method: "POST" as const,
+            path: "/",
+            request: failValidator,
+            response: makeValidator({ ok: true }),
+          },
+        },
+        { validate: "warn", onValidationError },
+      );
+      await api.create({ body: { title: "x" } });
+      // raw params still reach the executor (drift does not block the call)
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ body: { title: "x" } }),
+      );
+      expect(onValidationError).toHaveBeenCalledTimes(1);
+      const [, ctx] = onValidationError.mock.calls[0] as unknown as [
+        ValidationError,
+        { kind: string },
+      ];
+      expect(ctx.kind).toBe("request");
+    });
+
+    it("throws (not warns) when validate is true", async () => {
+      const onValidationError = mock(() => {});
+      const executor = mockExecutor({ bad: "data" });
+      const api = createApi(
+        executor,
+        "/todos",
+        { get: { method: "GET" as const, path: "/", response: failValidator } },
+        { validate: true, onValidationError },
+      );
+      let error: unknown;
+      try {
+        await api.get({});
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(onValidationError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Standard Schema support (SE-11)", () => {
+    it("validates a response via ~standard.validate", async () => {
+      const executor = mockExecutor({ id: 1 });
+      const api = createApi(executor, "/todos", {
+        get: {
+          method: "GET" as const,
+          path: "/",
+          response: standardValidator({ value: { id: 1 } }),
+        },
+      });
+      const result = await api.get({});
+      expect(result).toEqual({ id: 1 });
+    });
+
+    it("supports an async ~standard.validate", async () => {
+      const executor = mockExecutor({ id: 2 });
+      const api = createApi(executor, "/todos", {
+        get: {
+          method: "GET" as const,
+          path: "/",
+          response: standardValidator({ value: { id: 2 }, async: true }),
+        },
+      });
+      expect(await api.get({})).toEqual({ id: 2 });
+    });
+
+    it("throws ValidationError (cause: StandardSchemaError) on issues", async () => {
+      const executor = mockExecutor({ bad: true });
+      const api = createApi(executor, "/todos", {
+        get: {
+          method: "GET" as const,
+          path: "/",
+          response: standardValidator({ issues: [{ message: "expected id" }] }),
+        },
+      });
+      let error: unknown;
+      try {
+        await api.get({});
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ValidationError);
+      const cause = (error as ValidationError).cause;
+      expect(cause).toBeInstanceOf(StandardSchemaError);
+      expect((cause as StandardSchemaError).issues).toEqual([
+        { message: "expected id" },
+      ]);
+    });
+
+    it("reports standard-schema drift under validate: 'warn'", async () => {
+      const onValidationError = mock(() => {});
+      const executor = mockExecutor({ bad: true });
+      const api = createApi(
+        executor,
+        "/todos",
+        {
+          get: {
+            method: "GET" as const,
+            path: "/",
+            response: standardValidator({ issues: [{ message: "drift" }] }),
+          },
+        },
+        { validate: "warn", onValidationError },
+      );
+      const result = await api.get({});
+      expect(result).toEqual({ bad: true });
+      expect(onValidationError).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("per-call options (SE-10)", () => {
+    it("forwards per-call headers to the executor", async () => {
+      const executor = mockExecutor({});
+      const api = createApi(executor, "/todos", {
+        get: { method: "GET" as const, path: "/", response: makeValidator({}) },
+      });
+      await api.get({}, { headers: { "Idempotency-Key": "abc" } });
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ headers: { "Idempotency-Key": "abc" } }),
+      );
+    });
+
+    it("still accepts a bare AbortSignal (backward compatible)", async () => {
+      const executor = mockExecutor({});
+      const controller = new AbortController();
+      const api = createApi(executor, "/todos", {
+        get: { method: "GET" as const, path: "/", response: makeValidator({}) },
+      });
+      await api.get({}, controller.signal);
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
+    it("forwards the signal from an options object", async () => {
+      const executor = mockExecutor({});
+      const controller = new AbortController();
+      const api = createApi(executor, "/todos", {
+        get: { method: "GET" as const, path: "/", response: makeValidator({}) },
+      });
+      await api.get({}, { signal: controller.signal });
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
+    it("aborts with TimeoutError when per-call timeout elapses", async () => {
+      const hangingExecutor = {
+        execute: ({ signal }: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () =>
+              reject(signal.reason ?? new Error("aborted")),
+            );
+          }),
+      };
+      const api = createApi(hangingExecutor, "/todos", {
+        get: { method: "GET" as const, path: "/", response: makeValidator({}) },
+      });
+      let error: unknown;
+      try {
+        await api.get({}, { timeout: 10 });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(TimeoutError);
+    });
+  });
+
+  describe("separated request buckets (SE-12)", () => {
+    it("works end-to-end: path substitution, query, body", async () => {
+      const executor = mockExecutor({ id: 7 });
+      const router = defineRouter("/todos", {
+        update: endpoint({
+          method: "PATCH" as const,
+          path: "/:id",
+          pathParams: z.object({ id: z.number() }),
+          query: z.object({ notify: z.boolean() }),
+          body: z.object({ title: z.string() }),
+          response: z.object({ id: z.number() }),
+        }),
+      });
+      const api = createApi(executor, router);
+      const result = await api.update({
+        path: { id: 7 },
+        query: { notify: true },
+        body: { title: "new" },
+      });
+      expect(result).toEqual({ id: 7 });
+      expect(executor.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: "PATCH",
+          url: "/todos/7",
+          params: { notify: true },
+          body: { title: "new" },
+        }),
+      );
+    });
+
+    it("throws ValidationError when a composed bucket fails", async () => {
+      const executor = mockExecutor({ id: 1 });
+      const router = defineRouter("/todos", {
+        getDetail: endpoint({
+          method: "GET" as const,
+          path: "/:id",
+          pathParams: z.object({ id: z.number() }),
+          response: z.object({ id: z.number() }),
+        }),
+      });
+      const api = createApi(executor, router);
+      let error: unknown;
+      try {
+        // @ts-expect-error wrong path param type
+        await api.getDetail({ path: { id: "bad" } });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ValidationError);
     });
   });
 

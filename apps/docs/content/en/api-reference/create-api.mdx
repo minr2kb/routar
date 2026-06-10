@@ -5,7 +5,7 @@ description: Bind an executor to a router and get a fully typed API client ready
 
 # `createApi(executor, router)`
 
-Produces a fully-typed API client. Each endpoint becomes an async function with the signature `(params, signal?) => Promise<Response>`.
+Produces a fully-typed API client. Each endpoint becomes an async function with the signature `(params, signalOrOptions?) => Promise<Response>` — the second argument is an `AbortSignal` or a `{ signal?, headers?, timeout? }` options object (see [Per-call options](#per-call-options)).
 
 ```ts
 import { createApi } from '@routar/core'
@@ -60,16 +60,46 @@ await api.getList({ query: { page: 2 } })
 await api.create({ body: { title: 'buy milk' } })
 ```
 
-## AbortSignal
+## Per-call options
 
-Pass an `AbortSignal` as the second argument to cancel a request:
+The second argument accepts either a bare `AbortSignal` (backward compatible) or an options object `{ signal?, headers?, timeout? }`:
 
 ```ts
+// cancel with an AbortSignal
 const controller = new AbortController()
-const result = await todoApi.getList({}, controller.signal)
+await todoApi.getList({}, controller.signal)
+controller.abort()
 
-controller.abort() // cancels the request
+// per-call headers + timeout
+await todoApi.create(
+  { body: { title: 'buy milk' } },
+  {
+    headers: { 'Idempotency-Key': key }, // merged over executor defaults
+    timeout: 30_000,                      // throws TimeoutError when exceeded
+    signal: controller.signal,
+  },
+)
 ```
+
+- **`headers`** are seeded onto the request and merged over the executor's default headers (per-call wins). A plugin's `onRequest` runs afterward and wins on a key collision (plugins are cross-cutting policy such as auth).
+- **`timeout`** aborts the request with a `TimeoutError` and is applied by the core client, so it works on every executor (fetch, Axios, ky, custom) and composes with any executor-level timeout (whichever fires first).
+
+## Validation modes
+
+`validate` controls whether request/response schemas run, per phase. Each phase accepts `true` (default — validate and throw on failure), `false` (skip), or `'warn'`:
+
+```ts
+// observe response drift without breaking production
+const api = createApi(executor, todoRouter, {
+  validate: { request: true, response: 'warn' },
+  onValidationError: (err, ctx) => {
+    // ctx: { kind: 'request' | 'response', method, url, data }
+    Sentry.captureException(err, { extra: ctx })
+  },
+})
+```
+
+In `'warn'` mode a parse failure passes the **raw** data through (no outage) and calls `onValidationError(error, context)` instead of throwing — the drift-observation middle ground between full validation and `validate: false`. `onValidationError` is never called under `true` (which throws) or `false` (which skips).
 
 ## SSR/CSR pattern
 

@@ -6,7 +6,11 @@ import {
 } from "@routar/core";
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { isRoutarMutationCacheWired } from "./mutation-cache.js";
-import type { CreateQueriesOptions, Queries } from "./types.js";
+import type {
+  CreateQueriesOptions,
+  Queries,
+  QueryEndpointsMap,
+} from "./types.js";
 import {
   type BucketMap,
   captureBuckets,
@@ -25,6 +29,8 @@ type EndpointDefault =
   | Record<string, unknown>
   | ((params: unknown, q: Queries<RouterEndpoints>) => Record<string, unknown>);
 type InfiniteConfig = Record<string, unknown>;
+/** Runtime shape of the `queryEndpoints` override map (recursive). */
+type QueryOverrides = Record<string, true | Record<string, unknown>>;
 
 /**
  * Derives TanStack Query accessors from a routar API client.
@@ -60,10 +66,13 @@ type InfiniteConfig = Record<string, unknown>;
 export function createQueries<
   TEndpoints extends RouterEndpoints,
   TFlatten extends boolean = false,
+  // `const` preserves nested `true` literals in `queryEndpoints` so promotion
+  // survives for nested routers; the constraint validates the map shape.
+  const TQO extends QueryEndpointsMap<TEndpoints> = {},
 >(
   api: ApiClientWithRouter<TEndpoints>,
-  options?: CreateQueriesOptions<TEndpoints, TFlatten>,
-): Queries<TEndpoints, TFlatten> {
+  options?: CreateQueriesOptions<TEndpoints, TFlatten, TQO>,
+): Queries<TEndpoints, TFlatten, TQO> {
   const router = api.$router;
 
   const root = options?.key ? [options.key] : prefixToSegments(router.prefix);
@@ -80,11 +89,12 @@ export function createQueries<
     root,
     options?.defaults as Record<string, EndpointDefault> | undefined,
     options?.infinite as Record<string, InfiniteConfig> | undefined,
+    options?.queryEndpoints as QueryOverrides | undefined,
     options?.flatten === true,
     qRef,
   );
   Object.assign(qRef, result);
-  return qRef as unknown as Queries<TEndpoints, TFlatten>;
+  return qRef as unknown as Queries<TEndpoints, TFlatten, TQO>;
 }
 
 function buildQueries(
@@ -95,6 +105,8 @@ function buildQueries(
   // its key is the nested config map, recursed into the sub-tree.
   defaults: Record<string, EndpointDefault> | undefined,
   infinite: Record<string, InfiniteConfig> | undefined,
+  // Non-GET endpoints promoted to query accessors (SE-9); mirrors router shape.
+  queryEndpoints: QueryOverrides | undefined,
   flatten: boolean,
   qRef: Queries<RouterEndpoints>,
 ): Record<string, unknown> {
@@ -109,6 +121,7 @@ function buildQueries(
         childRoot,
         defaults?.[name] as Record<string, EndpointDefault> | undefined,
         infinite?.[name] as Record<string, InfiniteConfig> | undefined,
+        queryEndpoints?.[name] as QueryOverrides | undefined,
         flatten,
         qRef,
       );
@@ -122,18 +135,19 @@ function buildQueries(
     const endpointDefault = defaults?.[name];
     // Capture flatten buckets once per endpoint; `null`/non-flattenable → identity.
     const buckets = flatten ? captureBuckets(spec.request) : null;
-    out[name] =
-      spec.method === "GET"
-        ? makeQueryAccessor(
-            fn,
-            root,
-            name,
-            endpointDefault,
-            infinite?.[name],
-            buckets,
-            qRef,
-          )
-        : makeMutationAccessor(fn, root, name, endpointDefault, buckets, qRef);
+    // GET endpoints are queries; non-GET become queries only when promoted.
+    const asQuery = spec.method === "GET" || queryEndpoints?.[name] === true;
+    out[name] = asQuery
+      ? makeQueryAccessor(
+          fn,
+          root,
+          name,
+          endpointDefault,
+          infinite?.[name],
+          buckets,
+          qRef,
+        )
+      : makeMutationAccessor(fn, root, name, endpointDefault, buckets, qRef);
   }
 
   return out;

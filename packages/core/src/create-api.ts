@@ -1,25 +1,39 @@
 import { isRouterDef } from "./define-router.js";
+import { TimeoutError } from "./middleware.js";
+import type { StandardSchemaV1 } from "./standard-schema.js";
 import type {
   CreateApiOptions,
+  EndpointCallOptions,
   EndpointSpec,
+  ExecuteOptions,
   Executor,
   InferResponse,
   RequestShape,
   RouterDef,
   RouterEndpoints,
+  Validator,
   ValidatorOutput,
 } from "./types.js";
 import { joinPaths, resolvePath } from "./utils/path.js";
+import { runValidator } from "./utils/run-validator.js";
 import { ValidationError } from "./utils/validate.js";
 
 /** Callable type for a single endpoint on the generated API client. */
 type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
-  TSpec["request"] extends { parse: (data: unknown) => infer R }
-    ? (params: R, signal?: AbortSignal) => Promise<InferResponse<TSpec>>
-    : (
-        params?: RequestShape,
-        signal?: AbortSignal,
-      ) => Promise<InferResponse<TSpec>>;
+  TSpec["request"] extends Validator<infer R>
+    ? (
+        params: R,
+        options?: AbortSignal | EndpointCallOptions,
+      ) => Promise<InferResponse<TSpec>>
+    : TSpec["request"] extends StandardSchemaV1<unknown, infer O>
+      ? (
+          params: O,
+          options?: AbortSignal | EndpointCallOptions,
+        ) => Promise<InferResponse<TSpec>>
+      : (
+          params?: RequestShape,
+          options?: AbortSignal | EndpointCallOptions,
+        ) => Promise<InferResponse<TSpec>>;
 
 /**
  * Fully-typed API client produced by {@link createApi}.
@@ -187,14 +201,20 @@ function resolveArgs(
   };
 }
 
-function shouldValidate(
+type ResolvedMode = "on" | "off" | "warn";
+
+function validateMode(
   options: CreateApiOptions | undefined,
   kind: "request" | "response",
-): boolean {
+): ResolvedMode {
   const v = options?.validate;
-  if (v === undefined || v === true) return true;
-  if (v === false) return false;
-  return v[kind] ?? true;
+  const mode =
+    v === undefined
+      ? true
+      : typeof v === "boolean" || v === "warn"
+        ? v
+        : (v[kind] ?? true);
+  return mode === "warn" ? "warn" : mode ? "on" : "off";
 }
 
 function buildClient(
@@ -230,13 +250,25 @@ function buildEndpointFn(
   spec: EndpointSpec<any, any, any>,
   options: CreateApiOptions | undefined,
 ) {
-  return async (params: RequestShape = {}, signal?: AbortSignal) => {
+  return async (
+    params: RequestShape = {},
+    signalOrOptions?: AbortSignal | EndpointCallOptions,
+  ) => {
+    const call = normalizeCallOptions(signalOrOptions);
+    const reqMode = validateMode(options, "request");
     let validatedParams: RequestShape = params;
-    if (spec.request && shouldValidate(options, "request")) {
+    let requestError: ValidationError | null = null;
+    if (spec.request && reqMode !== "off") {
       try {
-        validatedParams = spec.request.parse(params);
+        validatedParams = (await runValidator(
+          spec.request,
+          params,
+        )) as RequestShape;
       } catch (err) {
-        throw new ValidationError("Request validation failed", err);
+        requestError = new ValidationError("Request validation failed", err);
+        if (reqMode !== "warn") throw requestError;
+        // 'warn': pass the raw params through and report the drift below.
+        validatedParams = params;
       }
     }
 
@@ -245,25 +277,133 @@ function buildEndpointFn(
       validatedParams?.path,
     );
 
-    const raw = await executor.execute({
+    if (requestError) {
+      options?.onValidationError?.(requestError, {
+        kind: "request",
+        method: spec.method,
+        url,
+        data: params,
+      });
+    }
+
+    const raw = await executeWithTimeout(executor, call.timeout, {
       method: spec.method,
       url,
       params: validatedParams?.query as Record<string, unknown> | undefined,
       body: validatedParams?.body,
-      signal,
+      headers: call.headers,
+      signal: call.signal,
     });
 
+    const resMode = validateMode(options, "response");
     let result: ValidatorOutput<typeof spec.response>;
-    if (shouldValidate(options, "response")) {
-      try {
-        result = spec.response.parse(raw);
-      } catch (err) {
-        throw new ValidationError("Response validation failed", err);
-      }
-    } else {
+    if (resMode === "off") {
       result = raw;
+    } else {
+      try {
+        result = (await runValidator(
+          spec.response,
+          raw,
+        )) as ValidatorOutput<typeof spec.response>;
+      } catch (err) {
+        const responseError = new ValidationError(
+          "Response validation failed",
+          err,
+        );
+        if (resMode !== "warn") throw responseError;
+        // 'warn': report the drift and pass the raw response through.
+        options?.onValidationError?.(responseError, {
+          kind: "response",
+          method: spec.method,
+          url,
+          data: raw,
+        });
+        result = raw;
+      }
     }
 
     return spec.adapter ? spec.adapter(result) : result;
+  };
+}
+
+/**
+ * Normalizes the optional second endpoint argument. A bare {@link AbortSignal}
+ * (the legacy form) is wrapped as `{ signal }`; an options object is returned
+ * as-is. Detection uses `instanceof AbortSignal` with a duck-typed fallback for
+ * runtimes/polyfills where the global identity differs.
+ */
+function normalizeCallOptions(
+  arg: AbortSignal | EndpointCallOptions | undefined,
+): EndpointCallOptions {
+  if (arg == null) return {};
+  if (isAbortSignal(arg)) return { signal: arg };
+  return arg;
+}
+
+function isAbortSignal(value: unknown): value is AbortSignal {
+  if (typeof AbortSignal !== "undefined" && value instanceof AbortSignal) {
+    return true;
+  }
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as AbortSignal).aborted === "boolean" &&
+    typeof (value as AbortSignal).addEventListener === "function"
+  );
+}
+
+/**
+ * Runs the executor, applying a per-call timeout when set. The timeout is
+ * implemented with an {@link AbortController} so it works across every executor
+ * (fetch, Axios, ky, custom) without per-transport support. On expiry the
+ * request is aborted with a {@link TimeoutError}.
+ */
+function executeWithTimeout(
+  executor: Executor,
+  timeout: number | undefined,
+  opts: ExecuteOptions,
+): Promise<unknown> {
+  if (timeout == null) return executor.execute(opts);
+
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new TimeoutError(timeout)),
+    timeout,
+  );
+  const { signal, cleanup } = combineSignals(opts.signal, controller.signal);
+
+  return (async () => {
+    try {
+      return await executor.execute({ ...opts, signal });
+    } finally {
+      clearTimeout(timer);
+      cleanup();
+    }
+  })();
+}
+
+/**
+ * Combines an optional caller signal with the timeout controller's signal into
+ * a single signal that aborts when either does. Returns a `cleanup` to detach
+ * the listener once the request settles.
+ */
+function combineSignals(
+  caller: AbortSignal | undefined,
+  timeoutSignal: AbortSignal,
+): { signal: AbortSignal; cleanup: () => void } {
+  if (!caller) return { signal: timeoutSignal, cleanup: () => {} };
+  if (caller.aborted) return { signal: caller, cleanup: () => {} };
+
+  const controller = new AbortController();
+  const onCallerAbort = () => controller.abort(caller.reason);
+  const onTimeoutAbort = () => controller.abort(timeoutSignal.reason);
+  caller.addEventListener("abort", onCallerAbort, { once: true });
+  timeoutSignal.addEventListener("abort", onTimeoutAbort, { once: true });
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      caller.removeEventListener("abort", onCallerAbort);
+      timeoutSignal.removeEventListener("abort", onTimeoutAbort);
+    },
   };
 }

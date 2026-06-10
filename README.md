@@ -44,11 +44,14 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 ## Features
 
 - **End-to-end type inference** — request params, response shape, and adapter output, all inferred without `any`
-- **Runtime validation** — Zod, Valibot, Yup, or any object with `.parse()` validates both request and response
+- **Runtime validation** — Zod, Valibot, Yup, any object with `.parse()`, or any [Standard Schema](https://standardschema.dev) (`~standard`, e.g. ArkType) validates both request and response
+- **Drift observation** — `validate: 'warn'` + `onValidationError` reports schema drift without turning it into an outage
 - **Transport agnostic** — swap `fetch`, axios, or your own HTTP client by changing one line
+- **Per-call options** — `(params, { signal, headers, timeout })` for per-request headers and timeouts (transport-agnostic)
 - **Plugin system** — composable named plugins with request/response/error hooks; `retry` and `timeout` as first-class options
+- **Flexible endpoint definition** — wrap a `request` envelope or declare `pathParams`/`query`/`body` as separate validators
 - **Nested routers** — mirror your URL structure in the type system
-- **Path param enforcement** — `path: '/:id'` with a missing `request.path.id` is a compile error
+- **Path param enforcement** — `path: '/:id'` with a missing path param is a compile error
 - **SSR/CSR ready** — same endpoint spec, different executor per environment
 
 ---
@@ -92,13 +95,19 @@ const { mutate } = useMutation(
 )
 ```
 
-Wire `routarMutationCache` once when creating your `QueryClient` to enable declarative `invalidates`:
+Wire `routarMutationCache` once when creating your `QueryClient` to enable declarative `invalidates` — or use `routarQueryClient()`, which self-wires it for you:
 
 ```ts
-import { routarMutationCache } from '@routar/react-query'
+import { routarQueryClient } from '@routar/react-query'
 
-let queryClient: QueryClient
-queryClient = new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })
+const queryClient = routarQueryClient() // routarMutationCache already wired
+```
+
+Need a POST that is semantically a read (e.g. a search with body filters)? Promote it to a query accessor with `queryEndpoints`:
+
+```ts
+const searchQuery = createQueries(searchApi, { queryEndpoints: { search: true } })
+useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } })) // body is part of the query key
 ```
 
 ---
@@ -213,6 +222,19 @@ endpoint({ path: '/:id', request: z.object({ path: z.object({ id: z.number() }) 
 endpoint({ path: '/:id', request: z.object({ query: z.object({ q: z.string() }) }), ... })
 ```
 
+**Separated buckets** — instead of the `request` envelope, declare each part on its own (both forms are equivalent):
+
+```ts
+endpoint({
+  method: 'GET', path: '/:id',
+  pathParams: z.object({ id: z.number() }),
+  query: z.object({ q: z.string() }),
+  response: TodoSchema,
+})
+```
+
+**Standard Schema** — `request`/`response` (and each bucket) also accept any `~standard` validator (ArkType, Zod 3.24+, Valibot, …), not just `.parse()` objects.
+
 ---
 
 ### `defineRouter(prefix, endpoints)`
@@ -242,7 +264,7 @@ await api.users.todos.getList({});                   // GET /api/users/todos
 
 ### `createApi(executor, router)`
 
-Produces a fully-typed API client. Each endpoint becomes an async function: `(params, signal?) => Promise<Response>`.
+Produces a fully-typed API client. Each endpoint becomes an async function: `(params, signalOrOptions?) => Promise<Response>` — the 2nd arg is an `AbortSignal` or a `{ signal?, headers?, timeout? }` options object.
 
 ```ts
 // three equivalent forms
@@ -258,6 +280,21 @@ await api.update({
   path:  { id: 1 },
   body:  { completed: true },
   query: { version: 2 },
+});
+
+// per-call headers + timeout (the bare-signal form still works)
+await api.update({ path: { id: 1 }, body: { completed: true } }, {
+  headers: { 'Idempotency-Key': key },
+  timeout: 30_000, // throws TimeoutError when exceeded
+});
+```
+
+**Validation modes** — `validate` is `boolean | 'warn' | { request?, response? }`. `'warn'` passes raw data through and calls `onValidationError(err, ctx)` instead of throwing — observe schema drift without an outage:
+
+```ts
+createApi(executor, todoRouter, {
+  validate: { request: true, response: 'warn' },
+  onValidationError: (err, ctx) => report(ctx), // { kind, method, url, data }
 });
 ```
 
@@ -488,9 +525,12 @@ controller.abort();
 
 | Error | Package | Thrown when |
 |-------|---------|-------------|
-| `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
-| `TimeoutError` | `@routar/core` | Request exceeds the `timeout` option duration |
+| `ValidationError` | `@routar/core` | `request`/`response` validation fails (under `validate: true`) |
+| `StandardSchemaError` | `@routar/core` | A Standard Schema (`~standard`) reports issues — wrapped as the `cause` of a `ValidationError`, with the `issues` array preserved |
+| `TimeoutError` | `@routar/core` | Request exceeds the executor `timeout` **or** a per-call `timeout` |
 | `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) returns a non-2xx status — the original transport error is on `err.cause` |
+
+> Under `validate: 'warn'`, validation failures do **not** throw — they pass the raw value through and call `onValidationError` instead.
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

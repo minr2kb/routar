@@ -70,6 +70,10 @@ const clientApi = createApi(axiosExecutor, todoRouter)   // CSR
 const serverApi = createApi(fetchExecutor, todoRouter)   // SSR — 동일한 스키마, 중복 없음
 ```
 
+## AI 시대: 검증 anchor
+
+AI는 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성하므로 "보일러플레이트 절감"은 더 이상 차별점이 아닙니다. 기계가 코드를 더 많이 쓸수록 가치가 오르는 것은 **생성된 코드가 틀렸을 때 기계적으로 잡아주는 가드레일**입니다 — 컴파일 타임 path-param 강제, 런타임 응답 검증, 그리고 클라이언트·타입·query key·MSW mock이 모두 파생되는 단일 스키마(한 곳을 고치면 전체 표면이 따라오거나 큰 소리로 실패). 모델은 빠르게 쓰게 하고, 컴파일러와 런타임 스키마가 검증하게 하세요. `routar infer` 입구와 drift → 스키마 수정 루프는 [AI 통합](/ko/ai-integration)을 참조하세요.
+
 ## 설계 원칙
 
 ### 1. 타입이 아닌 스키마

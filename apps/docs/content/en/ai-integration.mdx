@@ -7,6 +7,46 @@ description: Use routar with AI coding assistants — llms.txt, AGENTS.md, and I
 
 routar ships with resources so AI coding assistants (Claude Code, Copilot, Cursor) give accurate, routar-specific suggestions out of the box.
 
+## The verification anchor for AI-generated code
+
+AI now generates fetch wrappers, types, and hooks at near-zero cost — so "saves you boilerplate" is no longer the point. The value has shifted: the more code a model produces, the more you need **a mechanical guardrail that catches it when it's wrong.** routar is exactly that anchor:
+
+- **Compile-time path-param enforcement** — a generated call with a missing or misspelled `:param` fails to type-check, not at runtime.
+- **Runtime response validation** — when the backend drifts from what the model assumed, the schema catches it at the boundary instead of letting `undefined` propagate.
+- **One schema, everything downstream** — client, types, query keys, and MSW mocks all derive from a single endpoint definition. When AI edits one place, the whole surface stays consistent (or fails loudly).
+
+The takeaway for an AI-first workflow: let the model write fast, and let the compiler + runtime schema verify. routar's `llms.txt`, `AGENTS.md`, and JSDoc `@example` investments all serve this loop.
+
+## Generating schemas — `routar infer`
+
+routar's audience ("no backend spec, the frontend owns the schema") is exactly the team that can have AI *write* the schema. Turn that from a threat into an on-ramp: feed a real response into a model and have it emit a routar router.
+
+> **Status:** this is a documented manual workflow today, and a proposed `routar infer` CLI. It is not yet a shipped command — use the prompt recipe below with any assistant.
+
+```bash
+# Capture a real response
+curl -s https://api.example.com/todos/1 > sample.json
+```
+
+Then prompt your assistant:
+
+> "Here is a real response (`sample.json`) from `GET /todos/:id`. Generate a `@routar/core` router: a Zod `response` schema matching this JSON, an `endpoint()` with the correct `method`/`path`/`pathParams`, and a `defineRouter`. Use the separated-bucket form."
+
+Because the schema is the single source of truth, the generated router immediately yields a typed client, query keys, and MSW mocks — the cost of "writing the schema by hand" is paid by the model, once.
+
+## Observing drift → schema-fix loop
+
+Pair the on-ramp with `validate: 'warn'` + `onValidationError` (see [createApi](/en/api-reference/create-api#validation-modes)). In `'warn'` mode a response that no longer matches the schema passes through (no outage) but reports the exact mismatch:
+
+```ts
+const api = createApi(executor, todoRouter, {
+  validate: { response: 'warn' },
+  onValidationError: (err, ctx) => reportDrift(ctx), // { kind, method, url, data }
+})
+```
+
+Collected drift reports become the data source for the next step: an AI agent reads them and proposes a schema-fix PR. "The frontend owns the schema" stays sustainable in the AI era — the model both writes the initial schema and keeps it in sync with reality.
+
 ## llms.txt
 
 Two machine-readable documentation files are available at the root of this site:
