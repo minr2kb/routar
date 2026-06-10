@@ -160,6 +160,24 @@ describe("createFetchExecutor", () => {
     }
   });
 
+  it("HttpError includes url and method", async () => {
+    mockFetch({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: async () => null,
+    });
+    const executor = createFetchExecutor("https://api.example.com");
+    try {
+      await executor.execute({ method: "GET", url: "/todos/99" });
+      expect(true).toBe(false);
+    } catch (err) {
+      expect(err).toBeInstanceOf(HttpError);
+      expect((err as HttpError).url).toBe("https://api.example.com/todos/99");
+      expect((err as HttpError).method).toBe("GET");
+    }
+  });
+
   it("returns null for empty text body on 200", async () => {
     mockFetch({
       ok: true,

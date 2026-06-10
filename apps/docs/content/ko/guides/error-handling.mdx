@@ -27,7 +27,12 @@ try {
     console.log(err.message, err.cause)
   }
   if (err instanceof HttpError) {
-    console.log(err.status, err.statusText, err.body)
+    console.log(err.status)     // e.g. 422
+    console.log(err.statusText) // e.g. 'Unprocessable Entity'
+    console.log(err.body)       // 파싱된 JSON 페이로드, 또는 null
+    console.log(err.url)        // 전체 요청 URL, e.g. 'https://api.example.com/todos'
+    console.log(err.method)     // HTTP 메서드, e.g. 'POST'
+    console.log(err.cause)      // 원본 트랜스포트 에러 (AxiosError, ky HTTPError), 또는 undefined
   }
   if (err instanceof TimeoutError) {
     console.log(err.ms)

@@ -34,6 +34,9 @@ try {
     console.log(err.status)     // e.g. 422
     console.log(err.statusText) // e.g. 'Unprocessable Entity'
     console.log(err.body)       // parsed JSON payload, or null
+    console.log(err.url)        // full request URL, e.g. 'https://api.example.com/todos'
+    console.log(err.method)     // HTTP method, e.g. 'POST'
+    console.log(err.cause)      // original transport error (AxiosError, ky HTTPError), or undefined
   }
   if (err instanceof TimeoutError) {
     console.log(err.ms) // configured timeout in ms
