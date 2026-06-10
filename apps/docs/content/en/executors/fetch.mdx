@@ -34,6 +34,20 @@ createFetchExecutor(baseURL, {
 | `retry` | `number \| { count, shouldRetry? }` | Number of retries on failure |
 | `timeout` | `number` | Per-attempt timeout in milliseconds — throws `TimeoutError` on expiry |
 
+## Dynamic base URL
+
+`baseURL` accepts a static string or a sync/async factory called on every request. This is useful when the origin depends on the runtime environment — e.g. an absolute URL on the server (SSR) but a relative path on the client (CSR) — without maintaining two separate executors:
+
+```ts
+import { createFetchExecutor } from '@routar/core'
+
+const executor = createFetchExecutor(
+  () => (typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api'),
+)
+```
+
+The factory is evaluated per-request, so it always reflects the current environment. An async factory works too (e.g. resolving the origin from an async config source).
+
 ## Empty responses
 
 Responses with status `204`, `205`, or `304` resolve to `null`. A `200` response with an empty body also resolves to `null` instead of throwing a `SyntaxError`.

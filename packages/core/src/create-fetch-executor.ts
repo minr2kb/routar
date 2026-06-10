@@ -45,6 +45,8 @@ function buildFetchChain(
  * - Non-2xx responses throw an {@link HttpError}.
  *
  * @param baseURL - Absolute base URL prepended to every endpoint path.
+ *   Accepts a static string or a sync/async factory called on every request —
+ *   useful when the origin depends on runtime environment (e.g. SSR vs CSR).
  * @param options.defaultHeaders - Async factory called on every request to
  *   produce headers (e.g. reading cookies in a Next.js server component).
  * @param options.plugins - Plugins applied around the fetch call. Each retry
@@ -58,6 +60,13 @@ function buildFetchChain(
  * @example Minimal — no options needed
  * ```ts
  * const executor = createFetchExecutor('https://api.example.com');
+ * ```
+ *
+ * @example Dynamic base URL for SSR/CSR
+ * ```ts
+ * const executor = createFetchExecutor(
+ *   () => typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api',
+ * );
  * ```
  *
  * @example SSR with bearer token
@@ -79,7 +88,7 @@ function buildFetchChain(
  * ```
  */
 export function createFetchExecutor(
-  baseURL: string,
+  baseURL: string | (() => string | Promise<string>),
   options?: FetchExecutorOptions,
 ): Executor {
   const transport = async ({
@@ -90,7 +99,8 @@ export function createFetchExecutor(
     headers,
     signal,
   }: ExecuteOptions) => {
-    const fullURL = new URL(baseURL.replace(/\/$/, "") + url);
+    const resolvedBase = typeof baseURL === "function" ? await baseURL() : baseURL;
+    const fullURL = new URL(resolvedBase.replace(/\/$/, "") + url);
     if (params) {
       serializeParams(params).forEach((v, k) => {
         fullURL.searchParams.set(k, v);
@@ -112,7 +122,7 @@ export function createFetchExecutor(
 
     if (!res.ok) {
       const errorBody = await res.json().catch(() => null);
-      throw new HttpError(res.status, res.statusText, errorBody);
+      throw new HttpError(res.status, res.statusText, errorBody, { url: fullURL.toString(), method });
     }
     if (res.status === 204 || res.status === 205 || res.status === 304) {
       return null;
@@ -121,13 +131,17 @@ export function createFetchExecutor(
     return text === "" ? null : JSON.parse(text);
   };
 
-  const executor = createExecutor(transport, { plugins: options?.plugins });
+  const executor = createExecutor(transport, { plugins: options?.plugins, unwrap: options?.unwrap });
   return { execute: buildFetchChain(executor.execute, options?.retry, options?.timeout) };
 }
 
 /**
  * Thrown by {@link createFetchExecutor} when the server returns a non-2xx
- * status code.
+ * status code. The Axios and ky executors also normalize their transport
+ * errors to `HttpError`, so `onError` plugins and callers can branch on a
+ * single error type regardless of the underlying transport. The original
+ * transport error (e.g. an `AxiosError` or ky `HTTPError`) is preserved on
+ * the `cause` property.
  *
  * @example
  * ```ts
@@ -141,12 +155,18 @@ export function createFetchExecutor(
  * ```
  */
 export class HttpError extends Error {
+  public readonly url?: string;
+  public readonly method?: string;
+
   constructor(
     public readonly status: number,
     public readonly statusText: string,
     public readonly body: unknown = null,
+    options?: { url?: string; method?: string; cause?: unknown },
   ) {
-    super(`HTTP ${status}: ${statusText}`);
+    super(`HTTP ${status}: ${statusText}`, { cause: options?.cause });
     this.name = "HttpError";
+    this.url = options?.url;
+    this.method = options?.method;
   }
 }

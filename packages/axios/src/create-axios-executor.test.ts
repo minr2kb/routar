@@ -1,4 +1,6 @@
+import { HttpError } from "@routar/core";
 import { describe, expect, it, mock } from "bun:test";
+import { AxiosError } from "axios";
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import { createAxiosExecutor } from "./create-axios-executor.js";
 
@@ -70,5 +72,71 @@ describe("createAxiosExecutor", () => {
     const executor = createAxiosExecutor(instance);
     await executor.execute({ method: "GET", url: "/items" });
     expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  function makeAxiosError(status: number, data: unknown): AxiosError {
+    return new AxiosError(
+      `Request failed with status code ${status}`,
+      AxiosError.ERR_BAD_REQUEST,
+      undefined,
+      {},
+      {
+        status,
+        statusText: status === 404 ? "Not Found" : "Internal Server Error",
+        data,
+        headers: {},
+        // biome-ignore lint/suspicious/noExplicitAny: minimal config for test fixture
+        config: {} as any,
+      },
+    );
+  }
+
+  function makeThrowingInstance(error: unknown): AxiosInstance {
+    return {
+      interceptors: {},
+      defaults: { baseURL: "https://api.example.com" },
+      request: mock(async () => {
+        throw error;
+      }),
+    } as unknown as AxiosInstance;
+  }
+
+  it("normalizes a 4xx AxiosError to HttpError", async () => {
+    const axiosError = makeAxiosError(404, { message: "missing" });
+    const executor = createAxiosExecutor(makeThrowingInstance(axiosError));
+    await expect(
+      executor.execute({ method: "GET", url: "/todos/999" }),
+    ).rejects.toBeInstanceOf(HttpError);
+  });
+
+  it("populates HttpError fields from a 5xx AxiosError response", async () => {
+    const axiosError = makeAxiosError(500, { error: "boom" });
+    const executor = createAxiosExecutor(makeThrowingInstance(axiosError));
+    const err = await executor
+      .execute({ method: "GET", url: "/todos" })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(HttpError);
+    expect((err as HttpError).status).toBe(500);
+    expect((err as HttpError).statusText).toBe("Internal Server Error");
+    expect((err as HttpError).body).toEqual({ error: "boom" });
+  });
+
+  it("preserves the original AxiosError on HttpError.cause", async () => {
+    const axiosError = makeAxiosError(404, { message: "missing" });
+    const executor = createAxiosExecutor(makeThrowingInstance(axiosError));
+    const err = await executor
+      .execute({ method: "GET", url: "/todos/999" })
+      .catch((e) => e);
+    expect((err as HttpError).cause).toBe(axiosError);
+  });
+
+  it("re-throws non-response errors (network failures) unchanged", async () => {
+    const networkError = new AxiosError("Network Error", AxiosError.ERR_NETWORK);
+    const executor = createAxiosExecutor(makeThrowingInstance(networkError));
+    const err = await executor
+      .execute({ method: "GET", url: "/todos" })
+      .catch((e) => e);
+    expect(err).toBe(networkError);
+    expect(err).not.toBeInstanceOf(HttpError);
   });
 });

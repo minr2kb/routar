@@ -338,6 +338,14 @@ const correlationPlugin = definePlugin({
 
 네이티브 `fetch` API를 사용합니다. 요청마다 동적 헤더가 필요한 SSR 환경에 적합합니다.
 
+`baseURL`은 정적 문자열뿐 아니라 매 요청마다 호출되는 동기/비동기 팩토리도 받습니다 — origin이 런타임 환경에 따라 달라질 때(예: 서버에서는 절대 URL, 클라이언트에서는 상대 경로) 유용합니다:
+
+```ts
+const executor = createFetchExecutor(
+  () => (typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api'),
+);
+```
+
 ```ts
 import { createFetchExecutor } from '@routar/core';
 
@@ -378,7 +386,7 @@ const executor = createAxiosExecutor(async () => {
 });
 ```
 
-Axios 에러는 `AxiosError`로 전파되며 Axios 고유 필드(`err.response`, `err.config`)가 모두 보존됩니다.
+HTTP 실패는 (fetch executor와 동일하게) `HttpError`로 정규화됩니다. 원본 `AxiosError`는 `err.cause`에 보존되므로 Axios 고유 필드(`err.cause.config`, `err.cause.code`)에 계속 접근할 수 있습니다.
 
 ---
 
@@ -467,8 +475,7 @@ controller.abort();
 |------|--------|----------|
 | `ValidationError` | `@routar/core` | `request.parse()` 또는 `response.parse()` 실패 시 |
 | `TimeoutError` | `@routar/core` | `timeout` 옵션 제한 시간 초과 시 |
-| `HttpError` | `@routar/core` | 서버가 2xx가 아닌 상태 코드 반환 시 |
-| `AxiosError` | axios | Axios 전송 계층의 네트워크 또는 HTTP 에러 |
+| `HttpError` | `@routar/core` | 모든 executor(fetch, Axios, ky)가 2xx가 아닌 상태 코드 반환 시 — 원본 트랜스포트 에러는 `err.cause`에 보존 |
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

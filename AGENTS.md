@@ -66,7 +66,10 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } });
 | SSR (Next.js Server Components) | `createFetchExecutor` with `defaultHeaders` factory |
 | CSR (browser only) | `createAxiosExecutor` or `createFetchExecutor` |
 | SSR + CSR (same client) | `dispatchExecutor(() => isServer ? serverEx : clientEx)` |
+| SSR + CSR, only the origin differs | single `createFetchExecutor(() => isServer ? absoluteUrl : '/api')` |
 | Testing | `createMswHandlers` with MSW |
+
+`createFetchExecutor`'s `baseURL` accepts a static string or a sync/async factory called per request, so a runtime-dependent origin (SSR vs CSR) does not require a second executor.
 
 ```ts
 // SSR + CSR with dispatchExecutor — one API client works everywhere
@@ -323,10 +326,12 @@ try {
   await todoApi.create({ body: { title: '' } });
 } catch (err) {
   if (err instanceof ValidationError) /* request/response schema mismatch */;
-  if (err instanceof HttpError)       /* non-2xx: err.status, err.statusText, err.body */;
+  if (err instanceof HttpError)       /* non-2xx: err.status, err.statusText, err.body; err.cause = original transport error */;
   if (err instanceof TimeoutError)    /* timed out: err.ms */;
 }
 ```
+
+All executors (fetch, Axios, ky) normalize HTTP failures to `HttpError`, so a single `instanceof HttpError` check is transport-agnostic. The original `AxiosError` / ky `HTTPError` is preserved on `err.cause`. Network failures / cancellations (no response) re-throw unchanged.
 
 ## Anti-Patterns
 

@@ -216,7 +216,7 @@ type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title
 
 ## createExecutor(transportFn, options?)
 
-Low-level factory used internally by all executor packages. Use to integrate any HTTP client. `options.plugins` is an array of `ExecutorPlugin` applied in declaration order (first is outermost).
+Low-level factory used internally by all executor packages. Use to integrate any HTTP client. `options.plugins` is an array of `ExecutorPlugin` applied in declaration order (first is outermost). `options.unwrap` is `(raw: unknown) => unknown` — transforms the raw response before schema validation, useful for unwrapping envelope shapes like `{ data: T }`. It runs as the innermost `onResponse` hook (after the transport returns, before any plugin `onResponse` and before `createApi` validation), and is inherited by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`.
 
 ```ts
 import { createExecutor, logger } from '@routar/core';
@@ -226,7 +226,10 @@ const executor = createExecutor(
     const res = await myHttpClient.request({ method, url, body, headers, signal });
     return res.data;
   },
-  { plugins: [logger()] },
+  {
+    plugins: [logger()],
+    unwrap: (raw) => (raw as { data: unknown }).data, // unwrap `{ data: T }` envelopes
+  },
 );
 ```
 
@@ -268,15 +271,20 @@ export const todoApi = createApi(apiExecutor, todoRouter);
 
 ---
 
-## createFetchExecutor(baseURL, options?) — @routar/core
+## createFetchExecutor(baseURL: string | (() => string | Promise<string>), options?) — @routar/core
 
-Uses the native `fetch` API. Ideal for SSR with per-request dynamic headers.
+Uses the native `fetch` API. Ideal for SSR with per-request dynamic headers. `baseURL` accepts a static string or a sync/async factory called on every request (useful when the origin depends on runtime environment, e.g. SSR vs CSR).
 
 ```ts
 import { createFetchExecutor } from '@routar/core';
 
 // Minimal
 const executor = createFetchExecutor('https://api.example.com');
+
+// Dynamic base URL — absolute on the server, relative on the client
+const executor = createFetchExecutor(
+  () => (typeof window === 'undefined' ? 'http://localhost:3000/api' : '/api'),
+);
 
 // With SSR dynamic headers
 const executor = createFetchExecutor('https://api.example.com', {
@@ -712,8 +720,9 @@ export const todoApi = createApi(dispatchExecutor(() =>
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
 | `TimeoutError` | `@routar/core` | Request exceeds the `createFetchExecutor` `timeout` |
-| `HttpError` | `@routar/core` | `createFetchExecutor` gets a non-2xx response |
-| `AxiosError` | axios | Network or HTTP error from `@routar/axios` |
+| `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) gets a non-2xx response |
+
+All transports normalize HTTP failures to `HttpError`. The Axios and ky executors catch their native errors (`AxiosError`, ky `HTTPError`) and re-throw an `HttpError` with `status`/`statusText`/`body` populated from the response; the original transport error is preserved on `err.cause`. So a single `instanceof HttpError` check (and `onError` plugins) stay transport-agnostic. Network failures / cancellations (no response) are re-thrown unchanged.
 
 ```ts
 import { TimeoutError, ValidationError, HttpError } from '@routar/core';
@@ -722,7 +731,7 @@ try {
   await todoApi.create({ body: { title: '' } });
 } catch (err) {
   if (err instanceof ValidationError) console.log(err.message);
-  if (err instanceof HttpError)       console.log(err.status, err.body);
+  if (err instanceof HttpError)       console.log(err.status, err.body, err.cause);
   if (err instanceof TimeoutError)    console.log(`timed out after ${err.ms}ms`);
 }
 ```

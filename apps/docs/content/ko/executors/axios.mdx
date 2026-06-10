@@ -27,14 +27,24 @@ const executor = createAxiosExecutor(async () => {
 
 ## 에러
 
+HTTP 실패는 fetch executor와 동일하게 `HttpError`(`@routar/core`)로 정규화되므로, 호출부와 `onError` 플러그인이 트랜스포트에 무관해집니다. 원본 `AxiosError`는 `err.cause`에 보존됩니다:
+
 ```ts
+import { HttpError } from '@routar/core'
 import { isAxiosError } from 'axios'
 
 try {
   await todoApi.getDetail({ path: { id: 999 } })
 } catch (err) {
-  if (isAxiosError(err)) {
-    console.log(err.response?.status, err.response?.data)
+  if (err instanceof HttpError) {
+    console.log(err.status, err.statusText, err.body)
+
+    // Axios 고유 필드는 cause로 접근
+    if (isAxiosError(err.cause)) {
+      console.log(err.cause.config, err.cause.code)
+    }
   }
 }
 ```
+
+응답이 없는 에러(네트워크 실패, 요청 취소)는 정규화할 HTTP 상태가 없으므로 원본 `AxiosError` 그대로 다시 throw됩니다.

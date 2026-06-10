@@ -82,6 +82,26 @@ const executor = createExecutor(transport, {
 
 For retry and timeout on a custom transport, configure them on the underlying HTTP client (e.g. `ky.create({ retry, timeout })`, `got({ retry, timeout })`). The built-in `retry` and `timeout` options are only available on `createFetchExecutor`.
 
+## Unwrapping envelope responses
+
+When your API wraps payloads in an envelope like `{ data: T }`, use the `unwrap` option instead of writing an `onResponse` plugin:
+
+```ts
+const executor = createExecutor(transport, {
+  unwrap: (raw) => (raw as { data: unknown }).data,
+})
+```
+
+This is the clean alternative to the equivalent plugin:
+
+```ts
+// Works, but more boilerplate — prefer `unwrap`
+const unwrapEnvelope = definePlugin({ onResponse: (res) => (res as { data?: unknown })?.data ?? res })
+const executor = createExecutor(transport, { plugins: [unwrapEnvelope] })
+```
+
+`unwrap` runs as the innermost `onResponse` hook — immediately after the transport returns, before any plugins and before your `response` schema validates the payload. It is also available on `createFetchExecutor`, `@routar/axios`, and `@routar/ky`.
+
 ## Dynamic Authorization header
 
 The most common custom executor use case is injecting auth tokens per request:

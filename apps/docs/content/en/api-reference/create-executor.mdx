@@ -33,8 +33,21 @@ const executor = createExecutor(
 |-----------|------|-------------|
 | `transport` | `(opts: ExecuteOptions) => Promise<unknown>` | The actual HTTP call |
 | `options.plugins` | `ExecutorPlugin[]` | Plugins applied in declaration order (first is outermost). See [Plugins](/en/api-reference/plugins). |
+| `options.unwrap` | `(raw: unknown) => unknown` | Transforms the raw response before schema validation. Use to unwrap envelope shapes like `{ data: T }`. |
 
 For `retry` and `timeout`, use the options on [`createFetchExecutor`](/en/executors/fetch). For axios and ky, configure them on the underlying instance.
+
+## Unwrapping envelope responses
+
+Many APIs wrap payloads in an envelope such as `{ data: T }`. Pass `unwrap` to strip the envelope before your `response` schema runs — no boilerplate plugin needed:
+
+```ts
+const executor = createExecutor(transport, {
+  unwrap: (raw) => (raw as { data: unknown }).data,
+})
+```
+
+`unwrap` runs as the innermost `onResponse` hook: immediately after the transport returns, before any plugin `onResponse` hooks and before `createApi` validates the response. It is available on `createExecutor`, `createFetchExecutor`, `@routar/axios`, and `@routar/ky`.
 
 ## `ExecuteOptions`
 

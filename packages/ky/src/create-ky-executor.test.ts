@@ -1,4 +1,6 @@
+import { HttpError } from "@routar/core";
 import { describe, expect, it, mock } from "bun:test";
+import { HTTPError as KyHTTPError } from "ky";
 import type { KyInstance } from "ky";
 import { createKyExecutor } from "./create-ky-executor.js";
 
@@ -129,20 +131,64 @@ describe("createKyExecutor", () => {
     expect(callMock).toHaveBeenCalledTimes(1);
   });
 
-  it("propagates errors from ky unchanged", async () => {
-    class FakeHttpError extends Error {
-      constructor() {
-        super("404 Not Found");
-        this.name = "HTTPError";
-      }
-    }
+  function makeKyHttpError(status: number, body: unknown): KyHTTPError {
+    const response = {
+      status,
+      statusText: status === 404 ? "Not Found" : "Internal Server Error",
+      json: async () => body,
+    } as unknown as Response;
+    return new KyHTTPError(
+      response,
+      {} as Request,
+      // biome-ignore lint/suspicious/noExplicitAny: minimal options for test fixture
+      {} as any,
+    );
+  }
+
+  function makeThrowingInstance(error: unknown): KyInstance {
     const callMock = mock(async () => {
-      throw new FakeHttpError();
+      throw error;
     }) as unknown as CallMock;
-    const executor = createKyExecutor(makeInstance(callMock));
+    return makeInstance(callMock);
+  }
+
+  it("normalizes a ky HTTPError to HttpError", async () => {
+    const kyError = makeKyHttpError(404, { message: "missing" });
+    const executor = createKyExecutor(makeThrowingInstance(kyError));
     await expect(
-      executor.execute({ method: "GET", url: "/todos" }),
-    ).rejects.toBeInstanceOf(FakeHttpError);
+      executor.execute({ method: "GET", url: "/todos/999" }),
+    ).rejects.toBeInstanceOf(HttpError);
+  });
+
+  it("populates HttpError fields from the ky HTTPError response", async () => {
+    const kyError = makeKyHttpError(500, { error: "boom" });
+    const executor = createKyExecutor(makeThrowingInstance(kyError));
+    const err = await executor
+      .execute({ method: "GET", url: "/todos" })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(HttpError);
+    expect((err as HttpError).status).toBe(500);
+    expect((err as HttpError).statusText).toBe("Internal Server Error");
+    expect((err as HttpError).body).toEqual({ error: "boom" });
+  });
+
+  it("preserves the original ky HTTPError on HttpError.cause", async () => {
+    const kyError = makeKyHttpError(404, { message: "missing" });
+    const executor = createKyExecutor(makeThrowingInstance(kyError));
+    const err = await executor
+      .execute({ method: "GET", url: "/todos/999" })
+      .catch((e) => e);
+    expect((err as HttpError).cause).toBe(kyError);
+  });
+
+  it("re-throws non-HTTPError errors (network failures) unchanged", async () => {
+    const networkError = new TypeError("Failed to fetch");
+    const executor = createKyExecutor(makeThrowingInstance(networkError));
+    const err = await executor
+      .execute({ method: "GET", url: "/todos" })
+      .catch((e) => e);
+    expect(err).toBe(networkError);
+    expect(err).not.toBeInstanceOf(HttpError);
   });
 
   it("passes headers and signal to ky", async () => {

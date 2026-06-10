@@ -48,12 +48,26 @@ export function buildChain(
  *   plugins: [authPlugin, logger()],
  * });
  * ```
+ *
+ * @example Unwrap an envelope response
+ * ```ts
+ * const executor = createExecutor(transport, {
+ *   unwrap: (raw) => (raw as { data: unknown })?.data ?? raw,
+ * });
+ * ```
  */
 export function createExecutor(
   execute: (options: ExecuteOptions) => Promise<unknown>,
   options: CreateExecutorOptions = {},
 ): Executor {
-  const middlewares = (options.plugins ?? []).map(pluginToMiddleware);
+  const plugins = [...(options.plugins ?? [])];
+  // `unwrap` becomes the innermost `onResponse` hook: appended last so it runs
+  // first on the response (immediately after the transport, before user plugins).
+  if (options.unwrap) {
+    const unwrapFn = options.unwrap;
+    plugins.push({ onResponse: (raw) => unwrapFn(raw) });
+  }
+  const middlewares = plugins.map(pluginToMiddleware);
   return { execute: buildChain(execute, middlewares) };
 }
 

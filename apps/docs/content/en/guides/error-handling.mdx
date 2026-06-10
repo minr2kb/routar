@@ -1,6 +1,6 @@
 ---
 title: Error Handling
-description: Handle ValidationError, HttpError, and AxiosError — and normalize errors across transports with middleware.
+description: Handle ValidationError, HttpError, and TimeoutError — transport errors are normalized to HttpError across all executors.
 ---
 
 # Error Handling
@@ -10,9 +10,10 @@ description: Handle ValidationError, HttpError, and AxiosError — and normalize
 | Error | Package | Thrown when |
 |-------|---------|-------------|
 | `ValidationError` | `@routar/core` | Request or response validation fails |
-| `HttpError` | `@routar/core` | Server returns a non-2xx status (fetch executor only) |
+| `HttpError` | `@routar/core` | Server returns a non-2xx status (all executors — fetch, Axios, ky) |
 | `TimeoutError` | `@routar/core` | Request exceeds the `createFetchExecutor` `timeout` |
-| `AxiosError` | `axios` | Network or HTTP error via Axios |
+
+All transports normalize HTTP failures to `HttpError`. The Axios and ky executors catch their native errors (`AxiosError`, ky `HTTPError`) and re-throw an `HttpError` with `status`, `statusText`, and `body` populated from the response. The original transport error is preserved on `err.cause`, so you can still reach `AxiosError`-specific fields when you need them.
 
 ## Handling errors
 
@@ -33,6 +34,9 @@ try {
     console.log(err.status)     // e.g. 422
     console.log(err.statusText) // e.g. 'Unprocessable Entity'
     console.log(err.body)       // parsed JSON payload, or null
+    console.log(err.url)        // full request URL, e.g. 'https://api.example.com/todos'
+    console.log(err.method)     // HTTP method, e.g. 'POST'
+    console.log(err.cause)      // original transport error (AxiosError, ky HTTPError), or undefined
   }
   if (err instanceof TimeoutError) {
     console.log(err.ms) // configured timeout in ms
@@ -40,53 +44,40 @@ try {
 }
 ```
 
-## Branching by executor type
+## Transport-agnostic HTTP errors
 
-Each transport throws a different error type on HTTP failures. If you're switching executors or want to handle all HTTP errors in one place:
+Because every executor normalizes HTTP failures to `HttpError`, a single `instanceof HttpError` check handles fetch, Axios, and ky alike — no need to branch on `isAxiosError` or ky's `HTTPError`:
 
 ```ts
 import { HttpError } from '@routar/core'
-import { isAxiosError } from 'axios'
-import { HTTPError } from 'ky'
 
 try {
   await todoApi.getDetail({ path: { id: 1 } })
 } catch (err) {
   if (err instanceof HttpError) {
-    // createFetchExecutor — non-2xx response
+    // any executor — non-2xx response
     console.log(err.status, err.body)
-  } else if (isAxiosError(err)) {
-    // @routar/axios — Axios network or HTTP error
-    console.log(err.response?.status, err.response?.data)
-  } else if (err instanceof HTTPError) {
-    // @routar/ky — ky HTTP error
-    console.log(err.response.status, await err.response.json())
   }
 }
 ```
 
-## Normalizing errors across transports
-
-Each transport throws its own error type. If you want a single `instanceof` check across fetch and axios, add a normalizer plugin with an `onError` hook:
+If you need transport-specific fields (e.g. an `AxiosError`'s `config` or `code`), reach them through `err.cause`:
 
 ```ts
-import { definePlugin, HttpError } from '@routar/core'
+import { HttpError } from '@routar/core'
 import { isAxiosError } from 'axios'
 
-const errorNormalizer = definePlugin({
-  name: 'error-normalizer',
-  onError: async (err) => {
-    if (isAxiosError(err)) {
-      throw new HttpError(err.response?.status ?? 0, err.message)
-    }
-    throw err
-  },
-})
-
-const executor = createAxiosExecutor(instance, {
-  plugins: [errorNormalizer],
-})
+try {
+  await todoApi.getDetail({ path: { id: 1 } })
+} catch (err) {
+  if (err instanceof HttpError && isAxiosError(err.cause)) {
+    console.log(err.cause.code)   // e.g. 'ERR_BAD_REQUEST'
+    console.log(err.cause.config) // original request config
+  }
+}
 ```
+
+`onError` plugins see the same normalized `HttpError`, so plugin code is transport-agnostic too. (Network failures and cancellations — errors with no response — are re-thrown unchanged, since there is no HTTP status to normalize.)
 
 ## Retry only on server errors
 

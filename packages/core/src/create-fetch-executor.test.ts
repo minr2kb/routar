@@ -57,6 +57,31 @@ describe("createFetchExecutor", () => {
     );
   });
 
+  it("resolves a sync baseURL factory per request", async () => {
+    mockFetch({});
+    const baseURL = mock(() => "https://factory.example.com");
+    const executor = createFetchExecutor(baseURL);
+    await executor.execute({ method: "GET", url: "/todos" });
+    expect(baseURL).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://factory.example.com/todos",
+      expect.anything(),
+    );
+  });
+
+  it("resolves an async baseURL factory per request", async () => {
+    mockFetch({});
+    const baseURL = mock(async () => "https://async.example.com/api/");
+    const executor = createFetchExecutor(baseURL);
+    await executor.execute({ method: "GET", url: "/todos" });
+    await executor.execute({ method: "GET", url: "/users" });
+    expect(baseURL).toHaveBeenCalledTimes(2);
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      "https://async.example.com/api/users",
+      expect.anything(),
+    );
+  });
+
   it("appends query params to URL", async () => {
     const m = mockFetch({});
     const executor = createFetchExecutor("https://api.example.com");
@@ -135,6 +160,24 @@ describe("createFetchExecutor", () => {
     }
   });
 
+  it("HttpError includes url and method", async () => {
+    mockFetch({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: async () => null,
+    });
+    const executor = createFetchExecutor("https://api.example.com");
+    try {
+      await executor.execute({ method: "GET", url: "/todos/99" });
+      expect(true).toBe(false);
+    } catch (err) {
+      expect(err).toBeInstanceOf(HttpError);
+      expect((err as HttpError).url).toBe("https://api.example.com/todos/99");
+      expect((err as HttpError).method).toBe("GET");
+    }
+  });
+
   it("returns null for empty text body on 200", async () => {
     mockFetch({
       ok: true,
@@ -155,6 +198,17 @@ describe("createFetchExecutor", () => {
     expect(defaultHeaders).toHaveBeenCalledTimes(1);
     const headers = new Headers(m.mock.calls[0][1]?.headers);
     expect(headers.get("X-Auth")).toBe("token-123");
+  });
+
+  it("applies unwrap to the parsed response body", async () => {
+    mockFetch({
+      text: async () => JSON.stringify({ data: { id: 1, title: "todo" } }),
+    });
+    const executor = createFetchExecutor("https://api.example.com", {
+      unwrap: (raw) => (raw as { data: unknown }).data,
+    });
+    const result = await executor.execute({ method: "GET", url: "/todos/1" });
+    expect(result).toEqual({ id: 1, title: "todo" });
   });
 
   it("propagates network errors (non-HTTP) unchanged", async () => {

@@ -1,6 +1,7 @@
 import type { CreateExecutorOptions, Executor } from "@routar/core";
-import { createExecutor, serializeParams } from "@routar/core";
+import { createExecutor, HttpError, serializeParams } from "@routar/core";
 import type { KyInstance } from "ky";
+import { HTTPError as KyHTTPError } from "ky";
 
 /** Zero-argument factory that returns a ky instance (optionally async). */
 type InstanceFactory = () => KyInstance | Promise<KyInstance>;
@@ -38,8 +39,12 @@ function resolveInstance(
  * hook-friendly). Also supports SSR via a factory that produces a fresh
  * instance per request, allowing dynamic per-request auth headers.
  *
- * ky errors (`HTTPError`) propagate unchanged through the executor so you
- * can inspect `err.response` in middleware or callers.
+ * Transport errors are normalized: a ky `HTTPError` is re-thrown as an
+ * {@link HttpError} (with `status`, `statusText`, and the parsed response
+ * `body` populated, and the original ky `HTTPError` preserved on `cause`).
+ * This keeps `onError` plugins and callers transport-agnostic — they can
+ * branch on `instanceof HttpError` regardless of the underlying client.
+ * Other errors (network failures, timeouts) are re-thrown unchanged.
  *
  * The `KyInstance` must have `prefixUrl` set — routar route paths (e.g.
  * `/todos`) have their leading `/` stripped before being passed to ky, which
@@ -69,16 +74,29 @@ export function createKyExecutor(
     async ({ method, url, params, body, headers, signal }) => {
       const instance = await resolveInstance(instanceOrFactory);
       const relativeUrl = url.replace(/^\//, "");
-      const response = await instance(relativeUrl, {
-        method,
-        ...(params ? { searchParams: serializeParams(params) } : {}),
-        ...(body != null ? { json: body } : {}),
-        headers,
-        signal,
-      });
-      if (response.status === 204 || response.status === 205) return null;
-      const text = await response.text();
-      return text === "" ? null : JSON.parse(text);
+      try {
+        const response = await instance(relativeUrl, {
+          method,
+          ...(params ? { searchParams: serializeParams(params) } : {}),
+          ...(body != null ? { json: body } : {}),
+          headers,
+          signal,
+        });
+        if (response.status === 204 || response.status === 205) return null;
+        const text = await response.text();
+        return text === "" ? null : JSON.parse(text);
+      } catch (err) {
+        if (err instanceof KyHTTPError) {
+          const errorBody = await err.response.json().catch(() => null);
+          throw new HttpError(
+            err.response.status,
+            err.response.statusText,
+            errorBody,
+            { url: err.response.url, method, cause: err },
+          );
+        }
+        throw err;
+      }
     },
     options,
   );
