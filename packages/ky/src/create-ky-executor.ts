@@ -92,7 +92,7 @@ export function createKyExecutor(
             err.response.status,
             err.response.statusText,
             errorBody,
-            err,
+            { url: err.response.url, method, cause: err },
           );
         }
         throw err;

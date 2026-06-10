@@ -122,7 +122,7 @@ export function createFetchExecutor(
 
     if (!res.ok) {
       const errorBody = await res.json().catch(() => null);
-      throw new HttpError(res.status, res.statusText, errorBody);
+      throw new HttpError(res.status, res.statusText, errorBody, { url: fullURL.toString(), method });
     }
     if (res.status === 204 || res.status === 205 || res.status === 304) {
       return null;
@@ -155,13 +155,18 @@ export function createFetchExecutor(
  * ```
  */
 export class HttpError extends Error {
+  public readonly url?: string;
+  public readonly method?: string;
+
   constructor(
     public readonly status: number,
     public readonly statusText: string,
     public readonly body: unknown = null,
-    public readonly cause?: unknown,
+    options?: { url?: string; method?: string; cause?: unknown },
   ) {
-    super(`HTTP ${status}: ${statusText}`, { cause });
+    super(`HTTP ${status}: ${statusText}`, { cause: options?.cause });
     this.name = "HttpError";
+    this.url = options?.url;
+    this.method = options?.method;
   }
 }

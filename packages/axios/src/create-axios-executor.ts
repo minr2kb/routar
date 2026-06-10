@@ -91,7 +91,7 @@ export function createAxiosExecutor(
             err.response.status,
             err.response.statusText ?? String(err.response.status),
             err.response.data,
-            err,
+            { url: base + url, method, cause: err },
           );
         }
         throw err;
