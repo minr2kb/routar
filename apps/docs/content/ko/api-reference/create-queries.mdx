@@ -7,7 +7,7 @@ description: "createQueries는 routar 라우터에서 타입이 적용된 queryO
 
 ## `createQueries(api, options?)`
 
-routar API 클라이언트에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 파생합니다. 라우터를 다시 전달할 필요가 없습니다 — `createApi`가 클라이언트의 `$router` 프로퍼티에 라우터를 실어두고 `createQueries`가 이를 복원합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 쿼리 접근자, GET이 아닌 엔드포인트는 뮤테이션 접근자가 됩니다.
+routar API 클라이언트에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리를 파생합니다. 라우터를 다시 전달할 필요가 없습니다 — `createApi`가 클라이언트의 `$router` 프로퍼티에 라우터를 실어두고 `createQueries`가 이를 복원합니다. 반환 객체는 라우터의 형태를 그대로 반영합니다 — GET 엔드포인트는 쿼리 접근자, GET이 아닌 엔드포인트는 뮤테이션 접근자가 됩니다([`queryEndpoints`](#post-as-query-queryendpoints)로 승격하지 않는 한).
 
 ```ts
 import { createQueries } from '@routar/react-query'
@@ -25,6 +25,7 @@ export const todoQuery = createQueries(todoApi)
 | `options.defaults` | `Record<string, Options \| ((params, q) => Options)>` | 엔드포인트 이름을 키로 하는 per-endpoint 기본 옵션. 각 값은 **정적 옵션 객체** 또는 **함수** `(params, q) => options`입니다 ([동적 기본값](#동적-기본값) 참조). per-call 옵션 **이전에** 병합됩니다 (per-call이 우선). 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름); 뮤테이션 엔드포인트의 경우 값은 `invalidates`를 포함한 뮤테이션 옵션. |
 | `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | GET 엔드포인트 이름을 키로 하는 무한 쿼리 계약. `initialPageParam`, `getNextPageParam`, routar 고유의 `pageParam` 빌더를 한 번 선언하여 호출 지점에서 기본 파라미터만 전달하면 되도록 합니다. 중첩 라우터도 지원(맵이 라우터 구조를 그대로 따름). |
 | `options.flatten` | `boolean` (기본값 `false`) | `true`이면 접근자가 중첩 envelope 대신 **flat** 파라미터(request의 `path`/`query`/`body` 필드 합집합)를 받습니다. [Flatten](#flatten) 참조. |
+| `options.queryEndpoints` | `Record<string, true \| nested>` | GET이 아닌 엔드포인트를 **쿼리** 접근자로 승격. [POST-as-query](#post-as-query-queryendpoints) 참조. |
 
 > 기존의 외부 팩토리 형태 `createQueries(api, (q) => options)`는 **제거되었습니다**. 형제 키 헬퍼를 참조하려면 아래의 `defaults` 함수 형태(`(params, q) => options`)를 사용하세요.
 
@@ -61,6 +62,26 @@ todoQuery.getList({ done: true })         // { query: { done: true } } 대신
 
 - **envelope 폴백:** 버킷이 같은 키로 충돌하거나(예: `path.id` + `body.id`) `body`가 plain object가 아닌(`z.array`, `z.string` 등) 엔드포인트는 envelope 형태를 유지합니다. 타입이 엔드포인트별로 이를 강제합니다.
 - **키는 항상 envelope 기준:** `.queryKey()`, `.mutationKey`, `.infinite.queryKey()`는 flatten과 무관하므로, 호출 방식과 상관없이 SSR과 CSR 키가 일치합니다. `flatten`은 `createQueries`에만 있는 호출 편의 옵션 — routar 클라이언트와 HTTP 계약은 항상 envelope를 사용합니다.
+
+### POST-as-query (`queryEndpoints`)
+
+기본 분류는 HTTP 메서드 기준입니다 — GET → 쿼리 접근자, 그 외 → 뮤테이션 접근자. 하지만 의미상 *읽기*인 POST(예: 필터를 body로 보내는 복잡한 검색)는 `useSuspenseQuery`에 속하고 query key 캐싱 혜택을 받습니다. `queryEndpoints`로 승격하세요:
+
+```ts
+export const searchQuery = createQueries(searchApi, {
+  queryEndpoints: { search: true }, // POST /search → 쿼리 접근자
+})
+
+// 이제 쿼리 접근자 — body가 query key의 일부
+useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } }))
+searchQuery.search.queryKey({ body: { term: 'routar' } })
+// → ["search", "search", { body: { term: "routar" } }]
+```
+
+- 맵은 **라우터 구조를 그대로 미러링** — 하위 라우터는 중첩: `{ search: true, reports: { query: true } }`.
+- 승격된 엔드포인트는 `.infinite` 변형을 포함한 완전한 쿼리 접근자가 됩니다(계약은 평소처럼 `infinite`에 선언).
+- request body가 query key에 포함되므로(envelope 기반 키 빌더가 모든 파라미터를 키에 넣음) 서로 다른 검색은 별도로 캐시됩니다.
+- 승격하지 않은 GET이 아닌 엔드포인트는 뮤테이션 접근자로 유지됩니다.
 
 ### 에러 타이핑
 
@@ -223,3 +244,32 @@ queryClient = new QueryClient({
 모든 뮤테이션 성공 후, `routarMutationCache`는 `mutation.meta.invalidates`를 읽고 각 항목에 대해 `queryClient.invalidateQueries`를 호출합니다. `meta`에 `invalidates`가 없는 뮤테이션은 영향을 받지 않습니다.
 
 `invalidates`와 기본 `onSuccess` 콜백을 함께 사용할 수 있으며 둘 다 실행됩니다.
+
+---
+
+## `routarQueryClient(config?)`
+
+`routarMutationCache`가 이미 자기참조 배선된 `QueryClient`를 반환하는 편의 팩토리 — 수동 자기참조 보일러플레이트를 제거합니다:
+
+```ts
+import { routarQueryClient } from '@routar/react-query'
+
+// 이전 — 수동 자기참조:
+let queryClient: QueryClient
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+})
+
+// 이후:
+const queryClient = routarQueryClient()
+```
+
+모든 `QueryClientConfig`(예: `defaultOptions`)를 그대로 전달받습니다:
+
+```ts
+const queryClient = routarQueryClient({
+  defaultOptions: { queries: { staleTime: 60_000 } },
+})
+```
+
+직접 `mutationCache`를 전달하면 그것을 존중하고 routar 캐시는 배선하지 **않습니다**(따라서 해당 캐시가 `meta.invalidates`를 처리하지 않으면 `invalidates`가 동작하지 않습니다).

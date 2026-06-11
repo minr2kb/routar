@@ -62,7 +62,8 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 
 - **`response` + `adapter` are always separate.** `response` is a pure Zod schema (stays a `ZodObject`, can be composed). `adapter` is a plain function that transforms the validated response. Never put `.transform()` on a response schema.
 - **`RouterEndpoints` uses `any` generics intentionally.** `Record<string, EndpointSpec<any, any, any> | RouterDef<any>>` — the `any`s are not a mistake; they allow adapter functions typed to specific response shapes to be assignable without contravariance issues.
-- **`endpoint()` has 4 overloads** (request×adapter). All return types have `request` and `adapter` as required (not optional) fields. This is intentional — `| undefined` in return types breaks downstream conditional type inference in `createApi`.
+- **`endpoint()` has 4 envelope overloads** (request×adapter) **+ 2 separated-bucket overloads** (SE-12, adapter×). All return types have `request` and `adapter` as required (not optional) fields. This is intentional — `| undefined` in return types breaks downstream conditional type inference in `createApi`. The bucket overloads **capture the concrete validator type** (`TReq extends AnyValidator<…>`) rather than inferring the output shape, so the return type stays a single type (never a union) and `EndpointFn`'s `TSpec["request"] extends Validator<infer R>` detection keeps working.
+- **`AnyValidator` accepts `.parse` OR Standard Schema (SE-11).** `AnyValidator<T> = Validator<T> | StandardSchemaV1<unknown, T>`. `EndpointSpec` request/response are `AnyValidator`. Runtime validation goes through `runValidator` (prefers sync `.parse`, else `~standard.validate`). The `StandardSchemaV1` type is **vendored** (`standard-schema.ts`) to keep core zero-dependency — do not add `@standard-schema/spec`.
 - **`buildClient` is recursive.** When a `RouterEndpoints` value has `prefix` + `endpoints` keys it is treated as a nested `RouterDef` and `buildClient` recurses with `joinPaths(prefix, nested.prefix)`.
 - **`createApi` stamps the source router on the client's non-enumerable `$router` property** (return type `ApiClientWithRouter`). `@routar/react-query`'s `createQueries(api)` recovers prefix + endpoint `method`s from it, so the router is never re-passed. `$router` is `$`-prefixed (no endpoint-name collision) and excluded from `ApiTypes`; don't break this contract.
 - **DTS build requires `ignoreDeprecations: '6.0'`** in `tsup.config.ts` (not in tsconfig). tsup internally injects `baseUrl` which TypeScript 6.x treats as deprecated.
@@ -71,16 +72,19 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 
 | File | Purpose |
 |------|---------|
-| `types.ts` | All shared interfaces and types (`ExecuteOptions`, `Executor`, `EndpointSpec`, `RouterDef`, `RouterEntry`, `ApiTypes`, …) |
-| `define-endpoint.ts` | `endpoint()` helper with 4 overloads + `PathParams<TPath>` template literal type |
+| `types.ts` | All shared interfaces and types (`ExecuteOptions`, `Executor`, `EndpointSpec`, `RouterDef`, `RouterEntry`, `ApiTypes`, `AnyValidator`, `ValidationMode`, `ValidationErrorContext`, `EndpointCallOptions`, …) |
+| `standard-schema.ts` | Vendored `StandardSchemaV1` interface (SE-11) — keeps core dependency-free |
+| `define-endpoint.ts` | `endpoint()` helper with 4 envelope + 2 separated-bucket overloads + `PathParams<TPath>` template literal type |
 | `define-router.ts` | `defineRouter(prefix, endpoints)` — groups specs under a prefix |
 | `create-executor.ts` | `createExecutor(execute, options?)` + `dispatchExecutor` — wraps a transport function with `options.plugins` (converted to a middleware chain via `reduceRight`) |
 | `create-fetch-executor.ts` | `createFetchExecutor(baseURL, options?)` + `HttpError` — native fetch transport |
-| `create-api.ts` | `createApi(executor, router)` — produces a typed client; `buildClient` recurses for nested routers |
+| `create-api.ts` | `createApi(executor, router)` — typed client; per-call options + per-call timeout (`executeWithTimeout`/`combineSignals`); `validate` modes (`true`/`false`/`'warn'`) via `validateMode` |
 | `middleware.ts` | `definePlugin`, `logger`, `TimeoutError` (public exports) + `withRetry`, `withTimeout` (internal helpers) — `ExecutorPlugin` lifecycle hooks (`onRequest`/`onResponse`/`onError`) |
 | `utils/path.ts` | `joinPaths`, `resolvePath` (`:param` substitution) |
 | `utils/params.ts` | `serializeParams` → `URLSearchParams` |
-| `utils/validate.ts` | `ValidationError` |
+| `utils/validate.ts` | `ValidationError`, `StandardSchemaError` |
+| `utils/run-validator.ts` | `runValidator(validator, data)` — validate-or-throw for `.parse` **or** `~standard` (shared by createApi + `@routar/msw`) |
+| `utils/compose-request.ts` | `composeRequest(buckets)` — composes SE-12 separated buckets into an envelope `request` validator (carries Zod-like `.shape` for flatten) |
 
 ### `apps/example` structure
 
@@ -105,8 +109,10 @@ components/
 
 **TanStack Query patterns (`@routar/react-query`):**
 - `services/<domain>.ts` exports `export const <domain>Query = createQueries(<domain>Api)` alongside the api client — the single source of truth for keys + queryFn/mutationFn
-- Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints)
+- Query accessors: `<domain>Query.<endpoint>(params?, options?)` returns `queryOptions` (GET endpoints, **or** non-GET endpoints promoted via `queryEndpoints`)
 - Mutation accessors: `<domain>Query.<endpoint>(options?)` returns `mutationOptions` (non-GET endpoints)
+- POST-as-query (SE-9): `createQueries(api, { queryEndpoints: { search: true } })` promotes a non-GET endpoint to a query accessor (request body is part of the query key); the map mirrors the router shape and the promoted endpoint also exposes `.infinite`
+- `routarQueryClient(config?)` (SE-8): returns a `QueryClient` with `routarMutationCache` self-wired — removes the `let queryClient; queryClient = new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })` boilerplate
 - Key helpers: `<domain>Query.<endpoint>.queryKey(params?)` / `<domain>Query.<endpoint>.mutationKey` / `<domain>Query.$key` (domain root)
 - Per-endpoint defaults: `createQueries(api, { defaults: { getList: { staleTime: 60_000 } } })` — merged before per-call options (per-call wins); nested routers supported (the map mirrors the router shape). Each default value may be a static object or a function `(params, q) => options` (dynamic defaults) — `q` is the fully-built queries object (use its key helpers for `invalidates`), `params` is the call params for a query accessor or `undefined` for a mutation accessor. The old external factory form `createQueries(api, (q) => options)` was removed in favor of this `(params, q)` default form
 - Flatten: `createQueries(api, { flatten: true })` — accessors take flat params (union of the request's `path`/`query`/`body` fields) instead of the `{ path, query, body }` envelope; call-site convenience only (HTTP contract + keys stay envelope-based, so SSR/CSR keys match); endpoints with colliding buckets or non-object `body` fall back to the envelope
@@ -137,7 +143,16 @@ This uses the `PathParams<TPath>` template literal type and `PathConstraint<TPat
 
 ### Validator compatibility
 
-Any object with a `.parse(data: unknown): T` method works as a `Validator<T>`. Zod, Valibot, Yup, or a hand-rolled object all satisfy the interface.
+Any object with a `.parse(data: unknown): T` method works as a `Validator<T>` (Zod, Valibot, Yup, or a hand-rolled object). Additionally, any **Standard Schema** (`~standard` — ArkType, Zod 3.24+, Valibot, …) works via `AnyValidator` (SE-11). At runtime `runValidator` prefers `.parse` (sync) and falls back to `~standard.validate` (sync/async); Standard Schema issues are thrown as `StandardSchemaError` and wrapped in `ValidationError` (original on `.cause`).
+
+### Validation modes & per-call options (SE-7, SE-10)
+
+- `createApi(executor, router, { validate, onValidationError })`. `validate` is `boolean | 'warn' | { request?, response? }` (each a `ValidationMode = boolean | 'warn'`). `'warn'` passes raw data through and calls `onValidationError(err, { kind, method, url, data })` instead of throwing — drift observation without an outage.
+- Endpoint call signature: `fn(params, signalOrOptions?)` where the 2nd arg is `AbortSignal | { signal?, headers?, timeout? }` (bare signal stays valid). Per-call `headers` merge over executor defaults (plugin `onRequest` runs after, wins on key collision); per-call `timeout` aborts with `TimeoutError` at the core level (works on every executor).
+
+### Separated request buckets (SE-12)
+
+`endpoint()` also accepts `pathParams` / `query` / `body` as separate validators instead of a wrapped `request` envelope. `composeRequest` folds them into the same envelope `request` (with a Zod-like `.shape`), so call sites, keys, react-query flatten, and MSW are identical. The envelope `request` form is unchanged. Both forms coexist (additive, non-breaking).
 
 ---
 

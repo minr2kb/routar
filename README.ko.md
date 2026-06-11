@@ -43,11 +43,14 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 ## 특징
 
 - **엔드-투-엔드 타입 추론** — 요청 파라미터, 응답 형태, 어댑터 출력까지 `any` 없이 전부 추론
-- **런타임 검증** — Zod, Valibot, Yup 또는 `.parse()`를 가진 객체라면 무엇이든 요청·응답 검증에 사용 가능
+- **런타임 검증** — Zod, Valibot, Yup, `.parse()`를 가진 객체, 또는 모든 [Standard Schema](https://standardschema.dev)(`~standard`, 예: ArkType)로 요청·응답 검증
+- **drift 관찰** — `validate: 'warn'` + `onValidationError`로 장애 없이 스키마 drift 리포트
 - **전송 계층 독립** — 한 줄 변경으로 `fetch`, axios, 또는 커스텀 HTTP 클라이언트로 교체
+- **per-call 옵션** — `(params, { signal, headers, timeout })`로 요청별 헤더·타임아웃(전송 계층 독립)
 - **플러그인 시스템** — request/response/error 훅을 가진 이름 있는 플러그인; `retry`와 `timeout`은 first-class 옵션
+- **유연한 엔드포인트 정의** — `request` envelope로 감싸거나 `pathParams`/`query`/`body`를 개별 validator로 선언
 - **중첩 라우터** — URL 구조를 타입 시스템에 그대로 반영
-- **경로 파라미터 강제** — `request.path.id`가 없는데 `path: '/:id'`를 쓰면 컴파일 에러
+- **경로 파라미터 강제** — path param이 없는데 `path: '/:id'`를 쓰면 컴파일 에러
 - **SSR/CSR 지원** — 동일한 엔드포인트 스펙, 환경에 따라 다른 executor
 
 ---
@@ -91,13 +94,19 @@ const { mutate } = useMutation(
 )
 ```
 
-선언적 `invalidates`를 활성화하려면 `QueryClient` 생성 시 `routarMutationCache`를 한 번 배선하세요:
+선언적 `invalidates`를 활성화하려면 `QueryClient` 생성 시 `routarMutationCache`를 한 번 배선하세요 — 또는 자동 배선되는 `routarQueryClient()`를 사용하세요:
 
 ```ts
-import { routarMutationCache } from '@routar/react-query'
+import { routarQueryClient } from '@routar/react-query'
 
-let queryClient: QueryClient
-queryClient = new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })
+const queryClient = routarQueryClient() // routarMutationCache 자동 배선
+```
+
+의미상 읽기인 POST(예: body 필터를 쓰는 검색)는 `queryEndpoints`로 쿼리 접근자로 승격하세요:
+
+```ts
+const searchQuery = createQueries(searchApi, { queryEndpoints: { search: true } })
+useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } })) // body가 query key의 일부
 ```
 
 ---
@@ -198,6 +207,19 @@ endpoint({ path: '/:id', request: z.object({ path: z.object({ id: z.number() }) 
 endpoint({ path: '/:id', request: z.object({ query: z.object({ q: z.string() }) }), ... })
 ```
 
+**버킷 분리형** — `request` envelope 대신 각 부분을 개별 선언(두 형태는 동등):
+
+```ts
+endpoint({
+  method: 'GET', path: '/:id',
+  pathParams: z.object({ id: z.number() }),
+  query: z.object({ q: z.string() }),
+  response: TodoSchema,
+})
+```
+
+**Standard Schema** — `request`/`response`(및 각 버킷)는 `.parse()` 객체뿐 아니라 모든 `~standard` validator(ArkType, Zod 3.24+, Valibot 등)도 받습니다.
+
 ---
 
 ### `defineRouter(prefix, endpoints)`
@@ -227,7 +249,7 @@ await api.users.todos.getList({});                   // GET /api/users/todos
 
 ### `createApi(executor, router)`
 
-완전히 타입이 지정된 API 클라이언트를 생성합니다. 각 엔드포인트는 `(params, signal?) => Promise<Response>` 형태의 비동기 함수가 됩니다.
+완전히 타입이 지정된 API 클라이언트를 생성합니다. 각 엔드포인트는 `(params, signalOrOptions?) => Promise<Response>` 형태의 비동기 함수가 됩니다 — 두 번째 인자는 `AbortSignal` 또는 `{ signal?, headers?, timeout? }` 옵션 객체입니다.
 
 ```ts
 // 세 가지 동등한 형태
@@ -243,6 +265,21 @@ await api.update({
   path:  { id: 1 },
   body:  { completed: true },
   query: { version: 2 },
+});
+
+// per-call 헤더 + 타임아웃 (bare signal 형태도 유효)
+await api.update({ path: { id: 1 }, body: { completed: true } }, {
+  headers: { 'Idempotency-Key': key },
+  timeout: 30_000, // 초과 시 TimeoutError
+});
+```
+
+**검증 모드** — `validate`는 `boolean | 'warn' | { request?, response? }`입니다. `'warn'`은 raw 데이터를 통과시키고 throw 대신 `onValidationError(err, ctx)`를 호출 — 장애 없이 스키마 drift 관찰:
+
+```ts
+createApi(executor, todoRouter, {
+  validate: { request: true, response: 'warn' },
+  onValidationError: (err, ctx) => report(ctx), // { kind, method, url, data }
 });
 ```
 
@@ -473,9 +510,12 @@ controller.abort();
 
 | 에러 | 패키지 | 발생 조건 |
 |------|--------|----------|
-| `ValidationError` | `@routar/core` | `request.parse()` 또는 `response.parse()` 실패 시 |
-| `TimeoutError` | `@routar/core` | `timeout` 옵션 제한 시간 초과 시 |
+| `ValidationError` | `@routar/core` | `request`/`response` 검증 실패 시(`validate: true`에서) |
+| `StandardSchemaError` | `@routar/core` | Standard Schema(`~standard`)가 이슈를 보고할 때 — `ValidationError`의 `cause`로 래핑되며 `issues` 배열 보존 |
+| `TimeoutError` | `@routar/core` | executor `timeout` **또는** per-call `timeout` 초과 시 |
 | `HttpError` | `@routar/core` | 모든 executor(fetch, Axios, ky)가 2xx가 아닌 상태 코드 반환 시 — 원본 트랜스포트 에러는 `err.cause`에 보존 |
+
+> `validate: 'warn'`에서는 검증 실패가 throw하지 **않습니다** — raw 값을 통과시키고 대신 `onValidationError`를 호출합니다.
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

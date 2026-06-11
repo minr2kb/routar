@@ -53,3 +53,69 @@ describe("endpoint() literal method", () => {
     expect(e.method).toBe("DELETE");
   });
 });
+
+describe("endpoint() separated request buckets (SE-12)", () => {
+  it("composes pathParams/query into an envelope request validator", () => {
+    const e = endpoint({
+      method: "GET",
+      path: "/:id",
+      pathParams: z.object({ id: z.number() }),
+      query: z.object({ q: z.string() }),
+      response: z.object({ id: z.number() }),
+    });
+    type _method = Expect<Equal<typeof e.method, "GET">>;
+    // The synthesized request parses into the canonical envelope shape.
+    const parsed = e.request.parse({ path: { id: 1 }, query: { q: "x" } });
+    expect(parsed).toEqual({ path: { id: 1 }, query: { q: "x" } });
+  });
+
+  it("infers the envelope request type from the buckets", () => {
+    const e = endpoint({
+      method: "POST",
+      path: "/:id",
+      pathParams: z.object({ id: z.number() }),
+      body: z.object({ title: z.string() }),
+      response: z.object({ ok: z.boolean() }),
+    });
+    type Req = ReturnType<typeof e.request.parse>;
+    // Structural round-trip: the envelope carries exactly path + body.
+    const value: Req = { path: { id: 1 }, body: { title: "x" } };
+    const back: { path: { id: number }; body: { title: string } } = value;
+    expect(back.path.id).toBe(1);
+    expect(e.method).toBe("POST");
+  });
+
+  it("exposes a Zod-like shape for react-query flatten introspection", () => {
+    const e = endpoint({
+      method: "GET",
+      path: "/:id",
+      pathParams: z.object({ id: z.number() }),
+      query: z.object({ q: z.string() }),
+      response: z.object({ id: z.number() }),
+    });
+    const shape = (e.request as unknown as { shape: Record<string, unknown> })
+      .shape;
+    expect(Object.keys(shape).sort()).toEqual(["path", "query"]);
+  });
+
+  it("throws when a bucket fails validation", () => {
+    const e = endpoint({
+      method: "GET",
+      path: "/:id",
+      pathParams: z.object({ id: z.number() }),
+      response: z.object({ id: z.number() }),
+    });
+    expect(() => e.request.parse({ path: { id: "nope" } })).toThrow();
+  });
+
+  it("@ts-expect-error — pathParams required when path has :param", () => {
+    // @ts-expect-error missing pathParams for ':id'
+    endpoint({
+      method: "GET",
+      path: "/:id",
+      query: z.object({ q: z.string() }),
+      response: z.object({ id: z.number() }),
+    });
+    expect(true).toBe(true);
+  });
+});

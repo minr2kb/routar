@@ -29,9 +29,49 @@ endpoint({
 |-------|------|----------|-------------|
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'PATCH' \| 'DELETE'` | Yes | HTTP 메서드 |
 | `path` | `string` | Yes | 라우터 접두사에 상대적인 경로 |
-| `response` | `Validator<T>` | Yes | 응답 검증 스키마 |
-| `request` | `Validator<R>` | No | `{ path?, query?, body? }`용 스키마 |
+| `response` | `AnyValidator<T>` | Yes | 응답 검증 스키마. `.parse(data): T`를 가진 객체 또는 [Standard Schema](#standard-schema) |
+| `request` | `AnyValidator<R>` | No | `{ path?, query?, body? }`용 스키마(envelope 형태) |
+| `pathParams` / `query` / `body` | `AnyValidator` | No | [버킷 분리형](#버킷-분리형-요청) — `request`의 대안 |
 | `adapter` | `(raw: T) => U` | No | 검증된 응답 변환 |
+
+## 버킷 분리형 요청
+
+`request` envelope로 감싸는 대신 각 부분을 개별 validator로 선언할 수 있습니다. 두 형태는 상호 교환 가능하며 호출부·query key·react-query flatten·MSW 동작이 동일합니다 — 버킷은 내부에서 동일한 envelope로 합성됩니다.
+
+```ts
+// envelope 형태
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: z.object({ path: z.object({ id: z.number() }), query: z.object({ q: z.string() }) }),
+  response: TodoSchema,
+})
+
+// 버킷 분리형 — 동등
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  pathParams: z.object({ id: z.number() }),
+  query: z.object({ q: z.string() }),
+  response: TodoSchema,
+})
+```
+
+Path param 강제는 그대로 적용됩니다: `path`에 `:param`이 있으면 `pathParams`가 필수이며 해당 키를 포함해야 합니다.
+
+## Standard Schema
+
+`request`/`response`(및 각 버킷)는 `.parse()`를 가진 객체 외에도 [Standard Schema](https://standardschema.dev)(`~standard` 인터페이스 — ArkType, Zod 3.24+, Valibot 등)를 받습니다. 런타임은 `.parse()`가 있으면 우선 사용하고 없으면 `~standard.validate`(sync/async)를 호출합니다. Standard Schema 이슈는 `StandardSchemaError`로 변환되어 `ValidationError`로 래핑됩니다.
+
+```ts
+import { type } from 'arktype'
+
+endpoint({
+  method: 'GET',
+  path: '/',
+  response: type({ id: 'number', title: 'string' }).array(), // ArkType — .parse 없음
+})
+```
 
 ## Path param 강제
 

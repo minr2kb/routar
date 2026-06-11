@@ -665,3 +665,140 @@ describe("createQueries — unwired invalidates warning (A1)", () => {
     }
   });
 });
+
+const SearchRouter = defineRouter("/search", {
+  // POST search — semantically a read; promoted via queryEndpoints.
+  query: endpoint({
+    method: "POST",
+    path: "/",
+    request: z.object({ body: z.object({ term: z.string() }) }),
+    response: z.array(z.object({ id: z.number() })),
+  }),
+  // Plain mutation — stays a mutation.
+  create: endpoint({
+    method: "POST",
+    path: "/",
+    request: z.object({ body: z.object({ term: z.string() }) }),
+    response: z.object({ id: z.number() }),
+  }),
+});
+
+function makeSearchApi() {
+  const query = mock(async () => [{ id: 1 }]);
+  const create = mock(async () => ({ id: 2 }));
+  const api = {
+    query,
+    create,
+    $router: SearchRouter,
+  } as unknown as ApiClientWithRouter<typeof SearchRouter.endpoints>;
+  return { api, query, create };
+}
+
+describe("createQueries — POST-as-query override (SE-9)", () => {
+  it("exposes a promoted endpoint as a query accessor (queryKey includes body)", () => {
+    const { api } = makeSearchApi();
+    const q = createQueries(api, { queryEndpoints: { query: true } });
+    const opts = q.query({ body: { term: "abc" } });
+    expect(opts.queryKey as unknown).toEqual([
+      "search",
+      "query",
+      { body: { term: "abc" } },
+    ]);
+    expect(typeof opts.queryFn).toBe("function");
+    // It also gains the infinite variant available to query accessors.
+    expect(typeof q.query.infinite).toBe("function");
+  });
+
+  it("the promoted query's queryFn calls the api with the envelope", async () => {
+    const { api, query } = makeSearchApi();
+    const q = createQueries(api, { queryEndpoints: { query: true } });
+    const opts = q.query({ body: { term: "abc" } });
+    await (
+      opts.queryFn as (ctx: {
+        signal: AbortSignal;
+        queryKey: unknown;
+        meta: undefined;
+      }) => Promise<unknown>
+    )({
+      signal: new AbortController().signal,
+      queryKey: opts.queryKey,
+      meta: undefined,
+    });
+    expect(query).toHaveBeenCalledWith(
+      { body: { term: "abc" } },
+      expect.anything(),
+    );
+  });
+
+  it("leaves non-promoted non-GET endpoints as mutations", () => {
+    const { api } = makeSearchApi();
+    const q = createQueries(api, { queryEndpoints: { query: true } });
+    // `create` was not promoted → still a mutation accessor.
+    expect((q.create as { mutationKey: unknown }).mutationKey).toEqual([
+      "search",
+      "create",
+    ]);
+  });
+});
+
+// Type-level helpers for the nested-promotion assertions.
+type _Expect<T extends true> = T;
+type _HasInfinite<T> = T extends { infinite: unknown } ? true : false;
+
+const NestedSearchRouter = defineRouter("/api", {
+  search: endpoint({
+    method: "POST",
+    path: "/search",
+    request: z.object({ body: z.object({ term: z.string() }) }),
+    response: z.array(z.object({ id: z.number() })),
+  }),
+  sub: defineRouter("/sub", {
+    search: endpoint({
+      method: "POST",
+      path: "/search",
+      request: z.object({ body: z.object({ term: z.string() }) }),
+      response: z.array(z.object({ id: z.number() })),
+    }),
+  }),
+});
+
+function makeNestedSearchApi() {
+  const search = mock(async () => [{ id: 1 }]);
+  const subSearch = mock(async () => [{ id: 2 }]);
+  const api = {
+    search,
+    sub: { search: subSearch },
+    $router: NestedSearchRouter,
+  } as unknown as ApiClientWithRouter<typeof NestedSearchRouter.endpoints>;
+  return { api, search, subSearch };
+}
+
+describe("createQueries — POST-as-query override, nested routers (SE-9 regression)", () => {
+  it("promotes both top-level and nested endpoints to query accessors", () => {
+    const { api } = makeNestedSearchApi();
+    const q = createQueries(api, {
+      queryEndpoints: { search: true, sub: { search: true } },
+    });
+
+    // Top-level promoted endpoint is a query accessor.
+    expect(q.search({ body: { term: "a" } }).queryKey as unknown).toEqual([
+      "api",
+      "search",
+      { body: { term: "a" } },
+    ]);
+    expect(typeof q.search.infinite).toBe("function");
+
+    // Nested promoted endpoint is ALSO a query accessor (the regression).
+    expect(q.sub.search({ body: { term: "b" } }).queryKey as unknown).toEqual([
+      "api",
+      "sub",
+      "search",
+      { body: { term: "b" } },
+    ]);
+    expect(typeof q.sub.search.infinite).toBe("function");
+
+    // Type-level: both accessors must expose `.infinite` (query, not mutation).
+    type _topIsQuery = _Expect<_HasInfinite<typeof q.search>>;
+    type _subIsQuery = _Expect<_HasInfinite<(typeof q.sub)["search"]>>;
+  });
+});

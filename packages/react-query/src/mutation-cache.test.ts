@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import { QueryClient } from "@tanstack/react-query";
-import { routarMutationCache } from "./mutation-cache.js";
+import { MutationCache, QueryClient } from "@tanstack/react-query";
+import { routarMutationCache, routarQueryClient } from "./mutation-cache.js";
 
 describe("routarMutationCache", () => {
   it("invalidates each key in meta.invalidates on success", () => {
@@ -49,5 +49,37 @@ describe("routarMutationCache", () => {
     );
 
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("routarQueryClient (SE-8)", () => {
+  it("returns a QueryClient with routarMutationCache auto-wired", () => {
+    const qc = routarQueryClient();
+    expect(qc).toBeInstanceOf(QueryClient);
+    // The wired cache resolves the client lazily; invalidation must reach it.
+    const spy = mock(() => {});
+    qc.invalidateQueries = spy as unknown as typeof qc.invalidateQueries;
+    const cache = qc.getMutationCache();
+    cache.config.onSuccess?.(
+      undefined,
+      undefined,
+      undefined,
+      { meta: { invalidates: [["todos"]] } } as never,
+      undefined as never,
+    );
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["todos"] });
+  });
+
+  it("forwards defaultOptions config", () => {
+    const qc = routarQueryClient({
+      defaultOptions: { queries: { staleTime: 1234 } },
+    });
+    expect(qc.getDefaultOptions().queries?.staleTime).toBe(1234);
+  });
+
+  it("respects a user-supplied mutationCache", () => {
+    const custom = new MutationCache();
+    const qc = routarQueryClient({ mutationCache: custom });
+    expect(qc.getMutationCache()).toBe(custom);
   });
 });

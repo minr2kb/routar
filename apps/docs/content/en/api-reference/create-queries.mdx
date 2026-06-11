@@ -7,7 +7,7 @@ description: createQueries derives typed queryOptions and mutationOptions factor
 
 ## `createQueries(api, options?)`
 
-Derives typed `queryOptions` and `mutationOptions` factories from a routar API client. The router does not need to be re-passed — `createApi` stamps it on the client's `$router` property and `createQueries` recovers it. The returned object mirrors the router's shape — GET endpoints become query accessors, non-GET endpoints become mutation accessors.
+Derives typed `queryOptions` and `mutationOptions` factories from a routar API client. The router does not need to be re-passed — `createApi` stamps it on the client's `$router` property and `createQueries` recovers it. The returned object mirrors the router's shape — GET endpoints become query accessors, non-GET endpoints become mutation accessors (unless promoted via [`queryEndpoints`](#post-as-query-queryendpoints)).
 
 ```ts
 import { createQueries } from '@routar/react-query'
@@ -25,6 +25,7 @@ export const todoQuery = createQueries(todoApi)
 | `options.defaults` | `Record<string, Options \| ((params, q) => Options)>` | Per-endpoint default options keyed by endpoint name. Each value is a **static options object** or a **function** `(params, q) => options` (see [Dynamic defaults](#dynamic-defaults)). Merged **before** per-call options (per-call wins). Nested routers supported (the map mirrors the router shape); for mutation endpoints, the value is mutation options including `invalidates`. |
 | `options.infinite` | `Record<string, { initialPageParam, getNextPageParam, pageParam }>` | Per-endpoint infinite query contract keyed by GET endpoint name. Declares `initialPageParam`, `getNextPageParam`, and the routar-specific `pageParam` builder once so call sites only need base params. Nested routers supported — the map mirrors the router shape. |
 | `options.flatten` | `boolean` (default `false`) | When `true`, accessors accept **flat** params (the union of the request's `path`/`query`/`body` fields) instead of the nested envelope. See [Flatten](#flatten). |
+| `options.queryEndpoints` | `Record<string, true \| nested>` | Promote non-GET endpoints to **query** accessors. See [POST-as-query](#post-as-query-queryendpoints). |
 
 > The previous external factory form `createQueries(api, (q) => options)` has been **removed**. To reference sibling key helpers, use the function form of `defaults` (`(params, q) => options`) below.
 
@@ -61,6 +62,26 @@ todoQuery.getList({ done: true })         // instead of { query: { done: true } 
 
 - **Fallback to envelope:** an endpoint whose buckets collide on a key (e.g. `path.id` + `body.id`) or whose `body` is not a plain object (`z.array`, `z.string`, …) keeps the envelope shape. The types enforce this per endpoint.
 - **Keys are always envelope-based:** `.queryKey()`, `.mutationKey`, and `.infinite.queryKey()` are flatten-independent, so SSR and CSR keys match regardless of call style. `flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope.
+
+### POST-as-query (`queryEndpoints`)
+
+By default classification is by HTTP method — GET → query accessor, everything else → mutation accessor. But a POST that is semantically a *read* (e.g. a complex search whose filters go in the body) belongs in `useSuspenseQuery` and benefits from query-key caching. Promote it with `queryEndpoints`:
+
+```ts
+export const searchQuery = createQueries(searchApi, {
+  queryEndpoints: { search: true }, // POST /search → query accessor
+})
+
+// now a query accessor — the body is part of the query key
+useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } }))
+searchQuery.search.queryKey({ body: { term: 'routar' } })
+// → ["search", "search", { body: { term: "routar" } }]
+```
+
+- The map **mirrors the router shape** — nest for sub-routers: `{ search: true, reports: { query: true } }`.
+- Promoted endpoints become full query accessors, including the `.infinite` variant (declare its contract in `infinite` as usual).
+- The request body is included in the query key (the envelope-based key builder already keys on all params), so distinct searches cache separately.
+- Non-promoted non-GET endpoints stay mutation accessors.
 
 ### Error typing
 
@@ -223,3 +244,32 @@ queryClient = new QueryClient({
 After every successful mutation, `routarMutationCache` reads `mutation.meta.invalidates` and calls `queryClient.invalidateQueries` for each entry. Mutations without `invalidates` in their `meta` are unaffected.
 
 You can still combine `invalidates` with a native `onSuccess` callback — both run.
+
+---
+
+## `routarQueryClient(config?)`
+
+A convenience factory that returns a `QueryClient` with `routarMutationCache` already self-wired — removing the manual self-reference boilerplate:
+
+```ts
+import { routarQueryClient } from '@routar/react-query'
+
+// Before — manual self-reference:
+let queryClient: QueryClient
+queryClient = new QueryClient({
+  mutationCache: routarMutationCache(() => queryClient),
+})
+
+// After:
+const queryClient = routarQueryClient()
+```
+
+It accepts any `QueryClientConfig` (e.g. `defaultOptions`), forwarded unchanged:
+
+```ts
+const queryClient = routarQueryClient({
+  defaultOptions: { queries: { staleTime: 60_000 } },
+})
+```
+
+If you pass your own `mutationCache`, it is respected and routar's is **not** wired (so `invalidates` won't run unless your cache handles `meta.invalidates`).

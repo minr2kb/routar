@@ -68,16 +68,29 @@ await todoApi.remove({ path: { id: 1 } });
 
 Defines a single endpoint. Use instead of a plain object to get full type inference on `adapter`.
 
-**Signature:**
+**Signature (envelope form):**
 ```ts
 endpoint(spec: {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
-  request?: Validator<RequestShape>; // optional — for endpoints with no params
-  response: Validator<unknown>;
+  request?: AnyValidator<RequestShape>; // optional — for endpoints with no params
+  response: AnyValidator<unknown>;
   adapter?: (raw: ValidatorOutput<typeof response>) => unknown;
 }): EndpointSpec
 ```
+
+**Separated-bucket form (alternative, equivalent):** instead of `request`, declare `pathParams` / `query` / `body` as separate validators. Composed internally into the same envelope, so call sites, query keys, react-query flatten, and MSW behave identically.
+
+```ts
+endpoint({
+  method: 'GET', path: '/:id',
+  pathParams: z.object({ id: z.number() }), // required when path has :param
+  query: z.object({ q: z.string() }),
+  response: TodoSchema,
+});
+```
+
+**Validators (`AnyValidator`):** `request`/`response` (and each bucket) accept any object with `.parse(data): T` (Zod, Valibot, Yup) **or** any [Standard Schema](https://standardschema.dev) (`~standard` — ArkType, Zod 3.24+, Valibot). At runtime routar prefers `.parse()` and otherwise calls `~standard.validate` (sync/async); Standard Schema issues are thrown as `StandardSchemaError` wrapped in `ValidationError`.
 
 **Path param enforcement** — if `path` contains `:param` segments, `request.path` must include matching keys. This is a compile-time error:
 
@@ -166,7 +179,7 @@ const apiRouter = defineRouter('/api', {
 
 ## createApi(executor, router)
 
-Builds a fully-typed API client. Each endpoint becomes an async function: `(params, signal?) => Promise<Response>`.
+Builds a fully-typed API client. Each endpoint becomes an async function: `(params, signalOrOptions?) => Promise<Response>` — the second argument is an `AbortSignal` (legacy) or an `EndpointCallOptions` object `{ signal?, headers?, timeout? }`.
 
 **Three call signatures:**
 
@@ -200,9 +213,23 @@ const controller = new AbortController();
 const todos = await todoApi.getList({}, controller.signal);
 controller.abort();
 
+// per-call options: headers + timeout (transport-agnostic)
+await todoApi.create({ body: { title: 'x' } }, {
+  headers: { 'Idempotency-Key': key }, // merged over executor defaults (plugin onRequest wins on collision)
+  timeout: 30_000,                      // aborts with TimeoutError; composes with executor timeout
+  signal: controller.signal,
+});
+
 // skip response validation in production
 const prodApi = createApi(executor, todoRouter, {
   validate: { request: true, response: process.env.NODE_ENV !== 'production' },
+});
+
+// validate modes: true (default, throws) | false (skip) | 'warn' (observe drift)
+// 'warn' passes raw data through and calls onValidationError instead of throwing
+const driftApi = createApi(executor, todoRouter, {
+  validate: { request: true, response: 'warn' },
+  onValidationError: (err, ctx) => report(ctx), // ctx: { kind: 'request'|'response', method, url, data }
 });
 
 // extract types from the client — no duplication
@@ -529,6 +556,21 @@ const create = useMutation(todoQuery.create());
 create.mutate({ body: { title: 'buy milk' } });
 ```
 
+**POST-as-query (`queryEndpoints`)** — promote a non-GET endpoint that is semantically a read (e.g. a POST search) to a query accessor. The request body is part of the query key; the map mirrors the router shape (nest for sub-routers); promoted endpoints also expose `.infinite`. Non-promoted non-GET endpoints stay mutations.
+
+```ts
+const searchQuery = createQueries(searchApi, { queryEndpoints: { search: true, reports: { query: true } } });
+useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } }));
+searchQuery.search.queryKey({ body: { term: 'routar' } }); // ["search", "search", { body: { term: "routar" } }]
+```
+
+**`routarQueryClient(config?)`** — returns a `QueryClient` with `routarMutationCache` already self-wired (removes the manual self-reference boilerplate). Forwards any `QueryClientConfig`; if you pass your own `mutationCache`, it is respected and routar's is not wired.
+
+```ts
+import { routarQueryClient } from '@routar/react-query';
+const queryClient = routarQueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } });
+```
+
 **Key helpers:** `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix — override with `createQueries(api, { key: 'todo' })`.
 
 **Per-endpoint defaults:** pass `defaults` to set option defaults keyed by endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape). Mutation endpoints support all mutation options including `invalidates`. Each default value may be a **static object** or a **function** `(params, q) => options`, evaluated lazily on each accessor call: `q` is the fully-built queries object (every key helper `.queryKey()` / `.mutationKey` / `.$key` is available with no circular-reference issues — use it for `invalidates`), and `params` is the call params for a query accessor or `undefined` for a mutation accessor.
@@ -718,8 +760,9 @@ export const todoApi = createApi(dispatchExecutor(() =>
 
 | Error | Package | Thrown when |
 |-------|---------|-------------|
-| `ValidationError` | `@routar/core` | `request.parse()` or `response.parse()` fails |
-| `TimeoutError` | `@routar/core` | Request exceeds the `createFetchExecutor` `timeout` |
+| `ValidationError` | `@routar/core` | `request`/`response` validation fails under `validate: true` (not under `'warn'`, which calls `onValidationError` instead) |
+| `StandardSchemaError` | `@routar/core` | A Standard Schema (`~standard`) reports issues — wrapped as the `cause` of a `ValidationError`, `issues` array preserved |
+| `TimeoutError` | `@routar/core` | Request exceeds the executor `timeout` **or** a per-call `timeout` |
 | `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) gets a non-2xx response |
 
 All transports normalize HTTP failures to `HttpError`. The Axios and ky executors catch their native errors (`AxiosError`, ky `HTTPError`) and re-throw an `HttpError` with `status`/`statusText`/`body` populated from the response; the original transport error is preserved on `err.cause`. So a single `instanceof HttpError` check (and `onError` plugins) stay transport-agnostic. Network failures / cancellations (no response) are re-thrown unchanged.

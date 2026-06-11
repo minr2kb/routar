@@ -35,9 +35,49 @@ endpoint({
 |-------|------|----------|-------------|
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'PATCH' \| 'DELETE'` | Yes | HTTP method |
 | `path` | `string` | Yes | Path relative to the router prefix. Use `:param` for path parameters. |
-| `response` | `Validator<T>` | Yes | Schema for validating the response. Any object with `.parse(data): T`. |
-| `request` | `Validator<R>` | No | Schema for `{ path?, query?, body? }`. |
+| `response` | `AnyValidator<T>` | Yes | Schema for validating the response. Any object with `.parse(data): T`, or a [Standard Schema](#standard-schema). |
+| `request` | `AnyValidator<R>` | No | Schema for `{ path?, query?, body? }` (the envelope form). |
+| `pathParams` / `query` / `body` | `AnyValidator` | No | The [separated-bucket form](#separated-request-buckets) — an alternative to `request`. |
 | `adapter` | `(raw: T) => U` | No | Transform the validated response. |
+
+## Separated request buckets
+
+Instead of wrapping a `request` envelope, you can declare each part as its own validator. The two forms are interchangeable and produce identical call sites, query keys, react-query flatten, and MSW behavior — the buckets are composed into the same envelope internally.
+
+```ts
+// envelope form
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: z.object({ path: z.object({ id: z.number() }), query: z.object({ q: z.string() }) }),
+  response: TodoSchema,
+})
+
+// separated-bucket form — equivalent
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  pathParams: z.object({ id: z.number() }),
+  query: z.object({ q: z.string() }),
+  response: TodoSchema,
+})
+```
+
+Path-param enforcement still applies: when `path` has `:param` segments, `pathParams` is required and must cover them.
+
+## Standard Schema
+
+`request`/`response` (and each bucket) accept any [Standard Schema](https://standardschema.dev) validator (the `~standard` interface — ArkType, Zod 3.24+, Valibot, …) in addition to any object with `.parse()`. At runtime routar prefers `.parse()` when present and otherwise calls `~standard.validate` (sync or async). Standard Schema issues are surfaced as a `StandardSchemaError` wrapped in `ValidationError`.
+
+```ts
+import { type } from 'arktype'
+
+endpoint({
+  method: 'GET',
+  path: '/',
+  response: type({ id: 'number', title: 'string' }).array(), // ArkType — no .parse
+})
+```
 
 ## Path param enforcement
 

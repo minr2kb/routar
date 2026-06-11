@@ -1,5 +1,5 @@
 import { http, type HttpHandler } from "msw";
-import { isRouterDef, joinPaths } from "@routar/core";
+import { isRouterDef, joinPaths, runValidator } from "@routar/core";
 import type { EndpointSpec, RouterDef, RouterEndpoints } from "@routar/core";
 import type { MswResolver, MswResolverMap } from "./types.js";
 import { parseBody, parseQueryFromUrl } from "./utils/parse-request.js";
@@ -125,8 +125,9 @@ function walkRouter(
 
           // Spread raw first so that fields absent from the schema (which Zod
           // strips) keep their raw values; schema-validated fields override them.
+          // `runValidator` handles both `.parse` and Standard Schema validators.
           const parts: RequestParts = spec.request
-            ? { ...raw, ...(spec.request.parse(raw) as RequestParts) }
+            ? { ...raw, ...((await runValidator(spec.request, raw)) as RequestParts) }
             : raw;
 
           return fn({

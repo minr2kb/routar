@@ -146,12 +146,47 @@ type Todo          = TodoApiTypes['getDetail']['response'];
 type CreateRequest = TodoApiTypes['create']['request'];
 ```
 
-### AbortSignal
+### Separated request buckets (alternative to `request`)
+
+`endpoint()` also accepts `pathParams` / `query` / `body` as separate validators instead of a `request` envelope. The two forms are equivalent — same call sites, keys, flatten, and MSW behavior.
+
+```ts
+endpoint({
+  method: 'GET', path: '/:id',
+  pathParams: z.object({ id: z.number() }), // required when path has :param
+  query: z.object({ q: z.string() }),
+  response: TodoSchema,
+});
+```
+
+### Standard Schema validators
+
+`request`/`response` (and each bucket) accept any object with `.parse()` **or** any Standard Schema (`~standard` — ArkType, Zod 3.24+, Valibot). No code change needed; routar prefers `.parse()` and falls back to `~standard.validate`.
+
+### Per-call options (signal / headers / timeout)
+
+The second endpoint argument is an `AbortSignal` (legacy) **or** a `{ signal?, headers?, timeout? }` object:
 
 ```ts
 const controller = new AbortController();
-const todos = await todoApi.getList({}, controller.signal);
-controller.abort(); // cancels in-flight request
+await todoApi.getList({}, controller.signal); // bare signal still works
+
+await todoApi.create({ body }, {
+  headers: { 'Idempotency-Key': key }, // merged over executor defaults
+  timeout: 30_000,                      // throws TimeoutError (any executor)
+  signal: controller.signal,
+});
+```
+
+### Validation modes (drift observation)
+
+`createApi(executor, router, { validate, onValidationError })`. `validate` is `boolean | 'warn' | { request?, response? }`. Use `'warn'` to pass raw data through and report drift instead of throwing:
+
+```ts
+createApi(executor, todoRouter, {
+  validate: { response: 'warn' },
+  onValidationError: (err, ctx) => report(ctx), // ctx: { kind, method, url, data }
+});
 ```
 
 ## Testing with MSW
@@ -233,6 +268,15 @@ const todoQuery = createQueries(todoApi, { flatten: true })
 todoQuery.getDetail({ id: '1' })   // instead of { path: { id: '1' } }
 todoQuery.update({ id, title })    // instead of { path: { id }, body: { title } }
 ```
+
+**POST-as-query (`queryEndpoints`):** promote a non-GET endpoint (e.g. a POST search) to a query accessor. The request body becomes part of the query key; the map mirrors the router shape (nest for sub-routers); promoted endpoints also gain `.infinite`.
+
+```ts
+const searchQuery = createQueries(searchApi, { queryEndpoints: { search: true } })
+useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } }))
+```
+
+**`routarQueryClient(config?)`:** returns a `QueryClient` with `routarMutationCache` self-wired — use instead of the manual `let queryClient; queryClient = new QueryClient({ mutationCache: routarMutationCache(() => queryClient) })` boilerplate. Forwards any `QueryClientConfig`.
 
 **Error typing:** `error` is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment `Register` once — no `createQueries` change needed:
 

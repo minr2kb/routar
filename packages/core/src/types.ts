@@ -1,3 +1,6 @@
+import type { StandardSchemaV1 } from "./standard-schema.js";
+import type { ValidationError } from "./utils/validate.js";
+
 export type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 /** Options passed to {@link Executor.execute} on every HTTP call. */
@@ -13,6 +16,40 @@ export interface ExecuteOptions {
    */
   headers?: Record<string, string>;
   signal?: AbortSignal;
+}
+
+/**
+ * Per-call transport options, passed as the optional second argument to any
+ * generated endpoint function: `api.create(params, { signal, headers, timeout })`.
+ *
+ * Passing a bare {@link AbortSignal} as the second argument is still supported
+ * (backward compatible) — it is treated as `{ signal }`.
+ *
+ * @example
+ * ```ts
+ * await api.create({ body }, {
+ *   signal: controller.signal,
+ *   headers: { 'Idempotency-Key': key },
+ *   timeout: 30_000,
+ * });
+ * ```
+ */
+export interface EndpointCallOptions {
+  /** Aborts the request when the signal fires. */
+  signal?: AbortSignal;
+  /**
+   * Per-call headers. Seeded onto the request before plugin `onRequest` hooks
+   * run, and merged over the executor's default headers — so per-call headers
+   * win over defaults. A plugin that sets the same header key still wins on
+   * collision (plugins are cross-cutting policy such as auth).
+   */
+  headers?: Record<string, string>;
+  /**
+   * Per-call timeout in milliseconds. Aborts the request with a `TimeoutError`
+   * when exceeded. Applied by the core client (transport-agnostic) and composes
+   * with any executor-level timeout (whichever fires first wins).
+   */
+  timeout?: number;
 }
 
 /**
@@ -135,9 +172,31 @@ export interface Validator<TOutput> {
   parse(data: unknown): TOutput;
 }
 
-/** Extracts the output type of a {@link Validator}. */
-export type ValidatorOutput<T extends Validator<unknown>> =
-  T extends Validator<infer O> ? O : never;
+/**
+ * A validator accepted by routar: either the `.parse()` duck-typed
+ * {@link Validator} (Zod, Valibot, Yup, or any object with `.parse()`) **or** a
+ * [Standard Schema](https://standardschema.dev) (`~standard` — Zod 3.24+,
+ * Valibot, ArkType, …). Both forms are validated at runtime; the `.parse()` path
+ * is preferred when present (synchronous), otherwise `~standard.validate` is
+ * used (sync or async).
+ *
+ * @template TOutput Parsed/validated output type.
+ */
+export type AnyValidator<TOutput = unknown> =
+  | Validator<TOutput>
+  | StandardSchemaV1<unknown, TOutput>;
+
+/**
+ * Extracts the output type of an {@link AnyValidator} — the `.parse()` return
+ * type for a {@link Validator}, or the Standard Schema output type. The
+ * `Validator` branch is checked first so a schema satisfying both (e.g. Zod)
+ * resolves through its `.parse()` signature.
+ */
+export type ValidatorOutput<T> = T extends Validator<infer O>
+  ? O
+  : T extends StandardSchemaV1<unknown, infer O>
+    ? O
+    : never;
 
 /**
  * Shape of an endpoint's request parameters.
@@ -163,7 +222,7 @@ export interface RequestShape {
  */
 export interface EndpointSpec<
   TRequest extends RequestShape = RequestShape,
-  TResponse extends Validator<unknown> = Validator<unknown>,
+  TResponse extends AnyValidator = AnyValidator,
   TAdapter extends
     | ((raw: ValidatorOutput<TResponse>) => unknown)
     | undefined = undefined,
@@ -171,7 +230,7 @@ export interface EndpointSpec<
   method: HttpMethod;
   path: string;
   /** Validates and narrows request parameters before the HTTP call. */
-  request?: Validator<TRequest>;
+  request?: AnyValidator<TRequest>;
   /** Validates the raw server response. */
   response: TResponse;
   /**
@@ -239,6 +298,33 @@ export type ApiTypes<TApi> = {
 };
 
 /**
+ * Per-kind validation mode.
+ *
+ * - `true` (default) — validate and throw {@link ValidationError} on failure.
+ * - `false` — skip validation; raw data passes through untouched.
+ * - `'warn'` — attempt validation but, on failure, pass the raw data through
+ *   and report the error via {@link CreateApiOptions.onValidationError} instead
+ *   of throwing. The drift-observation mode: surface schema drift without
+ *   turning it into an outage.
+ */
+export type ValidationMode = boolean | "warn";
+
+/**
+ * Context passed to {@link CreateApiOptions.onValidationError} describing which
+ * call and which phase produced the validation failure.
+ */
+export interface ValidationErrorContext {
+  /** Which phase failed — request params or the server response. */
+  kind: "request" | "response";
+  /** The endpoint's HTTP method. */
+  method: HttpMethod;
+  /** The resolved request URL (path is already substituted). */
+  url: string;
+  /** The raw data that failed validation (raw params or raw response). */
+  data: unknown;
+}
+
+/**
  * Options for {@link createApi}.
  *
  * @example
@@ -248,6 +334,12 @@ export type ApiTypes<TApi> = {
  *
  * // Keep request validation (catch call-site bugs), skip response in prod
  * createApi(executor, router, { validate: { request: true, response: false } });
+ *
+ * // Observe response drift without breaking production
+ * createApi(executor, router, {
+ *   validate: { request: true, response: 'warn' },
+ *   onValidationError: (err, ctx) => Sentry.captureException(err, { extra: ctx }),
+ * });
  * ```
  */
 export interface CreateApiOptions {
@@ -256,7 +348,19 @@ export interface CreateApiOptions {
    *
    * - `true` (default) — validate both request and response.
    * - `false` — skip both; raw params and raw response pass through.
-   * - `{ request?, response? }` — enable/disable each independently.
+   * - `'warn'` — validate both, but pass raw data through and report via
+   *   {@link CreateApiOptions.onValidationError} instead of throwing.
+   * - `{ request?, response? }` — set each independently (each a
+   *   {@link ValidationMode}).
    */
-  validate?: boolean | { request?: boolean; response?: boolean };
+  validate?: ValidationMode | { request?: ValidationMode; response?: ValidationMode };
+  /**
+   * Called when validation fails under `'warn'` mode (instead of throwing).
+   * Use it to report schema drift to your observability stack. Never called
+   * when `validate` is `true` (which throws) or `false` (which skips).
+   */
+  onValidationError?: (
+    error: ValidationError,
+    context: ValidationErrorContext,
+  ) => void;
 }
