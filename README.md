@@ -27,9 +27,9 @@ const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.bo
 const todoRouter = defineRouter('/todos', {
   getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
   getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
-                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+                        request: { path: z.object({ id: z.number() }) } }),
   create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
-                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+                        request: { body: z.object({ title: z.string() }) } }),
 });
 
 const todoApi = createApi(createFetchExecutor('https://api.example.com'), todoRouter);
@@ -49,7 +49,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 - **Transport agnostic** — swap `fetch`, axios, or your own HTTP client by changing one line
 - **Per-call options** — `(params, { signal, headers, timeout })` for per-request headers and timeouts (transport-agnostic)
 - **Plugin system** — composable named plugins with request/response/error hooks; `retry` and `timeout` as first-class options
-- **Flexible endpoint definition** — wrap a `request` envelope or declare `pathParams`/`query`/`body` as separate validators
+- **Clear endpoint definition** — `request` is a `{ path, query, body }` map of separate validators
 - **Nested routers** — mirror your URL structure in the type system
 - **Path param enforcement** — `path: '/:id'` with a missing path param is a compile error
 - **SSR/CSR ready** — same endpoint spec, different executor per environment
@@ -174,13 +174,13 @@ const todoRouter = defineRouter('/todos', {
   getDetail: endpoint({
     method: 'GET',
     path: '/:id',
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: TodoSchema,
   }),
   create: endpoint({
     method: 'POST',
     path: '/',
-    request: z.object({ body: z.object({ title: z.string() }) }),
+    request: { body: z.object({ title: z.string() }) },
     response: TodoSchema,
   }),
 });
@@ -216,19 +216,21 @@ endpoint({
 
 ```ts
 // ✅
-endpoint({ path: '/:id', request: z.object({ path: z.object({ id: z.number() }) }), ... })
+endpoint({ path: '/:id', request: { path: z.object({ id: z.number() }) }, ... })
 
 // ❌ compile error — ':id' is declared but request.path.id is missing
-endpoint({ path: '/:id', request: z.object({ query: z.object({ q: z.string() }) }), ... })
+endpoint({ path: '/:id', request: { query: z.object({ q: z.string() }) }, ... })
 ```
 
-**Separated buckets** — instead of the `request` envelope, declare each part on its own (both forms are equivalent):
+**Request buckets** — `request` is a `{ path, query, body }` map of standalone validators. `request.path` is required when the `path` contains `:param` segments:
 
 ```ts
 endpoint({
   method: 'GET', path: '/:id',
-  pathParams: z.object({ id: z.number() }),
-  query: z.object({ q: z.string() }),
+  request: {
+    path: z.object({ id: z.number() }),
+    query: z.object({ q: z.string() }),
+  },
   response: TodoSchema,
 })
 ```

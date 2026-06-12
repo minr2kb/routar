@@ -4,7 +4,9 @@ import { endpoint } from "./index.js";
 
 type Expect<T extends true> = T;
 type Equal<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
 
 describe("endpoint() literal method", () => {
   it("preserves the literal method type", () => {
@@ -23,7 +25,7 @@ describe("endpoint() literal method", () => {
     const e = endpoint({
       method: "POST",
       path: "/",
-      request: z.object({ body: z.object({ title: z.string() }) }),
+      request: { body: z.object({ title: z.string() }) },
       response: z.object({ id: z.number() }),
       adapter: (raw) => raw.id,
     });
@@ -35,7 +37,7 @@ describe("endpoint() literal method", () => {
     const e = endpoint({
       method: "PATCH",
       path: "/",
-      request: z.object({ body: z.object({ done: z.boolean() }) }),
+      request: { body: z.object({ done: z.boolean() }) },
       response: z.object({ id: z.number() }),
     });
     type _check = Expect<Equal<typeof e.method, "PATCH">>;
@@ -55,12 +57,14 @@ describe("endpoint() literal method", () => {
 });
 
 describe("endpoint() separated request buckets (SE-12)", () => {
-  it("composes pathParams/query into an envelope request validator", () => {
+  it("composes request.{path,query} into an envelope request validator", () => {
     const e = endpoint({
       method: "GET",
       path: "/:id",
-      pathParams: z.object({ id: z.number() }),
-      query: z.object({ q: z.string() }),
+      request: {
+        path: z.object({ id: z.number() }),
+        query: z.object({ q: z.string() }),
+      },
       response: z.object({ id: z.number() }),
     });
     type _method = Expect<Equal<typeof e.method, "GET">>;
@@ -73,8 +77,10 @@ describe("endpoint() separated request buckets (SE-12)", () => {
     const e = endpoint({
       method: "POST",
       path: "/:id",
-      pathParams: z.object({ id: z.number() }),
-      body: z.object({ title: z.string() }),
+      request: {
+        path: z.object({ id: z.number() }),
+        body: z.object({ title: z.string() }),
+      },
       response: z.object({ ok: z.boolean() }),
     });
     type Req = ReturnType<typeof e.request.parse>;
@@ -89,8 +95,10 @@ describe("endpoint() separated request buckets (SE-12)", () => {
     const e = endpoint({
       method: "GET",
       path: "/:id",
-      pathParams: z.object({ id: z.number() }),
-      query: z.object({ q: z.string() }),
+      request: {
+        path: z.object({ id: z.number() }),
+        query: z.object({ q: z.string() }),
+      },
       response: z.object({ id: z.number() }),
     });
     const shape = (e.request as unknown as { shape: Record<string, unknown> })
@@ -102,18 +110,36 @@ describe("endpoint() separated request buckets (SE-12)", () => {
     const e = endpoint({
       method: "GET",
       path: "/:id",
-      pathParams: z.object({ id: z.number() }),
+      request: { path: z.object({ id: z.number() }) },
       response: z.object({ id: z.number() }),
     });
     expect(() => e.request.parse({ path: { id: "nope" } })).toThrow();
   });
 
-  it("@ts-expect-error — pathParams required when path has :param", () => {
-    // @ts-expect-error missing pathParams for ':id'
+  it("@ts-expect-error — request.path required when path has :param", () => {
     endpoint({
       method: "GET",
       path: "/:id",
-      query: z.object({ q: z.string() }),
+      // @ts-expect-error missing request.path for ':id'
+      request: { query: z.object({ q: z.string() }) },
+      response: z.object({ id: z.number() }),
+    });
+    expect(true).toBe(true);
+  });
+
+  it("@ts-expect-error — pre-2.0 top-level buckets are rejected (not silently dropped)", () => {
+    endpoint({
+      method: "GET",
+      path: "/:id",
+      // @ts-expect-error top-level `pathParams` removed — use request: { path }
+      pathParams: z.object({ id: z.number() }),
+      response: z.object({ id: z.number() }),
+    });
+    endpoint({
+      method: "POST",
+      path: "/",
+      // @ts-expect-error top-level `body` removed — use request: { body }
+      body: z.object({ title: z.string() }),
       response: z.object({ id: z.number() }),
     });
     expect(true).toBe(true);

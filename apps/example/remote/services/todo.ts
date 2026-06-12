@@ -2,7 +2,7 @@ import type { ApiTypes } from "@routar/core";
 import { createApi, defineRouter, endpoint } from "@routar/core";
 import { createQueries } from "@routar/react-query";
 import { z } from "zod";
-import { localExecutor } from "../lib/executor";
+import { localExecutor } from "../lib/executors/local";
 
 export const TodoRawSchema = z.object({
   id: z.number(),
@@ -20,7 +20,7 @@ export const TodoRouter = defineRouter("/todos", {
   getList: endpoint({
     method: "GET" as const,
     path: "/",
-    request: z.object({
+    request: {
       query: z
         .object({
           userId: z.coerce.number().optional(),
@@ -33,51 +33,51 @@ export const TodoRouter = defineRouter("/todos", {
           _page: z.coerce.number().optional(),
         })
         .optional(),
-    }),
+    },
     response: z.array(TodoRawSchema),
     adapter: (raw) => raw.map(toTodoItem),
   }),
   getDetail: endpoint({
     method: "GET" as const,
     path: "/:id",
-    request: z.object({
+    request: {
       path: z.object({ id: z.coerce.number() }),
-    }),
+    },
     response: TodoRawSchema,
     adapter: toTodoItem,
   }),
   create: endpoint({
     method: "POST" as const,
     path: "/",
-    request: z.object({
+    request: {
       body: z.object({
         title: z.string().min(1),
         completed: z.boolean().default(false),
         userId: z.number().default(1),
       }),
-    }),
+    },
     response: TodoRawSchema,
     adapter: toTodoItem,
   }),
   update: endpoint({
     method: "PATCH" as const,
     path: "/:id",
-    request: z.object({
+    request: {
       path: z.object({ id: z.coerce.number() }),
       body: z.object({
         title: z.string().optional(),
         completed: z.boolean().optional(),
       }),
-    }),
+    },
     response: TodoRawSchema,
     adapter: toTodoItem,
   }),
   remove: endpoint({
     method: "DELETE" as const,
     path: "/:id",
-    request: z.object({
+    request: {
       path: z.object({ id: z.coerce.number() }),
-    }),
+    },
     response: z.unknown(),
   }),
 });

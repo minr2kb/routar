@@ -45,13 +45,13 @@ const todoRouter = defineRouter('/todos', {
   getDetail: endpoint({
     method: 'GET',
     path: '/:id',
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: TodoSchema,
   }),
   create: endpoint({
     method: 'POST',
     path: '/',
-    request: z.object({ body: z.object({ title: z.string() }) }),
+    request: { body: z.object({ title: z.string() }) },
     response: TodoSchema,
   }),
 })

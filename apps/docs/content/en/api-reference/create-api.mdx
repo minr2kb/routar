@@ -50,13 +50,13 @@ createApi(executor, { getList: endpoint({ ... }) })
 Request params map to `{ path?, query?, body? }` matching the `request` schema shape:
 
 ```ts
-// request: z.object({ path: z.object({ id: z.number() }) })
+// request: { path: z.object({ id: z.number() }) }
 await api.getDetail({ path: { id: 1 } })
 
-// request: z.object({ query: z.object({ page: z.number() }) })
+// request: { query: z.object({ page: z.number() }) }
 await api.getList({ query: { page: 2 } })
 
-// request: z.object({ body: z.object({ title: z.string() }) })
+// request: { body: z.object({ title: z.string() }) }
 await api.create({ body: { title: 'buy milk' } })
 ```
 

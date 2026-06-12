@@ -25,12 +25,37 @@
   font-weight: 800;
   letter-spacing: -0.03em;
   margin-bottom: 10px;
+  /* Subtle indigo sweep across the heading */
+  background: linear-gradient(
+    100deg,
+    currentColor 38%,
+    rgb(99, 102, 241) 50%,
+    currentColor 62%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: titleShimmer 7s linear infinite;
+}
+
+@keyframes titleShimmer {
+  to {
+    background-position: 220% center;
+  }
 }
 
 .subtitle {
   font-size: 0.95rem;
   color: #6b7280;
   line-height: 1.65;
+}
+
+/* ── Layout (controls + code) ────────────────────────────────────────────── */
+
+.layout {
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Selectors ───────────────────────────────────────────────────────────── */
@@ -55,13 +80,27 @@
 }
 
 .groupLabel {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #9ca3af;
-  min-width: 86px;
+  min-width: 122px;
   flex-shrink: 0;
+}
+
+.layerTag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  color: rgb(99, 102, 241);
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-right: 8px;
 }
 
 .groupDisabled {
@@ -88,7 +127,8 @@
   transition:
     border-color 0.15s,
     background 0.15s,
-    color 0.15s;
+    color 0.15s,
+    transform 0.12s;
   white-space: nowrap;
 }
 
@@ -97,10 +137,27 @@
   color: rgb(99, 102, 241);
 }
 
+.chip:not(:disabled):active {
+  transform: scale(0.93);
+}
+
 .chipActive {
   border-color: rgb(99, 102, 241) !important;
   background: rgba(99, 102, 241, 0.09);
   color: rgb(99, 102, 241) !important;
+  animation: chipPop 0.25s ease;
+}
+
+@keyframes chipPop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ── Code container ──────────────────────────────────────────────────────── */
@@ -213,9 +270,127 @@
   }
 }
 
+/* ── Architecture-layer rail ─────────────────────────────────────────────── */
+
+.rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.railPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: transparent;
+  color: #9ca3af;
+  text-decoration: none;
+  transition:
+    color 0.25s,
+    border-color 0.25s,
+    background 0.25s,
+    transform 0.2s,
+    box-shadow 0.25s;
+}
+
+.railPill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
+.railPill[data-active="true"] {
+  color: rgb(99, 102, 241);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 2px 16px rgba(99, 102, 241, 0.18);
+  animation: railPulse 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.railNum {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  opacity: 0.85;
+}
+
+.railLabel {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.railArrow {
+  color: #d1d5db;
+  font-size: 0.78rem;
+  user-select: none;
+}
+
+@keyframes railPulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ── Architecture guide link ─────────────────────────────────────────────── */
+
+.archLink {
+  display: block;
+  text-align: center;
+  margin-top: 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgb(99, 102, 241);
+  text-decoration: none;
+  transition:
+    opacity 0.2s,
+    letter-spacing 0.2s;
+}
+
+.archLink:hover {
+  opacity: 0.82;
+  letter-spacing: 0.005em;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .chipActive,
+  .railPill[data-active="true"],
+  .section[data-phase="entering"],
+  .section[data-phase="exiting"],
+  .section[data-phase="brightening"] {
+    animation: none !important;
+  }
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 540px) {
+  .rail {
+    gap: 2px;
+  }
+
+  .railLabel {
+    display: none;
+  }
+
+  .railArrow {
+    font-size: 0.7rem;
+  }
+
   .selectors {
     padding: 16px;
   }

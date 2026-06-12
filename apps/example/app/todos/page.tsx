@@ -8,16 +8,15 @@ export const dynamic = "force-dynamic";
 
 export default async function TodosPage() {
   const queryClient = getQueryClient();
-
-  // flatten: true → flat params. The query key is built from the envelope, so
-  // this prefetch key matches the CSR key in TodoListClient.
-  const params = { _limit: 20 };
-
-  await queryClient.prefetchQuery(todoQuery.getList(params));
+  await queryClient.prefetchQuery(todoQuery.getList({ _limit: 20 }));
 
   return (
     <div>
       <h1>Todos</h1>
+      <p style={{ color: "#666", fontSize: 14 }}>
+        Local CRUD over Next route handlers (fetch executor). Mutations
+        auto-invalidate the list via <code>createQueries</code> defaults.
+      </p>
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense fallback={<p>Loading…</p>}>
           <TodoListClient />

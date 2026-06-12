@@ -62,7 +62,7 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 
 - **`response` + `adapter` are always separate.** `response` is a pure Zod schema (stays a `ZodObject`, can be composed). `adapter` is a plain function that transforms the validated response. Never put `.transform()` on a response schema.
 - **`RouterEndpoints` uses `any` generics intentionally.** `Record<string, EndpointSpec<any, any, any> | RouterDef<any>>` — the `any`s are not a mistake; they allow adapter functions typed to specific response shapes to be assignable without contravariance issues.
-- **`endpoint()` has 4 envelope overloads** (request×adapter) **+ 2 separated-bucket overloads** (SE-12, adapter×). All return types have `request` and `adapter` as required (not optional) fields. This is intentional — `| undefined` in return types breaks downstream conditional type inference in `createApi`. The bucket overloads **capture the concrete validator type** (`TReq extends AnyValidator<…>`) rather than inferring the output shape, so the return type stays a single type (never a union) and `EndpointFn`'s `TSpec["request"] extends Validator<infer R>` detection keeps working.
+- **`endpoint()` has 4 overloads: 2 no-request** (adapter×) **+ 2 request-bucket-map** (adapter×). `request` is **always** a `{ path?, query?, body? }` bucket-map of standalone validators — the envelope `request: z.object({…})` form was **removed** (the bucket-map is the only form). All return types have `request` and `adapter` as required (not optional) fields. This is intentional — `| undefined` in return types breaks downstream conditional type inference in `createApi`. The bucket overloads synthesize the stored `request` as a single composed `Validator<BucketRequestOutput<…>>` (never a union), so `EndpointFn`'s `TSpec["request"] extends Validator<infer R>` detection keeps working. The removed top-level `pathParams`/`query`/`body` fields are rejected at compile time via a `NoLegacyBuckets` (`{ pathParams?: never; query?: never; body?: never }`) intersection on the no-request overloads, so the old form is a hard error instead of silently dropping validation.
 - **`AnyValidator` accepts `.parse` OR Standard Schema (SE-11).** `AnyValidator<T> = Validator<T> | StandardSchemaV1<unknown, T>`. `EndpointSpec` request/response are `AnyValidator`. Runtime validation goes through `runValidator` (prefers sync `.parse`, else `~standard.validate`). The `StandardSchemaV1` type is **vendored** (`standard-schema.ts`) to keep core zero-dependency — do not add `@standard-schema/spec`.
 - **`buildClient` is recursive.** When a `RouterEndpoints` value has `prefix` + `endpoints` keys it is treated as a nested `RouterDef` and `buildClient` recurses with `joinPaths(prefix, nested.prefix)`.
 - **`createApi` stamps the source router on the client's non-enumerable `$router` property** (return type `ApiClientWithRouter`). `@routar/react-query`'s `createQueries(api)` recovers prefix + endpoint `method`s from it, so the router is never re-passed. `$router` is `$`-prefixed (no endpoint-name collision) and excluded from `ApiTypes`; don't break this contract.
@@ -74,7 +74,7 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 |------|---------|
 | `types.ts` | All shared interfaces and types (`ExecuteOptions`, `Executor`, `EndpointSpec`, `RouterDef`, `RouterEntry`, `ApiTypes`, `AnyValidator`, `ValidationMode`, `ValidationErrorContext`, `EndpointCallOptions`, …) |
 | `standard-schema.ts` | Vendored `StandardSchemaV1` interface (SE-11) — keeps core dependency-free |
-| `define-endpoint.ts` | `endpoint()` helper with 4 envelope + 2 separated-bucket overloads + `PathParams<TPath>` template literal type |
+| `define-endpoint.ts` | `endpoint()` helper — 2 no-request + 2 request-bucket-map overloads (`request` is a `{ path?, query?, body? }` validator-map; envelope form removed) + `PathParams<TPath>` template literal type + `NoLegacyBuckets` guard |
 | `define-router.ts` | `defineRouter(prefix, endpoints)` — groups specs under a prefix |
 | `create-executor.ts` | `createExecutor(execute, options?)` + `dispatchExecutor` — wraps a transport function with `options.plugins` (converted to a middleware chain via `reduceRight`) |
 | `create-fetch-executor.ts` | `createFetchExecutor(baseURL, options?)` + `HttpError` — native fetch transport |
@@ -84,7 +84,7 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 | `utils/params.ts` | `serializeParams` → `URLSearchParams` |
 | `utils/validate.ts` | `ValidationError`, `StandardSchemaError` |
 | `utils/run-validator.ts` | `runValidator(validator, data)` — validate-or-throw for `.parse` **or** `~standard` (shared by createApi + `@routar/msw`) |
-| `utils/compose-request.ts` | `composeRequest(buckets)` — composes SE-12 separated buckets into an envelope `request` validator (carries Zod-like `.shape` for flatten) |
+| `utils/compose-request.ts` | `composeRequest(buckets)` — composes the `{ path?, query?, body? }` request buckets into an envelope `request` validator (carries Zod-like `.shape` for flatten) |
 
 ### `apps/example` structure
 
@@ -126,14 +126,14 @@ components/
 
 ### PathParams enforcement
 
-`endpoint()` enforces at compile time that if `path` contains `:param` segments, `request` must include a `path` field with matching keys:
+`endpoint()` enforces at compile time that if `path` contains `:param` segments, `request.path` must be present with matching keys:
 
 ```ts
-// ❌ compile error — ':id' in path but request.path.id missing
-endpoint({ path: '/:id', request: z.object({ query: z.object({}) }), response: Schema })
+// ❌ compile error — ':id' in path but request.path missing
+endpoint({ path: '/:id', request: { query: z.object({}) }, response: Schema })
 ```
 
-This uses the `PathParams<TPath>` template literal type and `PathConstraint<TPath>` intersection on `TRequest`.
+This uses the `PathParams<TPath>` template literal type and the `BucketRequestMap` helper, which makes `request.path` a required key (and constrains its validator to cover every `:param`) when `PathParams<TPath>` is non-`never`.
 
 ### Executor pattern
 
@@ -150,9 +150,9 @@ Any object with a `.parse(data: unknown): T` method works as a `Validator<T>` (Z
 - `createApi(executor, router, { validate, onValidationError })`. `validate` is `boolean | 'warn' | { request?, response? }` (each a `ValidationMode = boolean | 'warn'`). `'warn'` passes raw data through and calls `onValidationError(err, { kind, method, url, data })` instead of throwing — drift observation without an outage.
 - Endpoint call signature: `fn(params, signalOrOptions?)` where the 2nd arg is `AbortSignal | { signal?, headers?, timeout? }` (bare signal stays valid). Per-call `headers` merge over executor defaults (plugin `onRequest` runs after, wins on key collision); per-call `timeout` aborts with `TimeoutError` at the core level (works on every executor).
 
-### Separated request buckets (SE-12)
+### Request buckets (`request` is a bucket-map)
 
-`endpoint()` also accepts `pathParams` / `query` / `body` as separate validators instead of a wrapped `request` envelope. `composeRequest` folds them into the same envelope `request` (with a Zod-like `.shape`), so call sites, keys, react-query flatten, and MSW are identical. The envelope `request` form is unchanged. Both forms coexist (additive, non-breaking).
+`request` is **always** a plain `{ path?, query?, body? }` map of standalone validators — there is no single-validator envelope form (the `request: z.object({…})` form was **removed** (the bucket-map is the only form)). `endpoint()`'s runtime impl folds the buckets into a composed envelope `request` validator via `composeRequest` (carrying a Zod-like `.shape`), so createApi, query keys, react-query flatten, and MSW all read the canonical `{ path, query, body }` shape. `request.path` is required when `path` has `:param` segments. The legacy top-level `pathParams`/`query`/`body` fields are a compile error (`NoLegacyBuckets` guard), not silently dropped.
 
 ---
 

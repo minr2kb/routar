@@ -24,6 +24,7 @@ export default function RootLayout({
             <a href="/todos">Todos</a>
             <a href="/posts">Posts</a>
             <a href="/users">Users</a>
+            <a href="/catalog">Catalog</a>
           </nav>
           <main style={{ padding: "24px" }}>{children}</main>
         </Providers>

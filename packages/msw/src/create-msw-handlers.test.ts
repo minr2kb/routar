@@ -18,28 +18,28 @@ const todoRouter = defineRouter("/todos", {
   getDetail: endpoint({
     method: "GET",
     path: "/:id",
-    request: z.object({ path: z.object({ id: z.coerce.number() }) }),
+    request: { path: z.object({ id: z.coerce.number() }) },
     response: TodoSchema,
   }),
   create: endpoint({
     method: "POST",
     path: "/",
-    request: z.object({ body: z.object({ title: z.string() }) }),
+    request: { body: z.object({ title: z.string() }) },
     response: TodoSchema,
   }),
   update: endpoint({
     method: "PATCH",
     path: "/:id",
-    request: z.object({
+    request: {
       path: z.object({ id: z.coerce.number() }),
       body: z.object({ title: z.string() }),
-    }),
+    },
     response: TodoSchema,
   }),
   remove: endpoint({
     method: "DELETE",
     path: "/:id",
-    request: z.object({ path: z.object({ id: z.coerce.number() }) }),
+    request: { path: z.object({ id: z.coerce.number() }) },
     response: z.null(),
   }),
 });
@@ -179,7 +179,7 @@ describe("createMswHandlers — nested router", () => {
       getDetail: endpoint({
         method: "GET",
         path: "/:id",
-        request: z.object({ path: z.object({ id: z.coerce.number() }) }),
+        request: { path: z.object({ id: z.coerce.number() }) },
         response: TodoSchema,
       }),
     }),

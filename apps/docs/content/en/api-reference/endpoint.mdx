@@ -36,34 +36,26 @@ endpoint({
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'PATCH' \| 'DELETE'` | Yes | HTTP method |
 | `path` | `string` | Yes | Path relative to the router prefix. Use `:param` for path parameters. |
 | `response` | `AnyValidator<T>` | Yes | Schema for validating the response. Any object with `.parse(data): T`, or a [Standard Schema](#standard-schema). |
-| `request` | `AnyValidator<R>` | No | Schema for `{ path?, query?, body? }` (the envelope form). |
-| `pathParams` / `query` / `body` | `AnyValidator` | No | The [separated-bucket form](#separated-request-buckets) — an alternative to `request`. |
+| `request` | `{ path?, query?, body? }` | No | The request schema — a [bucket-map](#request-buckets) of standalone validators, one per part. When `path` has `:param` segments, `request.path` is required. |
 | `adapter` | `(raw: T) => U` | No | Transform the validated response. |
 
-## Separated request buckets
+## Request buckets
 
-Instead of wrapping a `request` envelope, you can declare each part as its own validator. The two forms are interchangeable and produce identical call sites, query keys, react-query flatten, and MSW behavior — the buckets are composed into the same envelope internally.
+`request` is a plain `{ path?, query?, body? }` map of standalone validators — one validator per part. routar composes the buckets into a single internal envelope, so call sites, query keys, react-query flatten, and MSW all see the same `{ path, query, body }` shape.
 
 ```ts
-// envelope form
 endpoint({
   method: 'GET',
   path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }), query: z.object({ q: z.string() }) }),
-  response: TodoSchema,
-})
-
-// separated-bucket form — equivalent
-endpoint({
-  method: 'GET',
-  path: '/:id',
-  pathParams: z.object({ id: z.number() }),
-  query: z.object({ q: z.string() }),
+  request: {
+    path: z.object({ id: z.number() }),
+    query: z.object({ q: z.string() }),
+  },
   response: TodoSchema,
 })
 ```
 
-Path-param enforcement still applies: when `path` has `:param` segments, `pathParams` is required and must cover them.
+Path-param enforcement still applies: when `path` has `:param` segments, `request.path` is required and must cover them.
 
 ## Standard Schema
 
@@ -87,7 +79,7 @@ If `path` contains `:param` segments, the `request` schema must include a matchi
 // ✅ correct
 endpoint({
   path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }) }),
+  request: { path: z.object({ id: z.number() }) },
   response: TodoSchema,
   method: 'GET',
 })
@@ -95,7 +87,7 @@ endpoint({
 // ❌ compile error — ':id' in path but request.path.id missing
 endpoint({
   path: '/:id',
-  request: z.object({ query: z.object({ q: z.string() }) }),
+  request: { query: z.object({ q: z.string() }) },
   response: TodoSchema,
   method: 'GET',
 })

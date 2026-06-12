@@ -14,23 +14,23 @@ const Router = defineRouter("/todos", {
   getList: endpoint({
     method: "GET",
     path: "/",
-    request: z.object({
+    request: {
       query: z
         .object({ userId: z.number(), _page: z.number().optional() })
         .optional(),
-    }),
+    },
     response: z.array(z.object({ id: z.number(), title: z.string() })),
   }),
   getDetail: endpoint({
     method: "GET",
     path: "/:id",
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: z.object({ id: z.number(), title: z.string() }),
   }),
   create: endpoint({
     method: "POST",
     path: "/",
-    request: z.object({ body: z.object({ title: z.string() }) }),
+    request: { body: z.object({ title: z.string() }) },
     response: z.object({ id: z.number(), title: z.string() }),
   }),
 });
@@ -157,10 +157,10 @@ describe("type-level", () => {
       replace: endpoint({
         method: "PUT",
         path: "/:id",
-        request: z.object({
+        request: {
           path: z.object({ id: z.number() }),
           body: z.object({ id: z.number(), name: z.string() }),
-        }),
+        },
         response: z.object({ id: z.number() }),
       }),
     });

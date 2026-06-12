@@ -8,15 +8,14 @@ export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
   const queryClient = getQueryClient();
-
   await queryClient.prefetchQuery(userQuery.getList());
 
   return (
     <div>
-      <h1>Users (SSR prefetch + adapter)</h1>
+      <h1>Users</h1>
       <p style={{ color: "#666", fontSize: 14 }}>
-        Adapter flattens <code>company.name → companyName</code> and{" "}
-        <code>address.city → city</code>
+        ArkType (Standard Schema) response + <code>adapter</code> flattening{" "}
+        <code>company.name → companyName</code>, <code>address.city → city</code>.
       </p>
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense fallback={<p>Loading…</p>}>
