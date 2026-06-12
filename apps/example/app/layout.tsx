@@ -1,7 +1,17 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = { title: "routar dev" };
+
+const NAV = [
+  { href: "/", label: "Home" },
+  { href: "/todos", label: "Todos" },
+  { href: "/posts", label: "Posts" },
+  { href: "/users", label: "Users" },
+  { href: "/catalog", label: "Catalog" },
+];
 
 export default function RootLayout({
   children,
@@ -10,23 +20,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-gray-50 text-ink">
         <Providers>
-          <nav
-            style={{
-              padding: "12px 24px",
-              borderBottom: "1px solid #eee",
-              display: "flex",
-              gap: 24,
-            }}
-          >
-            <a href="/">Home</a>
-            <a href="/todos">Todos</a>
-            <a href="/posts">Posts</a>
-            <a href="/users">Users</a>
-            <a href="/catalog">Catalog</a>
+          <nav className="sticky top-0 z-10 flex items-center gap-6 border-b border-line bg-white/80 px-6 py-3 backdrop-blur">
+            <span className="font-bold tracking-tight text-brand-fg">routar</span>
+            <div className="flex gap-5 text-sm text-muted">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="no-underline transition-colors hover:text-ink"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
           </nav>
-          <main style={{ padding: "24px" }}>{children}</main>
+          <main className="mx-auto max-w-3xl px-6 py-10">{children}</main>
         </Providers>
       </body>
     </html>

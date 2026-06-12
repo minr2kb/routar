@@ -9,25 +9,28 @@ const DOMAINS = [
 
 export default function Home() {
   return (
-    <div style={{ maxWidth: 720 }}>
-      <h1 style={{ marginBottom: 8 }}>routar example</h1>
-      <p style={{ fontSize: 16, lineHeight: 1.5, color: "#333" }}>
+    <div>
+      <h1 className="mb-2">routar example</h1>
+      <p className="text-base leading-relaxed text-gray-700">
         A small but realistic Next.js app. Each domain declares its API once in{" "}
         <code>remote/services/&lt;domain&gt;.ts</code> — router, schemas, client,
         and TanStack Query helpers together — and the pages just consume it.
       </p>
-      <p style={{ color: "#666", fontSize: 14 }}>
+      <p className="mt-1 text-sm text-muted">
         See <code>apps/example/README.md</code> for the folder layout and where
         each routar feature lives.
       </p>
 
-      <ul style={{ listStyle: "none", padding: 0, marginTop: 24 }}>
+      <ul className="mt-8 grid gap-3">
         {DOMAINS.map((d) => (
-          <li key={d.href} style={{ padding: "10px 0", borderBottom: "1px solid #eee" }}>
-            <Link href={d.href} style={{ fontSize: 16 }}>
-              {d.name}
+          <li key={d.href}>
+            <Link
+              href={d.href}
+              className="block rounded-xl border border-line bg-white p-4 no-underline transition-shadow hover:shadow-sm"
+            >
+              <span className="text-base font-semibold text-ink">{d.name}</span>
+              <div className="mt-1 text-sm text-faint">{d.blurb}</div>
             </Link>
-            <div style={{ color: "#999", fontSize: 14 }}>{d.blurb}</div>
           </li>
         ))}
       </ul>

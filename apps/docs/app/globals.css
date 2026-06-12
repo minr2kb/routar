@@ -1,47 +1,140 @@
-/* routar brand: indigo (#6366f1) — hsl(239, 84%, 67%) */
+/* Tailwind v4 — imported WITHOUT preflight so Nextra's own base styles and
+   theme reset stay intact. We only want the theme tokens + utility classes. */
+
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Split import skips the default auto-detection root — point it at our sources. */
+@source "../app";
+@source "../components";
+
+/* Nextra toggles dark mode with a `.dark` class on <html>; wire Tailwind's
+   `dark:` variant to it instead of the prefers-color-scheme default. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* routar brand: indigo #6366f1 */
+@theme {
+  --color-brand: #6366f1;
+  --color-brand-fg: #4f46e5;
+  --font-mono: var(--font-geist-mono, ui-monospace, SFMono-Regular, monospace);
+  --animate-title-shimmer: title-shimmer 7s linear infinite;
+  --animate-hero-shimmer: hero-shimmer 8s linear infinite;
+  --animate-chip-pop: chip-pop 0.25s ease;
+  --animate-section-enter: section-enter 0.32s cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+  --animate-section-exit: section-exit 0.22s ease forwards;
+  --animate-section-brighten: section-brighten 0.22s ease both;
+  --animate-rail-pulse: rail-pulse 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Nextra theme primary hue (indigo) — hsl(239, 84%, 67%). Not a styling
+   engine; keep as-is so the docs chrome stays on-brand. */
 :root {
   --nextra-primary-hue: 239deg;
   --nextra-primary-saturation: 84%;
   --nextra-primary-lightness: 67%;
 }
 
-.landing-code .shiki {
-  margin: 0;
-  padding: 28px 32px;
-  border-radius: 14px;
-  overflow-x: auto;
-  font-size: 0.82rem;
-  line-height: 1.7;
+@keyframes title-shimmer {
+  to {
+    background-position: 220% center;
+  }
 }
 
-.pkg-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
+@keyframes hero-shimmer {
+  to {
+    background-position: 200% center;
+  }
 }
 
-.pkg-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 18px 20px;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+@keyframes chip-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
-.dark .pkg-card {
-  border-color: rgba(255, 255, 255, 0.1);
+@keyframes section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.pkg-name {
-  font-weight: 700;
-  font-size: 0.84rem;
-  color: rgb(99, 102, 241);
+@keyframes section-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
-.pkg-desc {
-  flex: 1;
-  font-size: 0.77rem;
-  line-height: 1.5;
-  color: #9ca3af;
+@keyframes section-brighten {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rail-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Animated indigo sweep across a heading (ComposableDemo title). Pairs with
+   `animate-title-shimmer`; the gradient + text-clip can't be expressed as
+   stock utilities, so it lives here as a component utility. */
+@utility title-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    currentColor 38%,
+    rgb(99, 102, 241) 50%,
+    currentColor 62%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Landing hero title — flowing indigo→violet gradient. The stops are symmetric
+   (start === end color) and the size is 200%, so `animate-hero-shimmer` loops
+   seamlessly. Pairs with the clip/transparent text fill. */
+@utility hero-title {
+  background-image: linear-gradient(
+    110deg,
+    #6366f1 0%,
+    #a78bfa 25%,
+    #c4b5fd 50%,
+    #a78bfa 75%,
+    #6366f1 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }

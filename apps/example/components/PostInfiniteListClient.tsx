@@ -13,22 +13,22 @@ export function PostInfiniteListClient() {
 
   return (
     <div>
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <ul className="divide-y divide-line">
         {posts.map((post) => (
-          <li key={post.id} style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}>
+          <li key={post.id} className="py-3">
             <Link href={`/posts/${post.id}`}>
               <strong>[{post.id}]</strong> {post.title}
             </Link>
           </li>
         ))}
       </ul>
-      <div style={{ padding: "16px 0" }}>
+      <div className="py-4">
         {hasNextPage ? (
           <button type="button" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
             {isFetchingNextPage ? "Loading…" : "Load more"}
           </button>
         ) : (
-          <span style={{ color: "#999" }}>No more posts ({posts.length} total)</span>
+          <span className="text-sm text-faint">No more posts ({posts.length} total)</span>
         )}
       </div>
     </div>

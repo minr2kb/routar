@@ -13,7 +13,7 @@ export function CatalogClient() {
   return (
     <section>
       <NewProductForm firstCategoryId={categories[0]?.id ?? 1} />
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <ul className="divide-y divide-line">
         {products.map((p) => (
           <ProductRow key={p.id} product={p} category={categoryName(p.categoryId)} />
         ))}
@@ -46,13 +46,13 @@ function NewProductForm({ firstCategoryId }: { firstCategoryId: number }) {
           { onSuccess: () => setName("") },
         );
       }}
-      style={{ display: "flex", gap: 8, marginBottom: 16 }}
+      className="mb-4 flex items-center gap-2"
     >
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="New product name…"
-        style={{ padding: "4px 8px", flex: 1 }}
+        className="flex-1"
       />
       <button type="submit" disabled={create.isPending}>
         {create.isPending ? "Adding…" : "Add"}
@@ -66,9 +66,9 @@ function ProductRow({ product, category }: { product: Product; category: string 
   const remove = useMutation(catalogQuery.products.remove());
 
   return (
-    <li style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-      <span style={{ flex: 1 }}>
-        {product.name} <small style={{ color: "#999" }}>· {category}</small>
+    <li className="flex items-center gap-2 py-2">
+      <span className="flex-1">
+        {product.name} <small className="text-faint">· {category}</small>
       </span>
       <button
         type="button"
@@ -81,7 +81,7 @@ function ProductRow({ product, category }: { product: Product; category: string 
         type="button"
         onClick={() => remove.mutate({ path: { id: product.id } })}
         disabled={remove.isPending}
-        style={{ color: "red", background: "none", border: "none", cursor: "pointer" }}
+        className="border-none bg-transparent px-1 text-faint hover:text-danger"
       >
         ✕
       </button>

@@ -13,7 +13,7 @@ export default async function PostsInfinitePage() {
 
   return (
     <div>
-      <h1>Posts — infinite</h1>
+      <h1 className="mb-5">Posts — infinite</h1>
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense fallback={<p>Loading…</p>}>
           <PostInfiniteListClient />

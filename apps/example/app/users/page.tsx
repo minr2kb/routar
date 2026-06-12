@@ -13,7 +13,7 @@ export default async function UsersPage() {
   return (
     <div>
       <h1>Users</h1>
-      <p style={{ color: "#666", fontSize: 14 }}>
+      <p className="mb-5 mt-1 text-sm text-muted">
         ArkType (Standard Schema) response + <code>adapter</code> flattening{" "}
         <code>company.name → companyName</code>, <code>address.city → city</code>.
       </p>

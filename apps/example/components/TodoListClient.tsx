@@ -17,36 +17,37 @@ export function TodoListClient() {
       : { _limit: 20 };
   const { data } = useSuspenseQuery(todoQuery.getList(params));
 
+  const filterBtn = (active: boolean) =>
+    active ? "border-brand font-semibold text-brand-fg" : "";
+
   return (
     <section>
-      <h2>Todos (CSR)</h2>
+      <h2 className="mb-3">Todos (CSR)</h2>
       <CreateTodoForm />
-      <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+      <div className="mb-3 flex gap-2">
         <button
           type="button"
           onClick={() => setShowCompleted(undefined)}
-          style={{
-            fontWeight: showCompleted === undefined ? "bold" : "normal",
-          }}
+          className={filterBtn(showCompleted === undefined)}
         >
           All
         </button>
         <button
           type="button"
           onClick={() => setShowCompleted(false)}
-          style={{ fontWeight: showCompleted === false ? "bold" : "normal" }}
+          className={filterBtn(showCompleted === false)}
         >
           Active
         </button>
         <button
           type="button"
           onClick={() => setShowCompleted(true)}
-          style={{ fontWeight: showCompleted === true ? "bold" : "normal" }}
+          className={filterBtn(showCompleted === true)}
         >
           Completed
         </button>
       </div>
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <ul className="divide-y divide-line">
         {data.map((todo) => (
           <TodoRow key={todo.id} todo={todo} />
         ))}

@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* routar brand: indigo #6366f1 */
+@theme {
+  --color-brand: #6366f1;
+  --color-brand-fg: #4f46e5;
+  --color-ink: #1f2937;
+  --color-muted: #6b7280;
+  --color-faint: #9ca3af;
+  --color-line: #e5e7eb;
+  --color-danger: #dc2626;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif;
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  a {
+    color: var(--color-brand-fg);
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    font-size: 0.85em;
+    background: #f3f4f6;
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+
+  /* Sensible defaults so demo markup stays light on classes. */
+  button {
+    font: inherit;
+    cursor: pointer;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--color-line);
+    background: #fff;
+    color: var(--color-ink);
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+  }
+
+  button:hover:not(:disabled) {
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]) {
+    font: inherit;
+    padding: 0.4rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--color-line);
+    background: #fff;
+  }
+
+  input:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
+  }
+}

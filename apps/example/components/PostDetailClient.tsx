@@ -14,15 +14,15 @@ export function PostDetailClient({ id }: { id: number }) {
 
   return (
     <article>
-      <h1>{post.title}</h1>
-      <p style={{ color: "#444" }}>{post.body}</p>
-      <h3 style={{ marginTop: 24 }}>Comments ({comments.length})</h3>
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <h1 className="mb-2">{post.title}</h1>
+      <p className="leading-relaxed text-gray-700">{post.body}</p>
+      <h3 className="mt-6">Comments ({comments.length})</h3>
+      <ul className="divide-y divide-line border-t border-line">
         {comments.map((c) => (
-          <li key={c.id} style={{ borderTop: "1px solid #eee", padding: "8px 0" }}>
+          <li key={c.id} className="py-2">
             <strong>{c.name}</strong>{" "}
-            <small style={{ color: "#999" }}>· {c.email}</small>
-            <p style={{ margin: "4px 0 0" }}>{c.body}</p>
+            <small className="text-faint">· {c.email}</small>
+            <p className="mt-1 text-sm text-gray-700">{c.body}</p>
           </li>
         ))}
       </ul>

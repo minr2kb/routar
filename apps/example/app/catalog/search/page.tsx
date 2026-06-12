@@ -15,7 +15,7 @@ export default async function ProductSearchPage() {
   return (
     <div>
       <h1>Product search</h1>
-      <p style={{ color: "#666", fontSize: 14 }}>
+      <p className="mb-5 mt-1 text-sm text-muted">
         POST-as-query (the search body is part of the query key) + infinite
         pagination.
       </p>

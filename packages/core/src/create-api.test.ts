@@ -67,7 +67,7 @@ describe("createApi", () => {
           response: makeValidator([]),
         },
       });
-      await api.list({});
+      await api.list();
       expect(executor.execute).toHaveBeenCalledWith(
         expect.objectContaining({ url: "/items" }),
       );

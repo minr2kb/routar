@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import styles from "./ComposableDemo.module.css";
+import { LandingSection } from "./LandingSection";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -537,6 +537,7 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
     );
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: schedule is not a dependency
   useEffect(() => {
     const state: DemoState = { routers, factory, executor, plugins, queries };
     const activeIds = getActiveSections(state);
@@ -663,54 +664,76 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
     });
   }
 
-  return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <p className={styles.eyebrow}>{copy.eyebrow}</p>
-        <h2 className={styles.title}>{copy.title}</h2>
-        <p className={styles.subtitle}>
-          {copy.subtitle[0]}
-          <br />
-          {copy.subtitle[1]}
-        </p>
-      </div>
+  const groupBase =
+    "flex flex-wrap items-center gap-3.5 transition-opacity max-[540px]:flex-col max-[540px]:items-start max-[540px]:gap-2";
+  const groupCls = (disabled: boolean) =>
+    `${groupBase}${disabled ? " pointer-events-none opacity-30" : ""}`;
+  const groupLabel =
+    "inline-flex shrink-0 items-center text-[0.68rem] font-bold uppercase tracking-[0.07em] text-gray-400 min-w-[122px] max-[540px]:min-w-0";
+  const layerTag =
+    "mr-2 rounded-[5px] bg-brand/10 px-[5px] py-px font-mono text-[0.58rem] font-extrabold tracking-[0.02em] text-brand";
+  const chipBase =
+    "whitespace-nowrap cursor-pointer rounded-full border border-black/10 bg-transparent px-3 py-1 font-mono text-[0.78rem] font-medium text-inherit transition-all enabled:hover:border-brand/45 enabled:hover:text-brand enabled:active:scale-[0.93]";
+  const chipCls = (active: boolean) =>
+    `${chipBase}${active ? " !border-brand bg-brand/10 !text-brand animate-chip-pop motion-reduce:animate-none" : ""}`;
 
+  return (
+    <LandingSection
+      eyebrow={copy.eyebrow}
+      title={copy.title}
+      subtitle={`${copy.subtitle[0]}\n${copy.subtitle[1]}`}
+      footer={
+        <a
+          className="text-[0.82rem] font-semibold text-brand no-underline transition-all hover:opacity-80"
+          href={`/${lang}/guides/architecture`}
+        >
+          {copy.archLink}
+        </a>
+      }
+    >
       {/* ── Architecture-layer rail (mirrors /guides/architecture) ── */}
-      <div className={styles.rail}>
+      <div className="mb-[18px] flex flex-wrap items-center justify-center gap-1 max-[540px]:gap-0.5">
         {LAYERS.map((l, i) => (
           <Fragment key={l.n}>
             {i > 0 && (
-              <span className={styles.railArrow} aria-hidden="true">
+              <span
+                className="select-none text-[0.78rem] text-gray-300 max-[540px]:text-[0.7rem]"
+                aria-hidden="true"
+              >
                 →
               </span>
             )}
             <a
-              className={styles.railPill}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-black/8 bg-transparent px-[11px] py-1.5 text-gray-400 no-underline transition-all hover:-translate-y-px hover:border-brand/45 data-[active=true]:animate-rail-pulse data-[active=true]:border-brand/40 data-[active=true]:bg-brand/8 data-[active=true]:text-brand data-[active=true]:shadow-[0_2px_16px_rgba(99,102,241,0.18)] motion-reduce:animate-none"
               data-active={layerActive[l.n] ? "true" : "false"}
               href={`/${lang}/guides/architecture#${l.anchor}`}
               title={`Layer ${l.n} — open the Architecture guide`}
             >
-              <span className={styles.railNum}>L{l.n}</span>
-              <span className={styles.railLabel}>{copy.layers[l.n]}</span>
+              <span className="font-mono text-[0.6rem] font-extrabold tracking-[0.03em] opacity-85">
+                L{l.n}
+              </span>
+              <span className="text-[0.74rem] font-semibold max-[540px]:hidden">
+                {copy.layers[l.n]}
+              </span>
             </a>
           </Fragment>
         ))}
       </div>
 
-      <div className={styles.layout}>
-        <div className={styles.selectors}>
-          <div className={styles.group}>
-            <span className={styles.groupLabel}>
-              <span className={styles.layerTag}>L1</span>
+      <div className="flex flex-col">
+        <div className="mb-5 flex flex-col gap-3 rounded-[14px] border border-black/8 bg-brand/2 px-6 py-5 max-[540px]:p-4 dark:border-white/10">
+          <div className={groupCls(false)}>
+            <span className={groupLabel}>
+              <span className={layerTag}>L1</span>
               {copy.groups.routers}
             </span>
-            <div className={styles.chips}>
+            <div className="flex flex-wrap gap-1.5">
               {ROUTERS.map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => toggleRouter(key)}
-                  className={`${styles.chip} ${routers.has(key) ? styles.chipActive : ""}`}
+                  className={chipCls(routers.has(key))}
                 >
                   {label}
                 </button>
@@ -718,18 +741,18 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
             </div>
           </div>
 
-          <div className={styles.group}>
-            <span className={styles.groupLabel}>
-              <span className={styles.layerTag}>L2</span>
+          <div className={groupCls(false)}>
+            <span className={groupLabel}>
+              <span className={layerTag}>L2</span>
               {copy.groups.factory}
             </span>
-            <div className={styles.chips}>
+            <div className="flex flex-wrap gap-1.5">
               {FACTORIES.map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setFactory(key)}
-                  className={`${styles.chip} ${factory === key ? styles.chipActive : ""}`}
+                  className={chipCls(factory === key)}
                 >
                   {label}
                 </button>
@@ -737,20 +760,18 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
             </div>
           </div>
 
-          <div
-            className={`${styles.group} ${pluginsDisabled ? styles.groupDisabled : ""}`}
-          >
-            <span className={styles.groupLabel}>
-              <span className={styles.layerTag}>L3</span>
+          <div className={groupCls(pluginsDisabled)}>
+            <span className={groupLabel}>
+              <span className={layerTag}>L3</span>
               {copy.groups.plugins}
             </span>
-            <div className={styles.chips}>
+            <div className="flex flex-wrap gap-1.5">
               {PLUGINS.map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => togglePlugin(key)}
-                  className={`${styles.chip} ${plugins.has(key) && !pluginsDisabled ? styles.chipActive : ""}`}
+                  className={chipCls(plugins.has(key) && !pluginsDisabled)}
                   disabled={pluginsDisabled}
                 >
                   {label}
@@ -759,20 +780,18 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
             </div>
           </div>
 
-          <div
-            className={`${styles.group} ${executorDisabled ? styles.groupDisabled : ""}`}
-          >
-            <span className={styles.groupLabel}>
-              <span className={styles.layerTag}>L4</span>
+          <div className={groupCls(executorDisabled)}>
+            <span className={groupLabel}>
+              <span className={layerTag}>L4</span>
               {copy.groups.executor}
             </span>
-            <div className={styles.chips}>
+            <div className="flex flex-wrap gap-1.5">
               {EXECUTORS.map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => !executorDisabled && setExecutor(key)}
-                  className={`${styles.chip} ${executor === key && !executorDisabled ? styles.chipActive : ""}`}
+                  className={chipCls(executor === key && !executorDisabled)}
                   disabled={executorDisabled}
                 >
                   {label}
@@ -781,18 +800,16 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
             </div>
           </div>
 
-          <div
-            className={`${styles.group} ${queriesDisabled ? styles.groupDisabled : ""}`}
-          >
-            <span className={styles.groupLabel}>
-              <span className={styles.layerTag}>L5</span>
+          <div className={groupCls(queriesDisabled)}>
+            <span className={groupLabel}>
+              <span className={layerTag}>L5</span>
               {copy.groups.queries}
             </span>
-            <div className={styles.chips}>
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={() => !queriesDisabled && setQueries((v) => !v)}
-                className={`${styles.chip} ${queries && !queriesDisabled ? styles.chipActive : ""}`}
+                className={chipCls(queries && !queriesDisabled)}
                 disabled={queriesDisabled}
               >
                 createQueries
@@ -801,22 +818,18 @@ export function ComposableDemo({ lang = "en" }: { lang?: string }) {
           </div>
         </div>
 
-        <div className={styles.codeContainer}>
+        <div className="max-h-[540px] overflow-hidden overflow-y-auto rounded-[14px] bg-[#24292e] shadow-[0_8px_40px_rgba(0,0,0,0.18)] [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-thumb]:bg-white/12 [&::-webkit-scrollbar]:w-[5px]">
           {sections.map((s) => (
             <div
               key={s.id}
-              className={styles.section}
+              className="px-8 text-[0.82rem] leading-[1.7] first:pt-7 last:pb-7 max-[540px]:px-5 max-[540px]:first:pt-5 max-[540px]:last:pb-5 data-[phase=brightening]:animate-section-brighten data-[phase=entering]:animate-section-enter data-[phase=exiting]:pointer-events-none data-[phase=exiting]:animate-section-exit data-[phase=dimming]:opacity-0 data-[phase=dimming]:transition-opacity data-[phase=dimming]:duration-[140ms] motion-reduce:animate-none [&+&]:pt-[1.7em] [&_.shiki]:!m-0 [&_.shiki]:!overflow-visible [&_.shiki]:!bg-transparent [&_.shiki]:!p-0 [&_.shiki]:!text-[0.82rem] [&_.shiki]:!leading-[1.7]"
               data-phase={s.phase}
-              // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: code to html
               dangerouslySetInnerHTML={{ __html: s.html }}
             />
           ))}
         </div>
       </div>
-
-      <a className={styles.archLink} href={`/${lang}/guides/architecture`}>
-        {copy.archLink}
-      </a>
-    </div>
+    </LandingSection>
   );
 }

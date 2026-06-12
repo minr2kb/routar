@@ -17,7 +17,7 @@ export default async function CatalogPage() {
   return (
     <div>
       <h1>Catalog</h1>
-      <p style={{ color: "#666", fontSize: 14 }}>
+      <p className="mb-5 mt-1 text-sm text-muted">
         Nested router (products + categories) over the ky executor. See also{" "}
         <Link href="/catalog/search">product search</Link>.
       </p>

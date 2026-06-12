@@ -13,7 +13,7 @@ export default async function TodosPage() {
   return (
     <div>
       <h1>Todos</h1>
-      <p style={{ color: "#666", fontSize: 14 }}>
+      <p className="mb-5 mt-1 text-sm text-muted">
         Local CRUD over Next route handlers (fetch executor). Mutations
         auto-invalidate the list via <code>createQueries</code> defaults.
       </p>

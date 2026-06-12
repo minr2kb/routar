@@ -8,22 +8,22 @@ export function UserListClient() {
   const { data: users } = useSuspenseQuery(userQuery.getList());
 
   return (
-    <table style={{ borderCollapse: "collapse", width: "100%" }}>
+    <table className="w-full border-collapse text-sm">
       <thead>
-        <tr style={{ borderBottom: "2px solid #eee", textAlign: "left" }}>
-          <th style={{ padding: "8px 12px" }}>Name</th>
-          <th style={{ padding: "8px 12px" }}>Email</th>
-          <th style={{ padding: "8px 12px" }}>Company</th>
-          <th style={{ padding: "8px 12px" }}>City</th>
+        <tr className="border-b-2 border-line text-left text-muted">
+          <th className="px-3 py-2 font-semibold">Name</th>
+          <th className="px-3 py-2 font-semibold">Email</th>
+          <th className="px-3 py-2 font-semibold">Company</th>
+          <th className="px-3 py-2 font-semibold">City</th>
         </tr>
       </thead>
       <tbody>
         {users.map((user) => (
-          <tr key={user.id} style={{ borderBottom: "1px solid #eee" }}>
-            <td style={{ padding: "8px 12px" }}>{user.name}</td>
-            <td style={{ padding: "8px 12px" }}>{user.email}</td>
-            <td style={{ padding: "8px 12px" }}>{user.companyName}</td>
-            <td style={{ padding: "8px 12px" }}>{user.city}</td>
+          <tr key={user.id} className="border-b border-line">
+            <td className="px-3 py-2">{user.name}</td>
+            <td className="px-3 py-2">{user.email}</td>
+            <td className="px-3 py-2">{user.companyName}</td>
+            <td className="px-3 py-2">{user.city}</td>
           </tr>
         ))}
       </tbody>

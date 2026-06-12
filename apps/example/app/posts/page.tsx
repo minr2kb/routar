@@ -14,7 +14,7 @@ export default async function PostsPage() {
   return (
     <div>
       <h1>Posts</h1>
-      <p style={{ color: "#666", fontSize: 14 }}>
+      <p className="mb-5 mt-1 text-sm text-muted">
         SSR-prefetched list over the external API. See also{" "}
         <Link href="/posts/infinite">infinite scroll</Link>.
       </p>

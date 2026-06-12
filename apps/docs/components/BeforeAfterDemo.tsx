@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import styles from "./BeforeAfterDemo.module.css";
+import { LandingSection } from "./LandingSection";
 
 interface ShikiHighlighter {
   codeToHtml(code: string, options: { lang: string; theme: string }): string;
@@ -27,7 +27,8 @@ interface Copy {
 const COPY: Record<Locale, Copy> = {
   en: {
     eyebrow: "The contrast",
-    title: "AI generates fast.\nBut the growing context is still yours to manage.",
+    title:
+      "AI generates fast.\nBut the growing context is still yours to manage.",
     subtitle:
       "AI can write all 6 files. But when the API changes, it has to find and update every one — or ship drift.",
     beforeLabel: "Without routar",
@@ -48,7 +49,8 @@ const COPY: Record<Locale, Copy> = {
   },
   ko: {
     eyebrow: "코드 비교",
-    title: "AI가 빠르게 생성합니다.\n그러나 불어난 컨텍스트는 여전히 당신의 몫입니다.",
+    title:
+      "AI가 빠르게 생성합니다.\n그러나 불어난 컨텍스트는 여전히 당신의 몫입니다.",
     subtitle:
       "AI가 왼쪽 6개 파일을 전부 생성할 수 있습니다. 하지만 API가 바뀌면 — 6곳을 찾아 수정하거나, drift를 배포하거나.",
     beforeLabel: "routar 없이",
@@ -269,98 +271,125 @@ export function BeforeAfterDemo({ lang = "en" }: { lang?: string }) {
     });
   }, []);
 
-  return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <p className={styles.eyebrow}>{copy.eyebrow}</p>
-        <h2 className={styles.title}>{copy.title}</h2>
-        <p className={styles.subtitle}>{copy.subtitle}</p>
-      </div>
+  const panelBase =
+    "flex min-w-0 flex-col overflow-hidden rounded-[14px] border";
+  const tabBase =
+    "cursor-pointer whitespace-nowrap select-none rounded-t-[5px] border border-transparent border-b-0 bg-transparent px-2.5 py-1 font-mono text-[0.68rem] transition-colors";
+  const codeShiki =
+    "flex-1 min-h-[180px] overflow-x-auto overflow-y-hidden bg-[#0d1117] [&_.shiki]:!m-0 [&_.shiki]:!rounded-none [&_.shiki]:!bg-[#0d1117] [&_.shiki]:!p-4 [&_.shiki]:!text-[0.73rem] [&_.shiki]:!leading-[1.65]";
 
-      <div className={styles.grid}>
+  return (
+    <LandingSection
+      eyebrow={copy.eyebrow}
+      title={copy.title}
+      subtitle={copy.subtitle}
+      footer={
+        <span className="text-[0.77rem] font-semibold tracking-[0.01em] text-brand-fg dark:text-[#818cf8]">
+          {copy.reduction}
+        </span>
+      }
+    >
+      <div className="grid grid-cols-[1fr_30px_1fr] items-stretch gap-x-2 max-[860px]:grid-cols-1 max-[860px]:gap-0">
         {/* ── Before panel ── */}
-        <div className={styles.panel} data-side="before">
-          <div className={styles.panelHeader}>
-            <span className={styles.panelLabel}>
-              <span className={styles.panelIcon} aria-hidden="true">
+        <div className={`${panelBase} border-black/10 dark:border-white/10`}>
+          <div className="flex items-center justify-between border-b border-red-500/10 bg-red-500/7 px-4 py-[11px] dark:border-red-500/15 dark:bg-red-500/10">
+            <span className="inline-flex items-center gap-[7px] text-[0.71rem] font-bold uppercase tracking-[0.06em] text-red-600 dark:text-red-300">
+              <span
+                className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-red-500/14 text-[0.62rem] font-extrabold normal-case tracking-normal text-red-600 dark:bg-red-500/20 dark:text-red-300"
+                aria-hidden="true"
+              >
                 ✕
               </span>
               {copy.beforeLabel}
             </span>
-            <span className={styles.panelCount}>{copy.beforeCount}</span>
+            <span className="font-mono text-[0.67rem] font-medium text-gray-400">
+              {copy.beforeCount}
+            </span>
           </div>
 
-          <div className={styles.tabs}>
+          <div className="flex flex-nowrap gap-0.5 overflow-x-auto border-b border-black/6 bg-black/2 px-1.5 pt-1.5 [scrollbar-width:none] dark:border-white/6 dark:bg-white/2 [&::-webkit-scrollbar]:hidden">
             {BEFORE_FILES.map((f, i) => (
               <button
                 key={f.name}
                 type="button"
                 onClick={() => setActiveTab(i)}
-                className={`${styles.tab} ${i === activeTab ? styles.tabActive : ""}`}
+                className={`${tabBase} ${
+                  i === activeTab
+                    ? "border-red-500/15 bg-red-500/5 text-red-600 dark:text-red-300"
+                    : "text-gray-400 hover:text-gray-500 dark:text-slate-600 dark:hover:text-slate-400"
+                }`}
               >
                 {f.name}
               </button>
             ))}
           </div>
 
-          <div className={styles.note} data-side="before">
+          <div className="flex min-h-[34px] items-center border-b border-black/5 bg-red-500/4 px-4 py-[7px] text-[0.73rem] leading-[1.4] text-red-600 dark:border-white/5 dark:bg-red-500/7 dark:text-red-400">
             {copy.fileNotes[activeTab]}
           </div>
 
-          <div className={styles.code}>
+          <div className={codeShiki}>
             {beforeHtml[activeTab] ? (
-              // eslint-disable-next-line react/no-danger
               <div
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: code to html
                 dangerouslySetInnerHTML={{ __html: beforeHtml[activeTab] }}
               />
             ) : (
-              <div className={styles.skeleton} />
+              <div className="min-h-[180px] flex-1 bg-[#0d1117]" />
             )}
           </div>
         </div>
 
         {/* ── Center arrow ── */}
-        <div className={styles.vsCol} aria-hidden="true">
-          <div className={styles.vsArrow}>
-            <span className={styles.arrowH}>→</span>
-            <span className={styles.arrowV}>↓</span>
-          </div>
+        <div
+          className="flex flex-col items-center justify-center max-[860px]:py-1.5"
+          aria-hidden="true"
+        >
+          <span className="inline max-[860px]:hidden">→</span>
+          <span className="hidden max-[860px]:inline">↓</span>
         </div>
 
         {/* ── After panel ── */}
-        <div className={styles.panel} data-side="after">
-          <div className={styles.panelHeader}>
-            <span className={styles.panelLabel}>
-              <span className={styles.panelIcon} aria-hidden="true">
+        <div
+          className={`${panelBase} border-brand/30 shadow-[0_0_0_1px_rgba(99,102,241,0.1),0_4px_24px_rgba(99,102,241,0.08)] dark:border-brand/35 dark:shadow-[0_0_0_1px_rgba(99,102,241,0.2),0_4px_24px_rgba(99,102,241,0.2)]`}
+        >
+          <div className="flex items-center justify-between border-b border-brand/10 bg-brand/7 px-4 py-[11px] dark:border-brand/15 dark:bg-brand/10">
+            <span className="inline-flex items-center gap-[7px] text-[0.71rem] font-bold uppercase tracking-[0.06em] text-brand-fg dark:text-[#a5b4fc]">
+              <span
+                className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-brand/14 text-[0.62rem] font-extrabold normal-case tracking-normal text-brand-fg dark:bg-brand/20 dark:text-[#a5b4fc]"
+                aria-hidden="true"
+              >
                 ✓
               </span>
               {copy.afterLabel}
             </span>
-            <span className={styles.panelCount}>{copy.afterCount}</span>
+            <span className="font-mono text-[0.67rem] font-medium text-gray-400">
+              {copy.afterCount}
+            </span>
           </div>
 
-          <div className={styles.tabs}>
-            <div className={`${styles.tab} ${styles.tabActive}`}>
+          <div className="flex flex-nowrap gap-0.5 overflow-x-auto border-b border-black/6 bg-black/2 px-1.5 pt-1.5 [scrollbar-width:none] dark:border-white/6 dark:bg-white/2 [&::-webkit-scrollbar]:hidden">
+            <div
+              className={`${tabBase} cursor-default border-brand/18 bg-brand/5 text-brand-fg dark:text-[#c7d2fe]`}
+            >
               {AFTER_FILE.name}
             </div>
           </div>
 
-          <div className={styles.note} data-side="after">
+          <div className="flex min-h-[34px] items-center border-b border-black/5 bg-brand/4 px-4 py-[7px] text-[0.73rem] leading-[1.4] text-brand-fg dark:border-white/5 dark:bg-brand/7 dark:text-[#818cf8]">
             {copy.afterNote}
           </div>
 
-          <div className={styles.code}>
+          <div className={codeShiki}>
             {afterHtml ? (
-              // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: code to html
               <div dangerouslySetInnerHTML={{ __html: afterHtml }} />
             ) : (
-              <div className={styles.skeleton} />
+              <div className="min-h-[180px] flex-1 bg-[#0d1117]" />
             )}
           </div>
         </div>
       </div>
-
-      <div className={styles.reduction}>{copy.reduction}</div>
-    </div>
+    </LandingSection>
   );
 }

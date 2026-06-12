@@ -22,20 +22,17 @@ export function CreateTodoForm() {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{ display: "flex", gap: 8, marginBottom: 16 }}
-    >
+    <form onSubmit={handleSubmit} className="mb-4 flex items-center gap-2">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="New todo title..."
-        style={{ padding: "4px 8px", flex: 1 }}
+        className="flex-1"
       />
       <button type="submit" disabled={create.isPending}>
         {create.isPending ? "Adding…" : "Add"}
       </button>
-      {create.isError && <span style={{ color: "red" }}>Failed</span>}
+      {create.isError && <span className="text-sm text-danger">Failed</span>}
     </form>
   );
 }
@@ -49,16 +46,10 @@ export function TodoRow({ todo }: { todo: TodoItem }) {
   const remove = useMutation(todoQuery.remove());
 
   return (
-    <li
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "4px 0",
-      }}
-    >
+    <li className="flex items-center gap-3 py-2">
       <input
         type="checkbox"
+        className="size-4 accent-brand"
         checked={todo.completed}
         onChange={() =>
           // flatten: true → flat vars; `id` (path) + `completed` (body) merged
@@ -66,24 +57,16 @@ export function TodoRow({ todo }: { todo: TodoItem }) {
         }
       />
       <span
-        style={{
-          flex: 1,
-          textDecoration: todo.completed ? "line-through" : "none",
-        }}
+        className={`flex-1 ${todo.completed ? "text-faint line-through" : ""}`}
       >
         {todo.label}
       </span>
-      <small style={{ color: "#999" }}>user {todo.userId}</small>
+      <small className="text-faint">user {todo.userId}</small>
       <button
         type="button"
         onClick={() => remove.mutate({ id: todo.id })}
         disabled={remove.isPending}
-        style={{
-          color: "red",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-        }}
+        className="border-none bg-transparent px-1 text-faint hover:text-danger"
       >
         ✕
       </button>

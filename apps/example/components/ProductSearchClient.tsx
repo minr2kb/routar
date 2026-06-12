@@ -21,31 +21,31 @@ export function ProductSearchClient() {
           e.preventDefault();
           setQ(draft);
         }}
-        style={{ display: "flex", gap: 8, marginBottom: 16 }}
+        className="mb-4 flex items-center gap-2"
       >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Search products (empty = all)…"
-          style={{ padding: "4px 8px", flex: 1 }}
+          className="flex-1"
         />
         <button type="submit">Search</button>
       </form>
 
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      <ul className="divide-y divide-line">
         {products.map((p) => (
-          <li key={p.id} style={{ borderBottom: "1px solid #eee", padding: "8px 0" }}>
-            {p.name} <small style={{ color: "#999" }}>· ${p.price}</small>
+          <li key={p.id} className="py-2">
+            {p.name} <small className="text-faint">· ${p.price}</small>
           </li>
         ))}
       </ul>
 
       {hasNextPage ? (
-        <button type="button" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+        <button type="button" className="mt-4" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
           {isFetchingNextPage ? "Loading…" : "Load more"}
         </button>
       ) : (
-        <span style={{ color: "#999" }}>{products.length} result(s)</span>
+        <span className="mt-4 block text-sm text-faint">{products.length} result(s)</span>
       )}
     </div>
   );

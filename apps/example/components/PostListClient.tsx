@@ -8,9 +8,9 @@ export function PostListClient() {
   const { data: posts } = useSuspenseQuery(postQuery.getList({ query: { _limit: 10 } }));
 
   return (
-    <ul style={{ listStyle: "none", padding: 0 }}>
+    <ul className="divide-y divide-line">
       {posts.map((post) => (
-        <li key={post.id} style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}>
+        <li key={post.id} className="py-3">
           <Link href={`/posts/${post.id}`}>
             <strong>[{post.id}]</strong> {post.title}
           </Link>
