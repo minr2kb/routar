@@ -1,0 +1,328 @@
+/* ── Root ──────────────────────────────────────────────────────── */
+
+.root {
+  max-width: 900px;
+  margin: 0 auto 120px;
+  padding: 0 24px;
+}
+
+/* ── Header (mirrors ComposableDemo) ──────────────────────────── */
+
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(99, 102, 241);
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  margin-bottom: 10px;
+  white-space: pre-line;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: #6b7280;
+  line-height: 1.65;
+}
+
+/* ── Two-column grid ──────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 44px 1fr;
+  gap: 0 8px;
+  align-items: stretch;
+}
+
+/* ── Arrow direction ─────────────────────────────────────────── */
+
+.arrowH { display: inline; }
+.arrowV { display: none; }
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .vsCol {
+    padding: 6px 0;
+    justify-content: center;
+  }
+  .arrowH { display: none; }
+  .arrowV { display: inline; }
+}
+
+/* ── Center VS column ────────────────────────────────────────── */
+
+.vsCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.vsArrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.08);
+  color: rgb(99, 102, 241);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+:global(.dark) .vsArrow {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+}
+
+/* ── Panel — matches landing page card / feature-grid style ────── */
+
+.panel {
+  /* min-width: 0 is critical — without it, CSS Grid lets items expand
+     beyond 1fr to fit their content (pre/code natural width). */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+:global(.dark) .panel {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* "After" panel has a subtle indigo glow to visually elevate it */
+.panel[data-side="after"] {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.1), 0 4px 24px rgba(99, 102, 241, 0.08);
+}
+
+:global(.dark) .panel[data-side="after"] {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15), 0 4px 24px rgba(99, 102, 241, 0.12);
+}
+
+/* ── Panel header ─────────────────────────────────────────────── */
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+}
+
+.panel[data-side="before"] .panelHeader {
+  background: rgba(239, 68, 68, 0.07);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+}
+
+.panel[data-side="after"] .panelHeader {
+  background: rgba(99, 102, 241, 0.07);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+:global(.dark) .panel[data-side="before"] .panelHeader {
+  background: rgba(239, 68, 68, 0.1);
+  border-bottom-color: rgba(239, 68, 68, 0.15);
+}
+
+:global(.dark) .panel[data-side="after"] .panelHeader {
+  background: rgba(99, 102, 241, 0.1);
+  border-bottom-color: rgba(99, 102, 241, 0.15);
+}
+
+.panelLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel[data-side="before"] .panelLabel { color: #dc2626; }
+.panel[data-side="after"]  .panelLabel { color: #4f46e5; }
+
+:global(.dark) .panel[data-side="before"] .panelLabel { color: #fca5a5; }
+:global(.dark) .panel[data-side="after"]  .panelLabel { color: #a5b4fc; }
+
+/* ── Panel header status icon ─────────────────────────────────── */
+
+.panelIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.62rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  /* cancel uppercase from parent */
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.panel[data-side="before"] .panelIcon {
+  background: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+}
+
+.panel[data-side="after"] .panelIcon {
+  background: rgba(99, 102, 241, 0.14);
+  color: #4f46e5;
+}
+
+:global(.dark) .panel[data-side="before"] .panelIcon {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+:global(.dark) .panel[data-side="after"] .panelIcon {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+
+.panelCount {
+  font-size: 0.67rem;
+  font-weight: 500;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  color: #9ca3af;
+}
+
+/* ── File tabs ────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 2px;
+  padding: 6px 6px 0;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
+
+:global(.dark) .tabs {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.tab {
+  padding: 4px 10px;
+  font-family: var(--font-geist-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  border-radius: 5px 5px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.12s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.tab:hover:not(.tabActive) { color: #6b7280; }
+
+:global(.dark) .tab { color: #475569; }
+:global(.dark) .tab:hover:not(.tabActive) { color: #94a3b8; }
+
+.panel[data-side="before"] .tabActive {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.panel[data-side="after"] .tabActive {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.05);
+  border-color: rgba(99, 102, 241, 0.18);
+  cursor: default;
+}
+
+:global(.dark) .panel[data-side="before"] .tabActive { color: #fca5a5; }
+:global(.dark) .panel[data-side="after"]  .tabActive { color: #c7d2fe; }
+
+/* ── Note banner ──────────────────────────────────────────────── */
+
+.note {
+  font-size: 0.73rem;
+  padding: 7px 16px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  line-height: 1.4;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+:global(.dark) .note { border-bottom-color: rgba(255, 255, 255, 0.05); }
+
+.note[data-side="before"] { color: #dc2626; background: rgba(239, 68, 68, 0.04); }
+.note[data-side="after"]  { color: #4f46e5; background: rgba(99, 102, 241, 0.04); }
+
+:global(.dark) .note[data-side="before"] { color: #f87171; background: rgba(239, 68, 68, 0.07); }
+:global(.dark) .note[data-side="after"]  { color: #818cf8; background: rgba(99, 102, 241, 0.07); }
+
+/* ── Code panel — always dark, like the landing code block ─────── */
+
+.code {
+  flex: 1;           /* fill remaining panel height */
+  min-height: 180px;
+  overflow-x: auto;  /* scroll horizontally; min-width:0 on .panel makes this work */
+  overflow-y: hidden;
+  background: #0d1117;
+}
+
+.code :global(.shiki) {
+  margin: 0 !important;
+  padding: 16px !important;
+  border-radius: 0 !important;
+  font-size: 0.73rem !important;
+  line-height: 1.65 !important;
+  background: #0d1117 !important;
+}
+
+/* ── Skeleton ─────────────────────────────────────────────────── */
+
+.skeleton {
+  flex: 1;
+  min-height: 180px;
+  background: #0d1117;
+}
+
+/* ── Reduction footer ─────────────────────────────────────────── */
+
+.reduction {
+  text-align: center;
+  font-size: 0.77rem;
+  font-weight: 600;
+  color: #4f46e5;
+  padding: 4px 0;
+  letter-spacing: 0.01em;
+}
+
+:global(.dark) .reduction { color: #818cf8; }

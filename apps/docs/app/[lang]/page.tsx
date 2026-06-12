@@ -1,5 +1,6 @@
 import { Image } from "nextra/components";
 import { codeToHtml } from "shiki";
+import { BeforeAfterDemo } from "../../components/BeforeAfterDemo";
 import { ComposableDemo } from "../../components/ComposableDemo";
 import { PackageInstall } from "../../components/PackageInstall";
 
@@ -309,7 +310,7 @@ export default async function LandingPage({
 
       {/* ── Code ─────────────────────────────────────────── */}
       <div
-        style={{ maxWidth: "780px", margin: "0 auto 80px", padding: "0 24px" }}
+        style={{ maxWidth: "900px", margin: "0 auto 120px", padding: "0 24px" }}
       >
         <div
           className="landing-code"
@@ -324,12 +325,15 @@ export default async function LandingPage({
         />
       </div>
 
+      {/* ── Before / After ──────────────────────────────── */}
+      <BeforeAfterDemo lang={locale} />
+
       {/* ── Composable Demo ──────────────────────────────── */}
       <ComposableDemo lang={locale} />
 
       {/* ── Features ─────────────────────────────────────── */}
       <div
-        style={{ maxWidth: "780px", margin: "0 auto 80px", padding: "0 24px" }}
+        style={{ maxWidth: "900px", margin: "0 auto 120px", padding: "0 24px" }}
       >
         <div
           style={{
@@ -380,7 +384,7 @@ export default async function LandingPage({
 
       {/* ── Packages ─────────────────────────────────────── */}
       <div
-        style={{ maxWidth: "780px", margin: "0 auto 80px", padding: "0 24px" }}
+        style={{ maxWidth: "900px", margin: "0 auto 120px", padding: "0 24px" }}
       >
         <p
           style={{
@@ -406,7 +410,7 @@ export default async function LandingPage({
       </div>
 
       {/* ── Nav links ────────────────────────────────────── */}
-      <div style={{ maxWidth: "780px", margin: "0 auto", padding: "0 24px" }}>
+      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 24px" }}>
         <div
           style={{
             display: "grid",

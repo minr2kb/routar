@@ -128,7 +128,7 @@ const COPY: Record<Locale, Copy> = {
     title: "무엇이든 조합하세요",
     subtitle: [
       "executor를 교체하고, 플러그인을 쌓고, 라우터를 합치고, TanStack Query를 연결하세요.",
-      "모든 컨트롤이 하나의 아키텍처 레이어 — 타입은 스스로 조립됩니다.",
+      "모든 컨트롤이 하나의 아키텍처 레이어로. 타입은 스스로 조합됩니다.",
     ],
     groups: {
       routers: "라우터",

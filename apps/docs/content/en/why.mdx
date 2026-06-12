@@ -84,9 +84,11 @@ const clientApi = createApi(axiosExecutor, todoRouter)   // CSR
 const serverApi = createApi(fetchExecutor, todoRouter)   // SSR — same schema, zero duplication
 ```
 
-## In the AI era: the verification anchor
+## In the AI era: less to keep consistent
 
-AI generates fetch wrappers, types, and hooks at near-zero cost, so "less boilerplate" is no longer the differentiator. What gains value as machines write more code is a **mechanical guardrail that catches generated code when it's wrong** — compile-time path-param enforcement, runtime response validation, and a single schema from which client, types, query keys, and MSW mocks all derive (edit one place, the whole surface follows or fails loudly). Let the model write fast; let the compiler and runtime schema verify. See [AI Integration](/en/ai-integration) for the `routar infer` on-ramp and the drift → schema-fix loop.
+Writing code is cheap now. AI generates fetch wrappers, types, and hooks at near-zero cost. But more generated code means more representations of the same API facts — and more places for drift when those facts change.
+
+routar reduces the number of representations. One `endpoint()` derives the client function, types, query keys, and MSW mocks — automatically. Change the endpoint; edit one place, and everything downstream follows. See [AI Integration](/en/ai-integration) for how this plays out in practice.
 
 ## Design principles
 

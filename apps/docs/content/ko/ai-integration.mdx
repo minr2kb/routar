@@ -1,51 +1,44 @@
 ---
 title: AI 통합
-description: AI 코딩 어시스턴트와 함께 routar 사용하기 — llms.txt, AGENTS.md, IDE에 최적화된 JSDoc.
+description: 코드 작성은 이제 저렴합니다. 일관되게 유지하는 것은 여전히 비쌉니다. AI 우선 워크플로우에서 routar가 변경 비용을 줄이는 방법.
 ---
 
 # AI 통합
 
-routar는 AI 코딩 어시스턴트(Claude Code, Copilot, Cursor)가 바로 routar에 특화된 제안을 제공할 수 있도록 리소스를 포함합니다.
+코드 작성은 이제 저렴합니다. 일관되게 유지하는 것은 여전히 비쌉니다 — AI가 더 많은 코드를 더 빠르게 생성할수록 이 차이는 커집니다. 이 페이지는 AI 시대에서 routar의 가치와 AI 코딩 어시스턴트(Claude Code, Copilot, Cursor)가 routar를 인식하게 만드는 머신 리더블 리소스를 다룹니다.
 
-## AI 생산 코드의 검증 anchor
+## 보일러플레이트가 적을수록, drift도 적습니다
 
-이제 AI는 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성합니다 — 그래서 "보일러플레이트를 줄여준다"는 더 이상 핵심이 아닙니다. 가치는 이동했습니다: 모델이 코드를 많이 생산할수록, **틀렸을 때 기계적으로 잡아주는 가드레일**이 더 필요합니다. routar가 바로 그 anchor입니다:
+코드 작성은 이제 저렴합니다 — AI가 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성합니다. API가 변경될 때 그 코드를 일관되게 유지하는 것은 여전히 비쌉니다.
 
-- **컴파일 타임 path-param 강제** — `:param`이 빠지거나 오타가 난 생성 코드는 런타임이 아니라 타입체크에서 실패합니다.
-- **런타임 응답 검증** — 백엔드가 모델이 가정한 형태에서 벗어나면, `undefined`가 전파되기 전에 경계에서 스키마가 잡아냅니다.
-- **하나의 스키마, 모든 파생** — 클라이언트·타입·query key·MSW mock이 단일 엔드포인트 정의에서 파생됩니다. AI가 한 곳을 고치면 전체 표면이 일관되게 유지되거나(또는 큰 소리로 실패).
+routar 없이는 하나의 API 엔드포인트가 보통 5개의 개별 표현으로 존재합니다: fetch 함수, TypeScript 타입, query key, query hook, MSW mock. 엔드포인트를 변경하면 — 5곳을 수정하거나, drift를 배포하거나.
 
-AI 우선 워크플로우의 결론: 모델은 빠르게 쓰게 하고, 컴파일러 + 런타임 스키마가 검증하게 하라. routar의 `llms.txt`·`AGENTS.md`·JSDoc `@example` 투자는 모두 이 루프를 위한 것입니다.
-
-## 스키마 생성 — `routar infer`
-
-routar의 시장("백엔드 스펙 없음, FE가 스키마 소유")은 바로 그 팀이 AI로 스키마를 *작성*할 수 있는 시장입니다. 이를 위협이 아니라 입구로: 실제 응답을 모델에 넣어 routar 라우터를 생성하게 하세요.
-
-> **상태:** 현재는 문서화된 수동 워크플로우이자 제안된 `routar infer` CLI입니다. 아직 배포된 명령이 아니므로 — 아래 프롬프트 레시피를 어떤 어시스턴트와도 사용하세요.
-
-```bash
-# 실제 응답 캡처
-curl -s https://api.example.com/todos/1 > sample.json
-```
-
-그런 다음 어시스턴트에 프롬프트:
-
-> "`GET /todos/:id`의 실제 응답(`sample.json`)입니다. `@routar/core` 라우터를 생성하세요: 이 JSON에 맞는 Zod `response` 스키마, 올바른 `method`/`path`/`request.path`를 가진 `endpoint()`, `defineRouter`. 버킷 분리형(`request: { path, query, body }`)을 사용하세요."
-
-스키마가 단일 진실 공급원이므로, 생성된 라우터는 즉시 타입 클라이언트·query key·MSW mock을 산출합니다 — "스키마를 손으로 쓰는" 비용을 모델이 한 번 지불합니다.
-
-## drift 관찰 → 스키마 수정 루프
-
-이 입구를 `validate: 'warn'` + `onValidationError`([createApi](/ko/api-reference/create-api#검증-모드) 참조)와 결합하세요. `'warn'` 모드에서 더 이상 스키마와 맞지 않는 응답은 통과시키되(장애 없음) 정확한 불일치를 리포트합니다:
+routar는 그 5개 표현을 하나의 `endpoint()` 정의로 압축합니다. 클라이언트 함수·TypeScript 타입·TanStack Query key·MSW 핸들러가 모두 자동으로 파생됩니다:
 
 ```ts
-const api = createApi(executor, todoRouter, {
-  validate: { response: 'warn' },
-  onValidationError: (err, ctx) => reportDrift(ctx), // { kind, method, url, data }
+// 하나의 계약 — 나머지는 모두 파생
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+  }),
 })
+
+// 타입 클라이언트, query key, MSW 핸들러 — 모두 일관, 중복 없음
+export const todoQuery = createQueries(createApi(executor, todoRouter))
 ```
 
-수집된 drift 리포트는 다음 단계의 데이터 소스가 됩니다: AI 에이전트가 이를 읽고 스키마 수정 PR을 제안. "FE가 스키마를 소유한다"가 AI 시대에도 지속 가능해집니다 — 모델이 초기 스키마를 쓰고, 현실과의 동기화도 유지합니다.
+엔드포인트를 변경할 때 `endpoint()` 하나만 수정하면 downstream이 전부 따라옵니다.
+
+이를 경계에서 강화하는 몇 가지 속성:
+
+- **컴파일 타임 path-param 강제** — 호출에서 `:param`이 빠지거나 이름이 바뀌면 런타임이 아니라 타입체크에서 실패합니다.
+- **런타임 응답 검증** — 백엔드가 변경되면, `undefined`가 조용히 전파되기 전에 경계에서 스키마가 잡아냅니다.
+- **단일 진실 공급원** — 클라이언트·타입·query key·MSW mock이 모두 같은 정의에서 파생됩니다. 불일치가 숨을 곳이 줄어듭니다.
+
+보일러플레이트가 적다는 것은 단순히 덜 쓴다는 의미가 아닙니다. 같은 사실에 대한 표현이 줄어드는 것 — 그만큼 drift가 발생할 곳도 줄어듭니다.
 
 ## llms.txt
 
