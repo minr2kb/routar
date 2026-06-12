@@ -1,0 +1,135 @@
+---
+title: Architecture
+description: How routar structures an HTTP client — five layers from schema declaration to transport, each with one responsibility.
+---
+
+# Architecture
+
+routar structures an HTTP client as five discrete layers. Each layer has one responsibility; layers below don't know about layers above.
+
+```
+endpoint() / defineRouter()    ←  Layer 1: Spec declaration
+           ↓
+       createApi()             ←  Layer 2: Typed client factory
+           ↓
+createExecutor() + plugins     ←  Layer 3: Middleware chain
+           ↓
+    transport function         ←  Layer 4: HTTP I/O (fetch / axios / ky)
+           ↓
+     createQueries()           ←  Layer 5: TanStack Query bindings (optional)
+```
+
+## Layer 1 — Spec declaration
+
+`endpoint()` and `defineRouter()` declare the HTTP contract as a pure value. No network access happens here; this layer defines what an API call _is_.
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+  }),
+})
+```
+
+The `request` schema separates `path`, `query`, and `body` explicitly — the contract is visible in the type, not hidden in a comment. The `response` schema stays a plain `ZodObject` so it can be composed and shared across endpoints.
+
+See: [`endpoint()`](/en/api-reference/endpoint) · [`defineRouter()`](/en/api-reference/define-router)
+
+## Layer 2 — Typed client factory
+
+`createApi(executor, router)` binds a router to a transport and returns a typed client. When you call a method on the client, five things happen in order:
+
+1. `request.parse(params)` — validates and narrows the input
+2. `resolvePath(prefix + path, pathParams)` — substitutes `:param` segments
+3. `executor.execute(opts)` — dispatches the HTTP request
+4. `response.parse(raw)` — validates the raw response
+5. `adapter(validated)` — transforms the validated value (if defined)
+
+```ts
+const todoApi = createApi(fetchExecutor, todoRouter)
+
+// validate → resolve path → execute → validate → adapt
+const todo = await todoApi.getDetail({ path: { id: 1 } })
+```
+
+See: [`createApi()`](/en/api-reference/create-api)
+
+## Layer 3 — Middleware chain
+
+`createExecutor(transportFn, { plugins })` wraps a transport function with a plugin chain composed via `reduceRight` — the first plugin in the array is outermost.
+
+Each plugin can hook into three points:
+
+| Hook | Runs | Use for |
+|------|------|---------|
+| `onRequest` | Before the transport | Auth headers, logging, timeouts |
+| `onResponse` | After a successful response | Response logging, cache writes |
+| `onError` | On transport error | Retry logic, error normalization |
+
+```ts
+const executor = createFetchExecutor(baseURL, {
+  plugins: [logger(), withTimeout(5000)],
+})
+```
+
+See: [`createExecutor()`](/en/api-reference/create-executor) · [Plugins](/en/api-reference/plugins)
+
+## Layer 4 — Transport
+
+The transport function is the only layer that performs actual HTTP I/O. routar ships three transport packages so you only include what you need:
+
+| Package | Transport | Use when |
+|---------|-----------|----------|
+| `@routar/core` | `createFetchExecutor` | Native fetch (SSR, edge, tests) |
+| `@routar/axios` | `createAxiosExecutor` | Axios (interceptors, progress) |
+| `@routar/ky` | `createKyExecutor` | ky (lightweight fetch wrapper) |
+
+Because the transport is injected at `createApi(executor, router)`, the same router runs on any transport — no duplication between SSR and CSR.
+
+See: [Executors](/en/executors)
+
+## Layer 5 — TanStack Query bindings (optional)
+
+`createQueries(api)` reads the `$router` metadata stamped on the client and generates typed `queryOptions` / `mutationOptions` accessors and query key helpers.
+
+```ts
+export const todoQuery = createQueries(todoApi)
+
+// queryOptions for GET endpoints
+const options = todoQuery.getDetail({ path: { id: 1 } })
+// options.queryKey → [..., 'getDetail', { path: { id: 1 } }]
+// options.queryFn  → () => todoApi.getDetail(...)
+```
+
+This layer is entirely optional — if you're not using TanStack Query, layers 1–4 are everything you need.
+
+See: [`createQueries()`](/en/api-reference/create-queries) · [TanStack Query guide](/en/guides/react-query)
+
+## Putting it together
+
+A complete setup wires all layers in one file:
+
+```ts
+// remote/services/todo.ts
+const todoRouter = defineRouter('/todos', {           // Layer 1 — spec
+  getList:   endpoint({ ... }),
+  getDetail: endpoint({ ... }),
+})
+
+const todoApi   = createApi(fetchExecutor, todoRouter) // Layers 2–4 — client
+export const todoQuery  = createQueries(todoApi)       // Layer 5 — query bindings
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+```
+
+Each layer has exactly one reason to change:
+
+| What changes | Where to change |
+|--------------|----------------|
+| Endpoint path, method, or schema | Layer 1 — `endpoint()` |
+| Validation or response transform | Layer 1 — `request` / `response` / `adapter` |
+| Auth headers, retry, timeout | Layer 3 — plugins |
+| Switch from fetch to axios | Layer 4 — swap the executor |
+| Query key shape or per-endpoint defaults | Layer 5 — `createQueries()` options |

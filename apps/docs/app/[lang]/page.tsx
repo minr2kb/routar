@@ -171,9 +171,9 @@ const TodoSchema = z.object({ id: z.number(), title: z.string(), done: z.boolean
 const api = createApi(createFetchExecutor('https://api.example.com'), defineRouter('/todos', {
   list:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
   detail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
-                     request: z.object({ path: z.object({ id: z.number() }) }) }),
+                     request: { path: z.object({ id: z.number() }) } }),
   create: endpoint({ method: 'POST', path: '/',    response: TodoSchema,
-                     request: z.object({ body: z.object({ title: z.string() }) }) }),
+                     request: { body: z.object({ title: z.string() }) } }),
 }))
 
 const todos = await api.list({})                              // Todo[]
@@ -325,7 +325,7 @@ export default async function LandingPage({
       </div>
 
       {/* ── Composable Demo ──────────────────────────────── */}
-      <ComposableDemo />
+      <ComposableDemo lang={locale} />
 
       {/* ── Features ─────────────────────────────────────── */}
       <div
@@ -394,30 +394,11 @@ export default async function LandingPage({
         >
           Packages
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div className="pkg-grid">
           {tr.packages.map((p) => (
-            <div key={p.name} className="pkg-row">
-              <div>
-                <code
-                  style={{
-                    fontWeight: 700,
-                    fontSize: "0.84rem",
-                    color: "rgb(99,102,241)",
-                  }}
-                >
-                  {p.name}
-                </code>
-                <div
-                  style={{
-                    fontSize: "0.77rem",
-                    color: "#9ca3af",
-                    marginTop: "4px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {p.desc}
-                </div>
-              </div>
+            <div key={p.name} className="pkg-card">
+              <code className="pkg-name">{p.name}</code>
+              <div className="pkg-desc">{p.desc}</div>
               <PackageInstall packages={p.pkg} />
             </div>
           ))}

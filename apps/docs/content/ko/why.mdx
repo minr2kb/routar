@@ -61,7 +61,7 @@ const todoRouter = defineRouter('/todos', {
   getDetail: endpoint({
     method: 'GET',
     path: '/:id',
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: TodoSchema,
   }),
 })
@@ -86,11 +86,11 @@ const todo = await todoApi.getDetail({ path: { id: 1 } })
 ### 2. 구조가 계약을 명시적으로 만듭니다
 
 ```ts
-request: z.object({
+request: {
   path:  z.object({ id: z.number() }),
   query: z.object({ include: z.string().optional() }),
   body:  z.object({ title: z.string() }),
-})
+}
 ```
 
 ### 3. response와 adapter는 항상 분리됩니다

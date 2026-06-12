@@ -1,0 +1,135 @@
+---
+title: 아키텍처
+description: routar가 HTTP 클라이언트를 구조화하는 방식 — 스키마 선언부터 전송까지 각자 하나의 책임을 갖는 5개 계층.
+---
+
+# 아키텍처
+
+routar는 HTTP 클라이언트를 5개의 독립된 계층으로 구성합니다. 각 계층은 하나의 책임만 가지며, 하위 계층은 상위 계층을 알지 못합니다.
+
+```
+endpoint() / defineRouter()    ←  1계층: 스펙 선언
+           ↓
+       createApi()             ←  2계층: 타입 안전 클라이언트 팩토리
+           ↓
+createExecutor() + plugins     ←  3계층: 미들웨어 체인
+           ↓
+    transport function         ←  4계층: HTTP I/O (fetch / axios / ky)
+           ↓
+     createQueries()           ←  5계층: TanStack Query 바인딩 (선택)
+```
+
+## 1계층 — 스펙 선언
+
+`endpoint()`와 `defineRouter()`는 HTTP 계약을 순수한 값으로 선언합니다. 이 계층에서는 네트워크 요청이 전혀 발생하지 않으며, API 호출이 _무엇인지_만 정의합니다.
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+  }),
+})
+```
+
+`request` 스키마는 `path`, `query`, `body`를 명시적으로 구분합니다 — 계약이 주석이 아닌 타입으로 드러납니다. `response` 스키마는 순수한 `ZodObject`로 유지되어 여러 엔드포인트에서 조합하고 공유할 수 있습니다.
+
+참고: [`endpoint()`](/ko/api-reference/endpoint) · [`defineRouter()`](/ko/api-reference/define-router)
+
+## 2계층 — 타입 안전 클라이언트 팩토리
+
+`createApi(executor, router)`는 라우터와 전송 계층을 결합해 타입 안전 클라이언트를 반환합니다. 클라이언트의 메서드를 호출하면 내부에서 다음 순서로 처리됩니다:
+
+1. `request.parse(params)` — 입력값 검증 및 타입 좁히기
+2. `resolvePath(prefix + path, pathParams)` — `:param` 세그먼트 치환
+3. `executor.execute(opts)` — HTTP 요청 디스패치
+4. `response.parse(raw)` — 응답값 검증
+5. `adapter(validated)` — 검증된 값 변환 (정의된 경우)
+
+```ts
+const todoApi = createApi(fetchExecutor, todoRouter)
+
+// 검증 → 경로 치환 → 실행 → 검증 → 변환
+const todo = await todoApi.getDetail({ path: { id: 1 } })
+```
+
+참고: [`createApi()`](/ko/api-reference/create-api)
+
+## 3계층 — 미들웨어 체인
+
+`createExecutor(transportFn, { plugins })`는 전송 함수를 `reduceRight`로 플러그인 체인으로 감쌉니다 — 배열의 첫 번째 플러그인이 가장 바깥쪽에 위치합니다.
+
+각 플러그인은 세 지점에 훅을 걸 수 있습니다:
+
+| 훅 | 실행 시점 | 활용 사례 |
+|----|----------|---------|
+| `onRequest` | 전송 이전 | 인증 헤더, 로깅, 타임아웃 |
+| `onResponse` | 성공 응답 이후 | 응답 로깅, 캐시 쓰기 |
+| `onError` | 전송 에러 발생 시 | 재시도 로직, 에러 정규화 |
+
+```ts
+const executor = createFetchExecutor(baseURL, {
+  plugins: [logger(), withTimeout(5000)],
+})
+```
+
+참고: [`createExecutor()`](/ko/api-reference/create-executor) · [플러그인](/ko/api-reference/plugins)
+
+## 4계층 — 전송
+
+전송 함수는 실제 HTTP I/O를 수행하는 유일한 계층입니다. routar는 필요한 것만 포함할 수 있도록 세 개의 전송 패키지를 별도로 제공합니다:
+
+| 패키지 | 전송 | 사용 시점 |
+|--------|------|---------|
+| `@routar/core` | `createFetchExecutor` | 네이티브 fetch (SSR, edge, 테스트) |
+| `@routar/axios` | `createAxiosExecutor` | Axios (인터셉터, 진행률) |
+| `@routar/ky` | `createKyExecutor` | ky (경량 fetch 래퍼) |
+
+전송 계층은 `createApi(executor, router)`에서 주입되므로, 동일한 라우터를 어떤 전송에서도 사용할 수 있습니다 — SSR과 CSR 간 코드 중복 없음.
+
+참고: [Executor](/ko/executors)
+
+## 5계층 — TanStack Query 바인딩 (선택)
+
+`createQueries(api)`는 클라이언트에 스탬프된 `$router` 메타데이터를 읽어 타입이 적용된 `queryOptions` / `mutationOptions` 접근자와 쿼리 키 헬퍼를 생성합니다.
+
+```ts
+export const todoQuery = createQueries(todoApi)
+
+// GET 엔드포인트의 queryOptions
+const options = todoQuery.getDetail({ path: { id: 1 } })
+// options.queryKey → [..., 'getDetail', { path: { id: 1 } }]
+// options.queryFn  → () => todoApi.getDetail(...)
+```
+
+이 계층은 완전히 선택적입니다 — TanStack Query를 사용하지 않는다면 1–4계층만으로 충분합니다.
+
+참고: [`createQueries()`](/ko/api-reference/create-queries) · [TanStack Query 가이드](/ko/guides/react-query)
+
+## 모두 합치면
+
+완전한 설정은 하나의 파일에서 모든 계층을 연결합니다:
+
+```ts
+// remote/services/todo.ts
+const todoRouter = defineRouter('/todos', {           // 1계층 — 스펙
+  getList:   endpoint({ ... }),
+  getDetail: endpoint({ ... }),
+})
+
+const todoApi  = createApi(fetchExecutor, todoRouter) // 2–4계층 — 클라이언트
+export const todoQuery  = createQueries(todoApi)      // 5계층 — 쿼리 바인딩
+export type TodoApiTypes = ApiTypes<typeof todoApi>
+```
+
+각 계층은 정확히 하나의 변경 이유를 가집니다:
+
+| 변경 사항 | 수정 위치 |
+|----------|---------|
+| 엔드포인트 경로, 메서드, 스키마 | 1계층 — `endpoint()` |
+| 검증 또는 응답 변환 | 1계층 — `request` / `response` / `adapter` |
+| 인증 헤더, 재시도, 타임아웃 | 3계층 — 플러그인 |
+| fetch에서 axios로 교체 | 4계층 — executor 교체 |
+| 쿼리 키 형태 또는 엔드포인트별 기본값 | 5계층 — `createQueries()` 옵션 |

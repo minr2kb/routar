@@ -26,9 +26,9 @@ const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.bo
 const todoRouter = defineRouter('/todos', {
   getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
   getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
-                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+                        request: { path: z.object({ id: z.number() }) } }),
   create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
-                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+                        request: { body: z.object({ title: z.string() }) } }),
 });
 
 const todoApi = createApi(createFetchExecutor('https://api.example.com'), todoRouter);
@@ -48,7 +48,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 - **전송 계층 독립** — 한 줄 변경으로 `fetch`, axios, 또는 커스텀 HTTP 클라이언트로 교체
 - **per-call 옵션** — `(params, { signal, headers, timeout })`로 요청별 헤더·타임아웃(전송 계층 독립)
 - **플러그인 시스템** — request/response/error 훅을 가진 이름 있는 플러그인; `retry`와 `timeout`은 first-class 옵션
-- **유연한 엔드포인트 정의** — `request` envelope로 감싸거나 `pathParams`/`query`/`body`를 개별 validator로 선언
+- **명확한 엔드포인트 정의** — `request`는 `{ path, query, body }` 개별 validator 맵으로 선언
 - **중첩 라우터** — URL 구조를 타입 시스템에 그대로 반영
 - **경로 파라미터 강제** — path param이 없는데 `path: '/:id'`를 쓰면 컴파일 에러
 - **SSR/CSR 지원** — 동일한 엔드포인트 스펙, 환경에 따라 다른 executor
@@ -159,13 +159,13 @@ const todoRouter = defineRouter('/todos', {
   getDetail: endpoint({
     method: 'GET',
     path: '/:id',
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: TodoSchema,
   }),
   create: endpoint({
     method: 'POST',
     path: '/',
-    request: z.object({ body: z.object({ title: z.string() }) }),
+    request: { body: z.object({ title: z.string() }) },
     response: TodoSchema,
   }),
 });
@@ -201,19 +201,21 @@ endpoint({
 
 ```ts
 // ✅
-endpoint({ path: '/:id', request: z.object({ path: z.object({ id: z.number() }) }), ... })
+endpoint({ path: '/:id', request: { path: z.object({ id: z.number() }) }, ... })
 
 // ❌ 컴파일 에러 — ':id'가 선언됐지만 request.path.id가 없음
-endpoint({ path: '/:id', request: z.object({ query: z.object({ q: z.string() }) }), ... })
+endpoint({ path: '/:id', request: { query: z.object({ q: z.string() }) }, ... })
 ```
 
-**버킷 분리형** — `request` envelope 대신 각 부분을 개별 선언(두 형태는 동등):
+**Request 버킷** — `request`는 `{ path, query, body }` validator 맵입니다. `path`에 `:param` 세그먼트가 있으면 `request.path`가 필수입니다:
 
 ```ts
 endpoint({
   method: 'GET', path: '/:id',
-  pathParams: z.object({ id: z.number() }),
-  query: z.object({ q: z.string() }),
+  request: {
+    path: z.object({ id: z.number() }),
+    query: z.object({ q: z.string() }),
+  },
   response: TodoSchema,
 })
 ```

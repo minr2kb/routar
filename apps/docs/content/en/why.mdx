@@ -74,7 +74,7 @@ const todoRouter = defineRouter('/todos', {
   getDetail: endpoint({
     method: 'GET',
     path: '/:id',
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: TodoSchema,
   }),
 })
@@ -106,11 +106,11 @@ const todo = await todoApi.getDetail({ path: { id: 1 } })
 Separating `path`, `query`, and `body` in the request schema isn't ceremony — it's the contract made visible:
 
 ```ts
-request: z.object({
+request: {
   path:  z.object({ id: z.number() }),   // → /todos/1
   query: z.object({ include: z.string().optional() }), // → ?include=...
   body:  z.object({ title: z.string() }), // → request body
-})
+}
 ```
 
 The type tells you exactly where each field goes. There's no implicit convention to remember.

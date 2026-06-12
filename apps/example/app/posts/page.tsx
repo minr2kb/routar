@@ -1,4 +1,5 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import Link from "next/link";
 import { Suspense } from "react";
 import { PostListClient } from "@/components/PostListClient";
 import { postQuery } from "@/remote/services/post";
@@ -8,14 +9,15 @@ export const dynamic = "force-dynamic";
 
 export default async function PostsPage() {
   const queryClient = getQueryClient();
-
-  await queryClient.prefetchQuery(
-    postQuery.getList({ query: { _limit: 10 } }),
-  );
+  await queryClient.prefetchQuery(postQuery.getList({ query: { _limit: 10 } }));
 
   return (
     <div>
       <h1>Posts</h1>
+      <p style={{ color: "#666", fontSize: 14 }}>
+        SSR-prefetched list over the external API. See also{" "}
+        <Link href="/posts/infinite">infinite scroll</Link>.
+      </p>
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense fallback={<p>Loading…</p>}>
           <PostListClient />

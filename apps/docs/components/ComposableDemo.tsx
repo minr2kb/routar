@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import styles from "./ComposableDemo.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -15,6 +15,7 @@ interface DemoState {
   factory: Factory;
   executor: ExecutorType;
   plugins: Set<PluginKey>;
+  queries: boolean;
 }
 
 // Phase drives CSS animation via data-phase attribute
@@ -65,19 +66,109 @@ const PLUGIN_REF: Record<PluginKey, string> = {
   custom: "customPlugin",
 };
 
+// ── Architecture layers (mirrors /guides/architecture) ───────────────────────
+// Each control below builds one of these five layers; the rail lights up the
+// layers the current configuration actually uses.
+
+type LayerNum = 1 | 2 | 3 | 4 | 5;
+
+const LAYERS: { n: LayerNum; anchor: string }[] = [
+  { n: 1, anchor: "layer-1--spec-declaration" },
+  { n: 2, anchor: "layer-2--typed-client-factory" },
+  { n: 3, anchor: "layer-3--middleware-chain" },
+  { n: 4, anchor: "layer-4--transport" },
+  { n: 5, anchor: "layer-5--tanstack-query-bindings-optional" },
+];
+
+// ── Copy (localized UI chrome; generated code stays English) ──────────────────
+
+type Locale = "en" | "ko";
+
+interface Copy {
+  eyebrow: string;
+  title: string;
+  subtitle: [string, string];
+  groups: {
+    routers: string;
+    factory: string;
+    plugins: string;
+    executor: string;
+    queries: string;
+  };
+  layers: Record<LayerNum, string>;
+  archLink: string;
+}
+
+const COPY: Record<Locale, Copy> = {
+  en: {
+    eyebrow: "Composable by design",
+    title: "Mix and match anything",
+    subtitle: [
+      "Swap executors, stack plugins, combine routers, bind TanStack Query.",
+      "Every control is one architecture layer — the types assemble themselves.",
+    ],
+    groups: {
+      routers: "Routers",
+      factory: "Create with",
+      plugins: "Plugins",
+      executor: "Executor",
+      queries: "Query bindings",
+    },
+    layers: {
+      1: "Spec",
+      2: "Client",
+      3: "Middleware",
+      4: "Transport",
+      5: "Query",
+    },
+    archLink: "See how these five layers fit together — Architecture guide →",
+  },
+  ko: {
+    eyebrow: "조합을 위한 설계",
+    title: "무엇이든 조합하세요",
+    subtitle: [
+      "executor를 교체하고, 플러그인을 쌓고, 라우터를 합치고, TanStack Query를 연결하세요.",
+      "모든 컨트롤이 하나의 아키텍처 레이어 — 타입은 스스로 조립됩니다.",
+    ],
+    groups: {
+      routers: "라우터",
+      factory: "생성 방식",
+      plugins: "플러그인",
+      executor: "Executor",
+      queries: "쿼리 바인딩",
+    },
+    layers: {
+      1: "스펙",
+      2: "클라이언트",
+      3: "미들웨어",
+      4: "트랜스포트",
+      5: "쿼리",
+    },
+    archLink: "다섯 레이어가 어떻게 맞물리는지 보기 — 아키텍처 가이드 →",
+  },
+};
+
 // ── Per-section code generators ────────────────────────────────────────────
 
-function codeImports({ factory, executor, plugins }: DemoState): string {
+function codeImports({
+  factory,
+  executor,
+  plugins,
+  queries,
+}: DemoState): string {
   const isMsw = factory === "createMswHandlers";
   const isDispatch = executor === "dispatch";
   const isCustomExec = executor === "custom";
   const pluginsActive = !isMsw && !isDispatch;
   const hasLogger = pluginsActive && plugins.has("logger");
-  const hasDefined = pluginsActive && (plugins.has("auth") || plugins.has("custom"));
+  const hasDefined =
+    pluginsActive && (plugins.has("auth") || plugins.has("custom"));
+  const hasQueries = !isMsw && queries;
 
   const core: string[] = ["endpoint", "defineRouter"];
   if (!isMsw) core.push("createApi");
-  if (!isMsw && (executor === "fetch" || isDispatch)) core.push("createFetchExecutor");
+  if (!isMsw && (executor === "fetch" || isDispatch))
+    core.push("createFetchExecutor");
   if (isDispatch) core.push("dispatchExecutor");
   if (isCustomExec) core.push("createExecutor");
   if (hasDefined) core.push("definePlugin");
@@ -95,6 +186,8 @@ function codeImports({ factory, executor, plugins }: DemoState): string {
   } else {
     lines.push(`import { createMswHandlers } from '@routar/msw'`);
   }
+  if (hasQueries)
+    lines.push(`import { createQueries } from '@routar/react-query'`);
   return lines.join("\n");
 }
 
@@ -105,9 +198,9 @@ function codeTodo(): string {
     `const todoRouter = defineRouter('/todos', {`,
     `  list:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),`,
     `  detail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,`,
-    `                     request: z.object({ path: z.object({ id: z.number() }) }) }),`,
+    `                     request: { path: z.object({ id: z.number() }) } }),`,
     `  create: endpoint({ method: 'POST', path: '/',    response: TodoSchema,`,
-    `                     request: z.object({ body: z.object({ title: z.string() }) }) }),`,
+    `                     request: { body: z.object({ title: z.string() }) } }),`,
     `})`,
   ].join("\n");
 }
@@ -119,7 +212,7 @@ function codePost(): string {
     `const postRouter = defineRouter('/posts', {`,
     `  list:   endpoint({ method: 'GET', path: '/',    response: z.array(PostSchema) }),`,
     `  detail: endpoint({ method: 'GET', path: '/:id', response: PostSchema,`,
-    `                     request: z.object({ path: z.object({ id: z.number() }) }) }),`,
+    `                     request: { path: z.object({ id: z.number() }) } }),`,
     `})`,
   ].join("\n");
 }
@@ -131,7 +224,7 @@ function codeUser(): string {
     `const userRouter = defineRouter('/users', {`,
     `  list:    endpoint({ method: 'GET', path: '/',    response: z.array(UserSchema) }),`,
     `  profile: endpoint({ method: 'GET', path: '/:id', response: UserSchema,`,
-    `                      request: z.object({ path: z.object({ id: z.number() }) }) }),`,
+    `                      request: { path: z.object({ id: z.number() }) } }),`,
     `})`,
   ].join("\n");
 }
@@ -148,7 +241,7 @@ function codePluginDefs({ plugins }: DemoState): string {
         "    headers: { ...opts.headers, Authorization: `Bearer ${await getToken()}` },",
         `  }),`,
         `})`,
-      ].join("\n")
+      ].join("\n"),
     );
   }
   if (plugins.has("custom")) {
@@ -158,15 +251,18 @@ function codePluginDefs({ plugins }: DemoState): string {
         `  name: 'custom',`,
         `  onResponse: (res) => res, // transform responses here`,
         `})`,
-      ].join("\n")
+      ].join("\n"),
     );
   }
   return blocks.join("\n\n");
 }
 
 function codeExecutor({ executor, plugins }: DemoState): string {
-  const refs = PLUGINS.filter(({ key }) => plugins.has(key)).map(({ key }) => PLUGIN_REF[key]);
-  const optsInline = refs.length > 0 ? `, { plugins: [${refs.join(", ")}] }` : "";
+  const refs = PLUGINS.filter(({ key }) => plugins.has(key)).map(
+    ({ key }) => PLUGIN_REF[key],
+  );
+  const optsInline =
+    refs.length > 0 ? `, { plugins: [${refs.join(", ")}] }` : "";
 
   if (executor === "fetch")
     return `const executor = createFetchExecutor('https://api.example.com'${optsInline})`;
@@ -232,31 +328,111 @@ function codeFactory({ routers, factory }: DemoState): string {
 
   const first = keys[0];
   const ns = isMulti
-    ? first === "todo" ? ".todos" : first === "post" ? ".posts" : ".users"
+    ? first === "todo"
+      ? ".todos"
+      : first === "post"
+        ? ".posts"
+        : ".users"
     : "";
 
   if (first === "todo") {
-    lines.push(`const todos = await api${ns}.list({})                         // Todo[]`);
-    lines.push(`const todo  = await api${ns}.detail({ path: { id: 1 } })     // Todo`);
+    lines.push(
+      `const todos = await api${ns}.list({})                         // Todo[]`,
+    );
+    lines.push(
+      `const todo  = await api${ns}.detail({ path: { id: 1 } })     // Todo`,
+    );
     if (!isMulti)
-      lines.push(`const next  = await api.create({ body: { title: 'buy milk' } }) // Todo`);
+      lines.push(
+        `const next  = await api.create({ body: { title: 'buy milk' } }) // Todo`,
+      );
   } else if (first === "post") {
-    lines.push(`const posts = await api${ns}.list({})                         // Post[]`);
-    lines.push(`const post  = await api${ns}.detail({ path: { id: 1 } })     // Post`);
+    lines.push(
+      `const posts = await api${ns}.list({})                         // Post[]`,
+    );
+    lines.push(
+      `const post  = await api${ns}.detail({ path: { id: 1 } })     // Post`,
+    );
   } else {
-    lines.push(`const users = await api${ns}.list({})                         // User[]`);
-    lines.push(`const user  = await api${ns}.profile({ path: { id: 1 } })    // User`);
+    lines.push(
+      `const users = await api${ns}.list({})                         // User[]`,
+    );
+    lines.push(
+      `const user  = await api${ns}.profile({ path: { id: 1 } })    // User`,
+    );
   }
 
   if (isMulti) {
     const second = keys[1];
-    const ns2 = second === "todo" ? ".todos" : second === "post" ? ".posts" : ".users";
+    const ns2 =
+      second === "todo" ? ".todos" : second === "post" ? ".posts" : ".users";
     lines.push(
       second === "todo"
         ? `const todos = await api${ns2}.list({})                      // Todo[]`
         : second === "post"
           ? `const posts = await api${ns2}.list({})                      // Post[]`
-          : `const users = await api${ns2}.list({})                      // User[]`
+          : `const users = await api${ns2}.list({})                      // User[]`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function codeQueries({ routers }: DemoState): string {
+  const keys = [...routers];
+  const isMulti = keys.length > 1;
+  const first = keys[0];
+  const ns = isMulti
+    ? first === "todo"
+      ? ".todos"
+      : first === "post"
+        ? ".posts"
+        : ".users"
+    : "";
+  const queryName = isMulti
+    ? "apiQuery"
+    : first === "todo"
+      ? "todoQuery"
+      : first === "post"
+        ? "postQuery"
+        : "userQuery";
+  const showMutation = first === "todo" && !isMulti;
+
+  const lines = [
+    showMutation
+      ? `import { useSuspenseQuery, useMutation } from '@tanstack/react-query'`
+      : `import { useSuspenseQuery } from '@tanstack/react-query'`,
+    ``,
+    `// Query keys + queryFn derived straight from \`api\` — one source of truth`,
+    `export const ${queryName} = createQueries(api)`,
+    ``,
+    `// In a client component — \`data\` is fully typed and never null`,
+  ];
+
+  if (first === "todo") {
+    lines.push(
+      `const { data: todos } = useSuspenseQuery(${queryName}${ns}.list({}))`,
+    );
+    lines.push(
+      `const { data: todo }  = useSuspenseQuery(${queryName}${ns}.detail({ path: { id: 1 } }))`,
+    );
+    if (showMutation)
+      lines.push(
+        `const { mutate: create } = useMutation(${queryName}.create()) // POST → mutationOptions`,
+      );
+  } else if (first === "post") {
+    lines.push(
+      `const { data: posts } = useSuspenseQuery(${queryName}${ns}.list({}))`,
+    );
+    lines.push(
+      `const { data: post }  = useSuspenseQuery(${queryName}${ns}.detail({ path: { id: 1 } }))`,
+    );
+  } else {
+    lines.push(
+      `const { data: users } = useSuspenseQuery(${queryName}${ns}.list({}))`,
+    );
+    lines.push(
+      `const { data: user }  = useSuspenseQuery(${queryName}${ns}.profile({ path: { id: 1 } }))`,
     );
   }
 
@@ -265,7 +441,15 @@ function codeFactory({ routers, factory }: DemoState): string {
 
 // ── Section ordering ───────────────────────────────────────────────────────
 
-type SectionId = "imports" | "todo" | "post" | "user" | "plugin-defs" | "executor" | "factory";
+type SectionId =
+  | "imports"
+  | "todo"
+  | "post"
+  | "user"
+  | "plugin-defs"
+  | "executor"
+  | "factory"
+  | "queries";
 
 const GENERATORS: Record<SectionId, (s: DemoState) => string> = {
   imports: codeImports,
@@ -275,13 +459,15 @@ const GENERATORS: Record<SectionId, (s: DemoState) => string> = {
   "plugin-defs": codePluginDefs,
   executor: codeExecutor,
   factory: codeFactory,
+  queries: codeQueries,
 };
 
 function getActiveSections(state: DemoState): SectionId[] {
-  const { routers, factory, executor, plugins } = state;
+  const { routers, factory, executor, plugins, queries } = state;
   const isMsw = factory === "createMswHandlers";
   const isDispatch = executor === "dispatch";
-  const hasDefinedPlugin = !isMsw && !isDispatch && (plugins.has("auth") || plugins.has("custom"));
+  const hasDefinedPlugin =
+    !isMsw && !isDispatch && (plugins.has("auth") || plugins.has("custom"));
   return [
     "imports",
     ...(routers.has("todo") ? (["todo"] as SectionId[]) : []),
@@ -290,6 +476,7 @@ function getActiveSections(state: DemoState): SectionId[] {
     ...(hasDefinedPlugin ? (["plugin-defs"] as SectionId[]) : []),
     ...(!isMsw ? (["executor"] as SectionId[]) : []),
     "factory",
+    ...(!isMsw && queries ? (["queries"] as SectionId[]) : []),
   ];
 }
 
@@ -300,20 +487,24 @@ let highlighterPromise: Promise<ShikiHighlighter> | null = null;
 function getHighlighter(): Promise<ShikiHighlighter> {
   if (!highlighterPromise) {
     highlighterPromise = import("shiki").then(({ getSingletonHighlighter }) =>
-      getSingletonHighlighter({ themes: ["github-dark"], langs: ["typescript"] })
+      getSingletonHighlighter({
+        themes: ["github-dark"],
+        langs: ["typescript"],
+      }),
     ) as Promise<ShikiHighlighter>;
   }
   return highlighterPromise;
 }
 
-
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function ComposableDemo() {
+export function ComposableDemo({ lang = "en" }: { lang?: string }) {
+  const copy = COPY[lang === "ko" ? "ko" : "en"];
   const [routers, setRouters] = useState<Set<RouterKey>>(new Set(["todo"]));
   const [factory, setFactory] = useState<Factory>("createApi");
   const [executor, setExecutor] = useState<ExecutorType>("fetch");
   const [plugins, setPlugins] = useState<Set<PluginKey>>(new Set());
+  const [queries, setQueries] = useState(false);
   const [sections, setSections] = useState<SectionView[]>([]);
 
   const isMounted = useRef(false);
@@ -323,6 +514,16 @@ export function ComposableDemo() {
   const isDispatch = executor === "dispatch";
   const executorDisabled = isMsw;
   const pluginsDisabled = isMsw || isDispatch;
+  const queriesDisabled = isMsw;
+
+  // Which architecture layers the current configuration assembles
+  const layerActive: Record<LayerNum, boolean> = {
+    1: true,
+    2: true,
+    3: !pluginsDisabled && plugins.size > 0,
+    4: !isMsw,
+    5: !isMsw && queries,
+  };
 
   function schedule(key: string, fn: () => void, delay: number) {
     const existing = timers.current.get(key);
@@ -332,12 +533,12 @@ export function ComposableDemo() {
       setTimeout(() => {
         timers.current.delete(key);
         fn();
-      }, delay)
+      }, delay),
     );
   }
 
   useEffect(() => {
-    const state: DemoState = { routers, factory, executor, plugins };
+    const state: DemoState = { routers, factory, executor, plugins, queries };
     const activeIds = getActiveSections(state);
     const isFirst = !isMounted.current;
 
@@ -357,28 +558,58 @@ export function ComposableDemo() {
           if (!prevSection) {
             next.push({ id, html, phase: isFirst ? "stable" : "entering" });
             if (!isFirst) {
-              schedule(id, () => {
-                setSections((v) =>
-                  v.map((s) => (s.id === id && s.phase === "entering" ? { ...s, phase: "stable" } : s))
-                );
-              }, 380);
+              schedule(
+                id,
+                () => {
+                  setSections((v) =>
+                    v.map((s) =>
+                      s.id === id && s.phase === "entering"
+                        ? { ...s, phase: "stable" }
+                        : s,
+                    ),
+                  );
+                },
+                380,
+              );
             }
           } else if (prevSection.html !== html) {
-            next.push({ id, html: prevSection.html, phase: "dimming", nextHtml: html });
-            schedule(id + ":swap", () => {
-              setSections((v) =>
-                v.map((s) =>
-                  s.id === id && s.phase === "dimming"
-                    ? { ...s, html: s.nextHtml!, phase: "brightening", nextHtml: undefined }
-                    : s
-                )
-              );
-            }, 160);
-            schedule(id + ":done", () => {
-              setSections((v) =>
-                v.map((s) => (s.id === id && s.phase === "brightening" ? { ...s, phase: "stable" } : s))
-              );
-            }, 380);
+            next.push({
+              id,
+              html: prevSection.html,
+              phase: "dimming",
+              nextHtml: html,
+            });
+            schedule(
+              id + ":swap",
+              () => {
+                setSections((v) =>
+                  v.map((s) =>
+                    s.id === id && s.phase === "dimming"
+                      ? {
+                          ...s,
+                          html: s.nextHtml!,
+                          phase: "brightening",
+                          nextHtml: undefined,
+                        }
+                      : s,
+                  ),
+                );
+              },
+              160,
+            );
+            schedule(
+              id + ":done",
+              () => {
+                setSections((v) =>
+                  v.map((s) =>
+                    s.id === id && s.phase === "brightening"
+                      ? { ...s, phase: "stable" }
+                      : s,
+                  ),
+                );
+              },
+              380,
+            );
           } else {
             next.push({ ...prevSection, phase: "stable" });
           }
@@ -387,14 +618,20 @@ export function ComposableDemo() {
         for (const s of prev) {
           if (!activeSet.has(s.id) && s.phase !== "exiting") {
             next.push({ ...s, phase: "exiting" });
-            schedule(s.id + ":rm", () => {
-              setSections((v) => v.filter((sv) => sv.id !== s.id));
-            }, 280);
+            schedule(
+              s.id + ":rm",
+              () => {
+                setSections((v) => v.filter((sv) => sv.id !== s.id));
+              },
+              280,
+            );
           }
         }
 
         // Keep exiting sections roughly in their original position
-        const orderMap = new Map<string, number>(activeIds.map((id, i) => [id, i]));
+        const orderMap = new Map<string, number>(
+          activeIds.map((id, i) => [id, i]),
+        );
         next.sort((a, b) => {
           const ai = orderMap.get(a.id) ?? prev.findIndex((s) => s.id === a.id);
           const bi = orderMap.get(b.id) ?? prev.findIndex((s) => s.id === b.id);
@@ -405,7 +642,7 @@ export function ComposableDemo() {
         return next;
       });
     });
-  }, [routers, factory, executor, plugins]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [routers, factory, executor, plugins, queries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleRouter(key: RouterKey) {
     setRouters((prev) => {
@@ -429,94 +666,157 @@ export function ComposableDemo() {
   return (
     <div className={styles.root}>
       <div className={styles.header}>
-        <p className={styles.eyebrow}>Composable by design</p>
-        <h2 className={styles.title}>Mix and match anything</h2>
+        <p className={styles.eyebrow}>{copy.eyebrow}</p>
+        <h2 className={styles.title}>{copy.title}</h2>
         <p className={styles.subtitle}>
-          Swap executors, stack plugins, combine routers.
+          {copy.subtitle[0]}
           <br />
-          The types assemble themselves.
+          {copy.subtitle[1]}
         </p>
       </div>
 
-      <div className={styles.selectors}>
-        <div className={styles.group}>
-          <span className={styles.groupLabel}>Routers</span>
-          <div className={styles.chips}>
-            {ROUTERS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleRouter(key)}
-                className={`${styles.chip} ${routers.has(key) ? styles.chipActive : ""}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.group}>
-          <span className={styles.groupLabel}>Create with</span>
-          <div className={styles.chips}>
-            {FACTORIES.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFactory(key)}
-                className={`${styles.chip} ${factory === key ? styles.chipActive : ""}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className={`${styles.group} ${executorDisabled ? styles.groupDisabled : ""}`}>
-          <span className={styles.groupLabel}>Executor</span>
-          <div className={styles.chips}>
-            {EXECUTORS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => !executorDisabled && setExecutor(key)}
-                className={`${styles.chip} ${executor === key && !executorDisabled ? styles.chipActive : ""}`}
-                disabled={executorDisabled}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className={`${styles.group} ${pluginsDisabled ? styles.groupDisabled : ""}`}>
-          <span className={styles.groupLabel}>Plugins</span>
-          <div className={styles.chips}>
-            {PLUGINS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => togglePlugin(key)}
-                className={`${styles.chip} ${plugins.has(key) && !pluginsDisabled ? styles.chipActive : ""}`}
-                disabled={pluginsDisabled}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.codeContainer}>
-        {sections.map((s) => (
-          <div
-            key={s.id}
-            className={styles.section}
-            data-phase={s.phase}
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: s.html }}
-          />
+      {/* ── Architecture-layer rail (mirrors /guides/architecture) ── */}
+      <div className={styles.rail}>
+        {LAYERS.map((l, i) => (
+          <Fragment key={l.n}>
+            {i > 0 && (
+              <span className={styles.railArrow} aria-hidden="true">
+                →
+              </span>
+            )}
+            <a
+              className={styles.railPill}
+              data-active={layerActive[l.n] ? "true" : "false"}
+              href={`/${lang}/guides/architecture#${l.anchor}`}
+              title={`Layer ${l.n} — open the Architecture guide`}
+            >
+              <span className={styles.railNum}>L{l.n}</span>
+              <span className={styles.railLabel}>{copy.layers[l.n]}</span>
+            </a>
+          </Fragment>
         ))}
       </div>
+
+      <div className={styles.layout}>
+        <div className={styles.selectors}>
+          <div className={styles.group}>
+            <span className={styles.groupLabel}>
+              <span className={styles.layerTag}>L1</span>
+              {copy.groups.routers}
+            </span>
+            <div className={styles.chips}>
+              {ROUTERS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleRouter(key)}
+                  className={`${styles.chip} ${routers.has(key) ? styles.chipActive : ""}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.group}>
+            <span className={styles.groupLabel}>
+              <span className={styles.layerTag}>L2</span>
+              {copy.groups.factory}
+            </span>
+            <div className={styles.chips}>
+              {FACTORIES.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFactory(key)}
+                  className={`${styles.chip} ${factory === key ? styles.chipActive : ""}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={`${styles.group} ${pluginsDisabled ? styles.groupDisabled : ""}`}
+          >
+            <span className={styles.groupLabel}>
+              <span className={styles.layerTag}>L3</span>
+              {copy.groups.plugins}
+            </span>
+            <div className={styles.chips}>
+              {PLUGINS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => togglePlugin(key)}
+                  className={`${styles.chip} ${plugins.has(key) && !pluginsDisabled ? styles.chipActive : ""}`}
+                  disabled={pluginsDisabled}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={`${styles.group} ${executorDisabled ? styles.groupDisabled : ""}`}
+          >
+            <span className={styles.groupLabel}>
+              <span className={styles.layerTag}>L4</span>
+              {copy.groups.executor}
+            </span>
+            <div className={styles.chips}>
+              {EXECUTORS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => !executorDisabled && setExecutor(key)}
+                  className={`${styles.chip} ${executor === key && !executorDisabled ? styles.chipActive : ""}`}
+                  disabled={executorDisabled}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={`${styles.group} ${queriesDisabled ? styles.groupDisabled : ""}`}
+          >
+            <span className={styles.groupLabel}>
+              <span className={styles.layerTag}>L5</span>
+              {copy.groups.queries}
+            </span>
+            <div className={styles.chips}>
+              <button
+                type="button"
+                onClick={() => !queriesDisabled && setQueries((v) => !v)}
+                className={`${styles.chip} ${queries && !queriesDisabled ? styles.chipActive : ""}`}
+                disabled={queriesDisabled}
+              >
+                createQueries
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.codeContainer}>
+          {sections.map((s) => (
+            <div
+              key={s.id}
+              className={styles.section}
+              data-phase={s.phase}
+              // eslint-disable-next-line react/no-danger
+              dangerouslySetInnerHTML={{ __html: s.html }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <a className={styles.archLink} href={`/${lang}/guides/architecture`}>
+        {copy.archLink}
+      </a>
     </div>
   );
 }

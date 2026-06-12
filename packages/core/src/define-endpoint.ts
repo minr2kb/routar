@@ -1,11 +1,11 @@
 import type {
   AnyValidator,
   HttpMethod,
-  RequestShape,
   Validator,
   ValidatorOutput,
 } from "./types.js";
 import { composeRequest } from "./utils/compose-request.js";
+import type { RequestBuckets } from "./utils/compose-request.js";
 
 /**
  * Extracts `:param` segment names from a path template string as a union of
@@ -24,50 +24,70 @@ export type PathParams<TPath extends string> =
       : never;
 
 /**
- * When `TPath` contains dynamic segments (`:param`), requires `request.path`
- * to include all extracted param names. No constraint for static paths.
+ * Wraps a single bucket key in an object type, marking it optional when the
+ * bucket validator's output includes `undefined` (i.e. the validator is
+ * `.optional()`). This preserves the legacy envelope behavior where
+ * `z.object({ query: z.object(...).optional() })` produced `{ query?: ... }`,
+ * so an all-optional request still makes the call params optional downstream.
  */
-type PathConstraint<TPath extends string> = [PathParams<TPath>] extends [never]
-  ? {}
-  : { path: Record<PathParams<TPath>, unknown> };
+type BucketKey<TKey extends string, TValidator> =
+  undefined extends ValidatorOutput<TValidator>
+    ? { [K in TKey]?: ValidatorOutput<TValidator> }
+    : { [K in TKey]: ValidatorOutput<TValidator> };
 
 /**
- * Builds the envelope request output type from the SE-12 separated bucket
+ * Builds the envelope request output type from the separated bucket
  * validators. Each bucket contributes its key only when supplied — the tuple
  * wrapping (`[T] extends [never]`) prevents the `never` default from
- * distributing and collapsing the whole intersection.
+ * distributing and collapsing the whole intersection. A bucket whose validator
+ * is `.optional()` contributes an optional key (see {@link BucketKey}).
  */
 type BucketRequestOutput<TPathParams, TQuery, TBody> = ([
   TPathParams,
 ] extends [never]
   ? {}
-  : { path: ValidatorOutput<TPathParams> }) &
-  ([TQuery] extends [never] ? {} : { query: ValidatorOutput<TQuery> }) &
-  ([TBody] extends [never] ? {} : { body: ValidatorOutput<TBody> });
+  : BucketKey<"path", TPathParams>) &
+  ([TQuery] extends [never] ? {} : BucketKey<"query", TQuery>) &
+  ([TBody] extends [never] ? {} : BucketKey<"body", TBody>);
 
 /**
- * The `pathParams` field of the separated form: required when `TPath` has
- * dynamic segments, optional otherwise. The validator type is further
+ * The `request` bucket-map of the separated form: `{ path?, query?, body? }`
+ * where each value is its own validator (instead of a wrapped
+ * `z.object({ path, query, body })` envelope). The `path` key is required when
+ * `TPath` has dynamic segments, optional otherwise — its validator is further
  * constrained (at the generic level) to cover every `:param` name.
  */
-type BucketPathField<TPath extends string, TPathParams> = [
+type BucketRequestMap<TPath extends string, TPathParams, TQuery, TBody> = ([
   PathParams<TPath>,
 ] extends [never]
-  ? { pathParams?: TPathParams }
-  : { pathParams: TPathParams };
+  ? { path?: TPathParams }
+  : { path: TPathParams }) & {
+  query?: TQuery;
+  body?: TBody;
+};
+
+/**
+ * Rejects the legacy top-level separated-bucket fields. Those buckets now live
+ * inside `request` (`{ path, query, body }`); a stray top-level `pathParams` /
+ * `query` / `body` would otherwise be silently dropped (no validation), so this
+ * intersection turns the removed form into a compile error instead.
+ */
+type NoLegacyBuckets = { pathParams?: never; query?: never; body?: never };
 
 /**
  * Type-safe endpoint definition helper.
  *
  * Use this instead of a plain object literal to get full type inference on
  * `adapter` without requiring explicit annotations or `as any` casts.
- * The four overloads cover every combination of optional `request` validator
- * and optional `adapter` function while keeping all return-type fields
- * required so that TypeScript can narrow them downstream.
+ *
+ * `request` is a `{ path?, query?, body? }` map of standalone validators (each
+ * any object with `.parse()` or a Standard Schema). routar composes the buckets
+ * into a single envelope validator internally. Omit `request` entirely for
+ * endpoints that take no parameters.
  *
  * When `path` contains dynamic segments (e.g. `'/:id'`), TypeScript enforces
- * that `request` includes a matching `path` field with those param names.
- * A mismatch or missing key is a compile-time error.
+ * that `request.path` includes a matching field for those param names. A
+ * mismatch or missing key is a compile-time error.
  *
  * The literal HTTP method (`'GET'`, `'POST'`, …) is preserved on the return
  * type — `endpoint({ method: 'GET', ... }).method` is typed `'GET'`, not the
@@ -83,7 +103,7 @@ type BucketPathField<TPath extends string, TPathParams> = [
  * const search = endpoint({
  *   method: 'GET',
  *   path: '/search',
- *   request: z.object({ query: z.object({ q: z.string(), limit: z.number().optional() }) }),
+ *   request: { query: z.object({ q: z.string(), limit: z.number().optional() }) },
  *   response: z.array(TodoSchema),
  * });
  * ```
@@ -93,7 +113,7 @@ type BucketPathField<TPath extends string, TPathParams> = [
  * const create = endpoint({
  *   method: 'POST',
  *   path: '/',
- *   request: z.object({ body: z.object({ title: z.string() }) }),
+ *   request: { body: z.object({ title: z.string() }) },
  *   response: TodoSchema,
  * });
  * ```
@@ -103,7 +123,7 @@ type BucketPathField<TPath extends string, TPathParams> = [
  * const getDetail = endpoint({
  *   method: 'GET',
  *   path: '/:id',
- *   request: z.object({ path: z.object({ id: z.number() }) }),
+ *   request: { path: z.object({ id: z.number() }) },
  *   response: TodoRawSchema,
  *   adapter: (raw) => ({ ...raw, label: `#${raw.id} ${raw.title}` }),
  * });
@@ -115,59 +135,20 @@ type BucketPathField<TPath extends string, TPathParams> = [
  * const getDetail = endpoint({
  *   method: 'GET',
  *   path: '/:id',
- *   request: z.object({ path: z.object({ id: z.number() }) }),
+ *   request: { path: z.object({ id: z.number() }) },
  *   response: TodoSchema,
  * });
  *
- * // ❌ compile error — 'id' is missing from request.path
+ * // ❌ compile error — request.path is missing for ':id'
  * const broken = endpoint({
  *   method: 'GET',
  *   path: '/:id',
- *   request: z.object({ query: z.object({ foo: z.string() }) }),
+ *   request: { query: z.object({ foo: z.string() }) },
  *   response: TodoSchema,
  * });
  * ```
  */
-// request O + adapter O
-export function endpoint<
-  TMethod extends HttpMethod,
-  TPath extends string,
-  TReq extends AnyValidator<RequestShape & PathConstraint<TPath>>,
-  TResponse extends AnyValidator,
-  TOut,
->(spec: {
-  method: TMethod;
-  path: TPath;
-  request: TReq;
-  response: TResponse;
-  adapter: (raw: ValidatorOutput<TResponse>) => TOut;
-}): {
-  method: TMethod;
-  path: string;
-  request: TReq;
-  response: TResponse;
-  adapter: (raw: ValidatorOutput<TResponse>) => TOut;
-};
-
-// request O + adapter X
-export function endpoint<
-  TMethod extends HttpMethod,
-  TPath extends string,
-  TReq extends AnyValidator<RequestShape & PathConstraint<TPath>>,
-  TResponse extends AnyValidator,
->(spec: {
-  method: TMethod;
-  path: TPath;
-  request: TReq;
-  response: TResponse;
-}): {
-  method: TMethod;
-  path: string;
-  request: TReq;
-  response: TResponse;
-};
-
-// request X + adapter O
+// no request + adapter O
 export function endpoint<
   TMethod extends HttpMethod,
   TResponse extends AnyValidator,
@@ -177,14 +158,14 @@ export function endpoint<
   path: string;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
-}): {
+} & NoLegacyBuckets): {
   method: TMethod;
   path: string;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
 };
 
-// request X + adapter X
+// no request + adapter X
 export function endpoint<
   TMethod extends HttpMethod,
   TResponse extends AnyValidator,
@@ -192,29 +173,29 @@ export function endpoint<
   method: TMethod;
   path: string;
   response: TResponse;
-}): {
+} & NoLegacyBuckets): {
   method: TMethod;
   path: string;
   response: TResponse;
 };
 
 // ─────────────────────────────────────────────────────────────────────────
-// SE-12 — separated request buckets (additive; the envelope `request` form
-// above keeps working unchanged). Declare each part on its own field instead of
-// wrapping a `z.object({ path, query, body })` envelope:
+// `request` as a `{ path?, query?, body? }` bucket-map of standalone validators:
 //
 //   endpoint({
 //     method: 'GET', path: '/:id',
-//     pathParams: z.object({ id: z.number() }),
-//     query: z.object({ q: z.string() }),
+//     request: {
+//       path: z.object({ id: z.number() }),
+//       query: z.object({ q: z.string() }),
+//     },
 //     response: TodoSchema,
 //   })
 //
-// Internally the buckets are composed into the same envelope request validator,
-// so call sites, keys, react-query flatten, and MSW all behave identically.
+// Internally the buckets are composed into a single envelope request validator,
+// so query keys, react-query flatten, and MSW all read the canonical shape.
 // ─────────────────────────────────────────────────────────────────────────
 
-// separated buckets + adapter O
+// request bucket-map + adapter O
 export function endpoint<
   TMethod extends HttpMethod,
   TPath extends string,
@@ -223,16 +204,13 @@ export function endpoint<
   TPathParams extends AnyValidator<Record<PathParams<TPath>, unknown>> = never,
   TQuery extends AnyValidator = never,
   TBody extends AnyValidator = never,
->(
-  spec: {
-    method: TMethod;
-    path: TPath;
-    query?: TQuery;
-    body?: TBody;
-    response: TResponse;
-    adapter: (raw: ValidatorOutput<TResponse>) => TOut;
-  } & BucketPathField<TPath, TPathParams>,
-): {
+>(spec: {
+  method: TMethod;
+  path: TPath;
+  request: BucketRequestMap<TPath, TPathParams, TQuery, TBody>;
+  response: TResponse;
+  adapter: (raw: ValidatorOutput<TResponse>) => TOut;
+}): {
   method: TMethod;
   path: string;
   request: Validator<BucketRequestOutput<TPathParams, TQuery, TBody>>;
@@ -240,7 +218,7 @@ export function endpoint<
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
 };
 
-// separated buckets + adapter X
+// request bucket-map + adapter X
 export function endpoint<
   TMethod extends HttpMethod,
   TPath extends string,
@@ -248,15 +226,12 @@ export function endpoint<
   TPathParams extends AnyValidator<Record<PathParams<TPath>, unknown>> = never,
   TQuery extends AnyValidator = never,
   TBody extends AnyValidator = never,
->(
-  spec: {
-    method: TMethod;
-    path: TPath;
-    query?: TQuery;
-    body?: TBody;
-    response: TResponse;
-  } & BucketPathField<TPath, TPathParams>,
-): {
+>(spec: {
+  method: TMethod;
+  path: TPath;
+  request: BucketRequestMap<TPath, TPathParams, TQuery, TBody>;
+  response: TResponse;
+}): {
   method: TMethod;
   path: string;
   request: Validator<BucketRequestOutput<TPathParams, TQuery, TBody>>;
@@ -264,22 +239,13 @@ export function endpoint<
 };
 
 export function endpoint(spec: Record<string, unknown>): unknown {
-  // Separated-bucket form (SE-12): normalize into the envelope `request`.
-  if (
-    spec.request === undefined &&
-    (spec.pathParams !== undefined ||
-      spec.query !== undefined ||
-      spec.body !== undefined)
-  ) {
-    const { pathParams, query, body, ...rest } = spec;
-    return {
-      ...rest,
-      request: composeRequest({
-        path: pathParams as AnyValidator | undefined,
-        query: query as AnyValidator | undefined,
-        body: body as AnyValidator | undefined,
-      }),
-    };
+  // `request` is a `{ path?, query?, body? }` bucket-map — compose it into the
+  // canonical envelope `request` validator that the rest of the pipeline
+  // (createApi, react-query, MSW) consumes.
+  const req = spec.request;
+  if (req !== undefined) {
+    const { path, query, body } = req as RequestBuckets;
+    return { ...spec, request: composeRequest({ path, query, body }) };
   }
   return spec;
 }

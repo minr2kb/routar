@@ -53,7 +53,7 @@ const handlers = createMswHandlers(UserRouter, BASE_URL, {
 ```ts
 getDetail: endpoint({
   path: '/:id',
-  request: z.object({ path: z.object({ id: z.coerce.number() }) }),
+  request: { path: z.object({ id: z.coerce.number() }) },
 })
 ```
 

@@ -8,17 +8,17 @@ const TodoRouter = defineRouter("/todos", {
   getList: endpoint({
     method: "GET",
     path: "/",
-    request: z.object({
+    request: {
       query: z
         .object({ userId: z.number(), _page: z.number().optional() })
         .optional(),
-    }),
+    },
     response: z.array(z.object({ id: z.number() })),
   }),
   getDetail: endpoint({
     method: "GET",
     path: "/:id",
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: z.object({ id: z.number() }),
   }),
 });
@@ -107,7 +107,7 @@ const TodoMutationRouter = defineRouter("/todos", {
   create: endpoint({
     method: "POST",
     path: "/",
-    request: z.object({ body: z.object({ title: z.string() }) }),
+    request: { body: z.object({ title: z.string() }) },
     response: z.object({ id: z.number() }),
   }),
 });
@@ -173,9 +173,9 @@ const NestedRouter = defineRouter("/users", {
     getList: endpoint({
       method: "GET",
       path: "/",
-      request: z.object({
+      request: {
         query: z.object({ page: z.number().optional() }).optional(),
-      }),
+      },
       response: z.array(z.object({ id: z.number() })),
     }),
   }),
@@ -534,33 +534,33 @@ const FlattenRouter = defineRouter("/todos", {
   getDetail: endpoint({
     method: "GET",
     path: "/:id",
-    request: z.object({ path: z.object({ id: z.number() }) }),
+    request: { path: z.object({ id: z.number() }) },
     response: z.object({ id: z.number() }),
   }),
   update: endpoint({
     method: "PATCH",
     path: "/:id",
-    request: z.object({
+    request: {
       path: z.object({ id: z.number() }),
       body: z.object({ title: z.string() }),
-    }),
+    },
     response: z.object({ id: z.number() }),
   }),
   // collision: `id` lives in both path and body → not flattenable.
   collide: endpoint({
     method: "POST",
     path: "/:id",
-    request: z.object({
+    request: {
       path: z.object({ id: z.number() }),
       body: z.object({ id: z.number(), title: z.string() }),
-    }),
+    },
     response: z.object({ id: z.number() }),
   }),
   // non-object body (array) → not flattenable.
   bulk: endpoint({
     method: "POST",
     path: "/",
-    request: z.object({ body: z.array(z.object({ title: z.string() })) }),
+    request: { body: z.array(z.object({ title: z.string() })) },
     response: z.array(z.object({ id: z.number() })),
   }),
 });
@@ -671,14 +671,14 @@ const SearchRouter = defineRouter("/search", {
   query: endpoint({
     method: "POST",
     path: "/",
-    request: z.object({ body: z.object({ term: z.string() }) }),
+    request: { body: z.object({ term: z.string() }) },
     response: z.array(z.object({ id: z.number() })),
   }),
   // Plain mutation — stays a mutation.
   create: endpoint({
     method: "POST",
     path: "/",
-    request: z.object({ body: z.object({ term: z.string() }) }),
+    request: { body: z.object({ term: z.string() }) },
     response: z.object({ id: z.number() }),
   }),
 });
@@ -749,14 +749,14 @@ const NestedSearchRouter = defineRouter("/api", {
   search: endpoint({
     method: "POST",
     path: "/search",
-    request: z.object({ body: z.object({ term: z.string() }) }),
+    request: { body: z.object({ term: z.string() }) },
     response: z.array(z.object({ id: z.number() })),
   }),
   sub: defineRouter("/sub", {
     search: endpoint({
       method: "POST",
       path: "/search",
-      request: z.object({ body: z.object({ term: z.string() }) }),
+      request: { body: z.object({ term: z.string() }) },
       response: z.array(z.object({ id: z.number() })),
     }),
   }),

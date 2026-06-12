@@ -1,5 +1,6 @@
 export default {
   index: "가이드",
+  architecture: "아키텍처",
   "ssr-csr": "SSR / CSR 패턴",
   "react-query": "TanStack Query",
   "custom-executor": "커스텀 Executor",

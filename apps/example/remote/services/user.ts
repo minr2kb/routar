@@ -1,52 +1,49 @@
-import type { ApiTypes } from "@routar/core";
 import { createApi, defineRouter, endpoint } from "@routar/core";
 import { createQueries } from "@routar/react-query";
+import { type } from "arktype";
 import { z } from "zod";
-import { apiExecutor } from "../lib/executor";
+import { apiExecutor } from "../lib/executors/api";
 
-const UserRawSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  username: z.string(),
-  email: z.string(),
-  phone: z.string(),
-  website: z.string(),
-  company: z.object({ name: z.string() }),
-  address: z.object({ city: z.string() }),
+// SE-11 — the response schema is an ArkType (Standard Schema) validator. routar
+// validates it via the `~standard` interface; everything else is unchanged.
+const User = type({
+  id: "number",
+  name: "string",
+  email: "string",
+  company: { name: "string" },
+  address: { city: "string" },
 });
 
-const toUser = (raw: z.infer<typeof UserRawSchema>) => ({
-  id: raw.id,
-  name: raw.name,
-  username: raw.username,
-  email: raw.email,
-  phone: raw.phone,
-  website: raw.website,
-  companyName: raw.company.name,
-  city: raw.address.city,
+// `adapter` runs after validation — flatten the nested API shape for the UI.
+// (Keep `response` a pure schema; never put `.transform()` on it.)
+const toUser = (u: typeof User.infer) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  companyName: u.company.name,
+  city: u.address.city,
 });
 
 export const UserRouter = defineRouter("/users", {
-  getList: endpoint({
-    method: "GET" as const,
-    path: "/",
-    response: z.array(UserRawSchema),
-    adapter: (raw) => raw.map(toUser),
-  }),
+  getList: endpoint({ method: "GET", path: "/", response: User.array(), adapter: (xs) => xs.map(toUser) }),
   getDetail: endpoint({
-    method: "GET" as const,
+    method: "GET",
     path: "/:id",
-    request: z.object({
-      path: z.object({ id: z.coerce.number() }),
-    }),
-    response: UserRawSchema,
+    request: { path: z.object({ id: z.coerce.number() }) },
+    response: User,
     adapter: toUser,
   }),
 });
 
-export const userApi = createApi(apiExecutor, UserRouter);
+// SE-7 — `validate: { response: 'warn' }` keeps validating, but on a mismatch it
+// passes the raw value through and reports via `onValidationError` instead of
+// throwing. The safe default for a third-party API that may drift.
+export const userApi = createApi(apiExecutor, UserRouter, {
+  validate: { response: "warn" },
+  onValidationError: (err, ctx) =>
+    console.warn(`[user drift] ${ctx.method} ${ctx.url}: ${err.message}`),
+});
 
 export const userQuery = createQueries(userApi);
 
-export type UserApiTypes = ApiTypes<typeof userApi>;
-export type User = UserApiTypes["getDetail"]["response"];
+export type User = ReturnType<typeof toUser>;

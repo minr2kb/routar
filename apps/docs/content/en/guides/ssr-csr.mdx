@@ -48,7 +48,7 @@ import { apiExecutor } from '../lib/executor'
 const todoRouter = defineRouter('/todos', {
   getList:   endpoint({ method: 'GET', path: '/',    response: TodoListSchema }),
   getDetail: endpoint({ method: 'GET', path: '/:id', response: TodoSchema,
-                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+                        request: { path: z.object({ id: z.number() }) } }),
 })
 
 // One API client — works in both SSR and CSR

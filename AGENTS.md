@@ -45,9 +45,9 @@ const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.bo
 const todoRouter = defineRouter('/todos', {
   getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
   getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
-                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+                        request: { path: z.object({ id: z.number() }) } }),
   create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
-                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+                        request: { body: z.object({ title: z.string() }) } }),
 });
 
 // 3. Create executor and API client
@@ -92,14 +92,14 @@ If `path` contains `:param`, `request.path` must have a matching key — compile
 // ✅ correct
 endpoint({
   method: 'GET', path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }) }),
+  request: { path: z.object({ id: z.number() }) },
   response: TodoSchema,
 });
 
 // ❌ compile error — ':id' in path but request.path.id missing
 endpoint({
   method: 'GET', path: '/:id',
-  request: z.object({ query: z.object({ q: z.string() }) }),
+  request: { query: z.object({ q: z.string() }) },
   response: TodoSchema,
 });
 ```
@@ -146,15 +146,17 @@ type Todo          = TodoApiTypes['getDetail']['response'];
 type CreateRequest = TodoApiTypes['create']['request'];
 ```
 
-### Separated request buckets (alternative to `request`)
+### Request buckets
 
-`endpoint()` also accepts `pathParams` / `query` / `body` as separate validators instead of a `request` envelope. The two forms are equivalent — same call sites, keys, flatten, and MSW behavior.
+`request` is a plain `{ path?, query?, body? }` map of standalone validators. `request.path` is required when the `path` contains `:param` segments. The composed buckets drive call sites, keys, flatten, and MSW behavior.
 
 ```ts
 endpoint({
   method: 'GET', path: '/:id',
-  pathParams: z.object({ id: z.number() }), // required when path has :param
-  query: z.object({ q: z.string() }),
+  request: {
+    path: z.object({ id: z.number() }), // required when path has :param
+    query: z.object({ q: z.string() }),
+  },
   response: TodoSchema,
 });
 ```
@@ -224,7 +226,7 @@ createMswHandlers(todoRouter, 'https://api.example.com', {
 **Important:** MSW path params are always strings. Use `z.coerce.number()` for numeric IDs:
 
 ```ts
-request: z.object({ path: z.object({ id: z.coerce.number() }) }) // ✅ in MSW context
+request: { path: z.object({ id: z.coerce.number() }) } // ✅ in MSW context
 ```
 
 ## TanStack Query (`@routar/react-query`)

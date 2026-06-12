@@ -38,16 +38,16 @@ const TodoSchema = z.object({ id: z.number(), title: z.string(), completed: z.bo
 const todoRouter = defineRouter('/todos', {
   getList:   endpoint({ method: 'GET',  path: '/',    response: z.array(TodoSchema) }),
   getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
-                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+                        request: { path: z.object({ id: z.number() }) } }),
   create:    endpoint({ method: 'POST', path: '/',    response: TodoSchema,
-                        request: z.object({ body: z.object({ title: z.string() }) }) }),
+                        request: { body: z.object({ title: z.string() }) } }),
   update:    endpoint({ method: 'PATCH', path: '/:id', response: TodoSchema,
-                        request: z.object({
+                        request: {
                           path: z.object({ id: z.number() }),
                           body: z.object({ completed: z.boolean() }),
-                        }) }),
+                        } }),
   remove:    endpoint({ method: 'DELETE', path: '/:id',
-                        request: z.object({ path: z.object({ id: z.number() }) }),
+                        request: { path: z.object({ id: z.number() }) },
                         response: z.object({}) }),
 });
 
@@ -68,24 +68,30 @@ await todoApi.remove({ path: { id: 1 } });
 
 Defines a single endpoint. Use instead of a plain object to get full type inference on `adapter`.
 
-**Signature (envelope form):**
+**Signature:**
 ```ts
 endpoint(spec: {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
-  request?: AnyValidator<RequestShape>; // optional — for endpoints with no params
+  request?: {                        // optional — omit for endpoints with no params
+    path?: AnyValidator<unknown>;    // required when path has :param segments
+    query?: AnyValidator<unknown>;
+    body?: AnyValidator<unknown>;
+  };
   response: AnyValidator<unknown>;
   adapter?: (raw: ValidatorOutput<typeof response>) => unknown;
 }): EndpointSpec
 ```
 
-**Separated-bucket form (alternative, equivalent):** instead of `request`, declare `pathParams` / `query` / `body` as separate validators. Composed internally into the same envelope, so call sites, query keys, react-query flatten, and MSW behave identically.
+**Request buckets:** `request` is a plain `{ path?, query?, body? }` map of standalone validators. The buckets are composed internally into a single envelope that drives call sites, query keys, react-query flatten, and MSW.
 
 ```ts
 endpoint({
   method: 'GET', path: '/:id',
-  pathParams: z.object({ id: z.number() }), // required when path has :param
-  query: z.object({ q: z.string() }),
+  request: {
+    path: z.object({ id: z.number() }), // required when path has :param
+    query: z.object({ q: z.string() }),
+  },
   response: TodoSchema,
 });
 ```
@@ -98,14 +104,14 @@ endpoint({
 // ✅ correct
 endpoint({
   method: 'GET', path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }) }),
+  request: { path: z.object({ id: z.number() }) },
   response: TodoSchema,
 });
 
 // ❌ compile error — ':id' declared but request.path.id missing
 endpoint({
   method: 'GET', path: '/:id',
-  request: z.object({ query: z.object({ q: z.string() }) }),
+  request: { query: z.object({ q: z.string() }) },
   response: TodoSchema,
 });
 ```
@@ -117,7 +123,7 @@ const TodoRawSchema = z.object({ id: z.number(), title: z.string(), is_done: z.b
 
 endpoint({
   method: 'GET', path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }) }),
+  request: { path: z.object({ id: z.number() }) },
   response: TodoRawSchema,
   adapter: (raw) => ({        // raw: { id: number; title: string; is_done: boolean }
     id: raw.id,
@@ -127,23 +133,23 @@ endpoint({
 });
 ```
 
-**Request shape** — `request` schema validates `{ path?, query?, body? }`:
+**Request shape** — `request` is a `{ path?, query?, body? }` bucket map:
 
 ```ts
 // query params
 endpoint({
   method: 'GET', path: '/search',
-  request: z.object({ query: z.object({ q: z.string(), limit: z.number().optional() }) }),
+  request: { query: z.object({ q: z.string(), limit: z.number().optional() }) },
   response: z.array(TodoSchema),
 });
 
 // path + body
 endpoint({
   method: 'PUT', path: '/:id',
-  request: z.object({
+  request: {
     path: z.object({ id: z.number() }),
     body: z.object({ title: z.string(), completed: z.boolean() }),
-  }),
+  },
   response: TodoSchema,
 });
 ```
@@ -161,7 +167,7 @@ import { defineRouter } from '@routar/core';
 const todoRouter = defineRouter('/todos', {
   getList:   endpoint({ method: 'GET',  path: '/', response: z.array(TodoSchema) }),
   getDetail: endpoint({ method: 'GET',  path: '/:id', response: TodoSchema,
-                        request: z.object({ path: z.object({ id: z.number() }) }) }),
+                        request: { path: z.object({ id: z.number() }) } }),
 });
 
 // Nested routers — mirror your URL structure
@@ -170,7 +176,7 @@ const apiRouter = defineRouter('/api', {
   users: defineRouter('/users', {
     getList:   endpoint({ method: 'GET', path: '/', response: z.array(UserSchema) }),
     getDetail: endpoint({ method: 'GET', path: '/:id', response: UserSchema,
-                          request: z.object({ path: z.object({ id: z.number() }) }) }),
+                          request: { path: z.object({ id: z.number() }) } }),
   }),
 });
 ```
@@ -739,10 +745,10 @@ endpoint({
 })
 
 // ❌ Don't use z.number() for path params in MSW (params are always strings)
-request: z.object({ path: z.object({ id: z.number() }) })  // ← in MSW context
+request: { path: z.object({ id: z.number() }) }  // ← in MSW context
 
 // ✅ Use z.coerce.number() in MSW resolvers
-request: z.object({ path: z.object({ id: z.coerce.number() }) })
+request: { path: z.object({ id: z.coerce.number() }) }
 
 // ❌ Don't create separate server/client API instances
 const todoServerApi = createApi(serverExecutor, todoRouter);

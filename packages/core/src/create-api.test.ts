@@ -4,8 +4,8 @@ import {
   createApi,
   defineRouter,
   endpoint,
-  type StandardSchemaV1,
   StandardSchemaError,
+  type StandardSchemaV1,
   TimeoutError,
   ValidationError,
 } from "./index.js";
@@ -199,7 +199,14 @@ describe("createApi", () => {
       const api = createApi(
         executor,
         "/items",
-        { get: { method: "GET" as const, path: "/", request: requestValidator, response: makeValidator({}) } },
+        {
+          get: {
+            method: "GET" as const,
+            path: "/",
+            request: requestValidator,
+            response: makeValidator({}),
+          },
+        },
         { validate: false },
       );
       await api.get({});
@@ -212,7 +219,13 @@ describe("createApi", () => {
       const api = createApi(
         executor,
         "/items",
-        { get: { method: "GET" as const, path: "/", response: responseValidator } },
+        {
+          get: {
+            method: "GET" as const,
+            path: "/",
+            response: responseValidator,
+          },
+        },
         { validate: false },
       );
       await api.get({});
@@ -226,7 +239,14 @@ describe("createApi", () => {
       const api = createApi(
         executor,
         "/items",
-        { get: { method: "GET" as const, path: "/", request: requestValidator, response: responseValidator } },
+        {
+          get: {
+            method: "GET" as const,
+            path: "/",
+            request: requestValidator,
+            response: responseValidator,
+          },
+        },
         { validate: { request: true, response: false } },
       );
       await api.get({});
@@ -264,7 +284,11 @@ describe("createApi", () => {
       const responseValidator = { parse: mock((data: unknown) => data) };
       const executor = mockExecutor([]);
       const inner = defineRouter("/todos", {
-        list: { method: "GET" as const, path: "/", response: responseValidator },
+        list: {
+          method: "GET" as const,
+          path: "/",
+          response: responseValidator,
+        },
       });
       const api = createApi(executor, { users: inner }, { validate: false });
       await api.users.list({});
@@ -491,9 +515,11 @@ describe("createApi", () => {
         update: endpoint({
           method: "PATCH" as const,
           path: "/:id",
-          pathParams: z.object({ id: z.number() }),
-          query: z.object({ notify: z.boolean() }),
-          body: z.object({ title: z.string() }),
+          request: {
+            path: z.object({ id: z.number() }),
+            query: z.object({ notify: z.boolean() }),
+            body: z.object({ title: z.string() }),
+          },
           response: z.object({ id: z.number() }),
         }),
       });
@@ -520,7 +546,7 @@ describe("createApi", () => {
         getDetail: endpoint({
           method: "GET" as const,
           path: "/:id",
-          pathParams: z.object({ id: z.number() }),
+          request: { path: z.object({ id: z.number() }) },
           response: z.object({ id: z.number() }),
         }),
       });
@@ -549,7 +575,7 @@ describe("createApi", () => {
       getDetail: endpoint({
         method: "GET" as const,
         path: "/:id",
-        request: z.object({ path: z.object({ id: z.number() }) }),
+        request: { path: z.object({ id: z.number() }) },
         response: UserSchema,
       }),
       todos: defineRouter("/todos", {
@@ -561,7 +587,7 @@ describe("createApi", () => {
         getDetail: endpoint({
           method: "GET" as const,
           path: "/:id",
-          request: z.object({ path: z.object({ id: z.number() }) }),
+          request: { path: z.object({ id: z.number() }) },
           response: TodoSchema,
         }),
         comments: defineRouter("/comments", {
@@ -670,7 +696,10 @@ describe("createApi", () => {
             method: "GET" as const,
             path: "/",
             response: makeValidator({ raw: true }),
-            adapter: (data: { raw: boolean }) => ({ transformed: true, original: data }),
+            adapter: (data: { raw: boolean }) => ({
+              transformed: true,
+              original: data,
+            }),
           },
         },
         { validate: false },

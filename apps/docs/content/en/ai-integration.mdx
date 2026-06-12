@@ -30,7 +30,7 @@ curl -s https://api.example.com/todos/1 > sample.json
 
 Then prompt your assistant:
 
-> "Here is a real response (`sample.json`) from `GET /todos/:id`. Generate a `@routar/core` router: a Zod `response` schema matching this JSON, an `endpoint()` with the correct `method`/`path`/`pathParams`, and a `defineRouter`. Use the separated-bucket form."
+> "Here is a real response (`sample.json`) from `GET /todos/:id`. Generate a `@routar/core` router: a Zod `response` schema matching this JSON, an `endpoint()` with the correct `method`/`path`/`request.path`, and a `defineRouter`. Use the separated-bucket form (`request: { path, query, body }`)."
 
 Because the schema is the single source of truth, the generated router immediately yields a typed client, query keys, and MSW mocks — the cost of "writing the schema by hand" is paid by the model, once.
 
@@ -81,7 +81,7 @@ Every exported function in `@routar/core` and `@routar/msw` ships with `@example
 endpoint({
   method: 'GET',
   path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }) }),
+  request: { path: z.object({ id: z.number() }) },
   response: TodoSchema,
 });
 

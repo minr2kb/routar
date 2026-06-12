@@ -30,7 +30,7 @@ curl -s https://api.example.com/todos/1 > sample.json
 
 그런 다음 어시스턴트에 프롬프트:
 
-> "`GET /todos/:id`의 실제 응답(`sample.json`)입니다. `@routar/core` 라우터를 생성하세요: 이 JSON에 맞는 Zod `response` 스키마, 올바른 `method`/`path`/`pathParams`를 가진 `endpoint()`, `defineRouter`. 버킷 분리형을 사용하세요."
+> "`GET /todos/:id`의 실제 응답(`sample.json`)입니다. `@routar/core` 라우터를 생성하세요: 이 JSON에 맞는 Zod `response` 스키마, 올바른 `method`/`path`/`request.path`를 가진 `endpoint()`, `defineRouter`. 버킷 분리형(`request: { path, query, body }`)을 사용하세요."
 
 스키마가 단일 진실 공급원이므로, 생성된 라우터는 즉시 타입 클라이언트·query key·MSW mock을 산출합니다 — "스키마를 손으로 쓰는" 비용을 모델이 한 번 지불합니다.
 
@@ -74,7 +74,7 @@ https://github.com/minr2kb/routar/blob/main/AGENTS.md 를 참조하세요.
 endpoint({
   method: 'GET',
   path: '/:id',
-  request: z.object({ path: z.object({ id: z.number() }) }),
+  request: { path: z.object({ id: z.number() }) },
   response: TodoSchema,
 });
 ```

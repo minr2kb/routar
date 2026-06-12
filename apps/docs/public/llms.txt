@@ -14,7 +14,7 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 
 ## Core API
 
-[endpoint(spec)](https://routar.vercel.app/api-reference): Define a single typed endpoint. Enforces path params at compile time. Accepts the `request` envelope OR separated `pathParams`/`query`/`body` validators (both forms coexist). `request`/`response` accept any `.parse()` object or a Standard Schema (`~standard`, e.g. ArkType) via `AnyValidator`.
+[endpoint(spec)](https://routar.vercel.app/api-reference): Define a single typed endpoint. Enforces path params at compile time. Accepts `request` as a `{ path?, query?, body? }` map of standalone validators (`request.path` is required when the path has `:param` segments). `request`/`response` accept any `.parse()` object or a Standard Schema (`~standard`, e.g. ArkType) via `AnyValidator`.
 [defineRouter(prefix, endpoints)](https://routar.vercel.app/api-reference): Group endpoints under a shared URL prefix. Supports arbitrary nesting.
 [createApi(executor, router, options?)](https://routar.vercel.app/api-reference): Build a fully-typed API client. Each endpoint becomes an async function `(params, signalOrOptions?) => Promise<Response>` — the 2nd arg is an `AbortSignal` or `{ signal?, headers?, timeout? }` (per-call options). `options.validate` is `boolean | 'warn' | { request?, response? }`; `'warn'` passes raw data through and calls `options.onValidationError(err, ctx)` instead of throwing (drift observation).
 [createExecutor(transport, options?)](https://routar.vercel.app/api-reference): Wrap any HTTP client with routar's plugin system. Pass `plugins` via options.

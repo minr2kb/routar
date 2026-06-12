@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { userQuery } from "@/remote/services/user";
 
 export function UserListClient() {
+  // `data` is already adapted (companyName / city flattened from nested fields).
   const { data: users } = useSuspenseQuery(userQuery.getList());
 
   return (
@@ -19,9 +20,7 @@ export function UserListClient() {
       <tbody>
         {users.map((user) => (
           <tr key={user.id} style={{ borderBottom: "1px solid #eee" }}>
-            <td style={{ padding: "8px 12px" }}>
-              <a href={`/users/${user.id}`}>{user.name}</a>
-            </td>
+            <td style={{ padding: "8px 12px" }}>{user.name}</td>
             <td style={{ padding: "8px 12px" }}>{user.email}</td>
             <td style={{ padding: "8px 12px" }}>{user.companyName}</td>
             <td style={{ padding: "8px 12px" }}>{user.city}</td>
