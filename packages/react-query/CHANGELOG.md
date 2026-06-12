@@ -1,5 +1,12 @@
 # @routar/react-query
 
+## 1.8.0
+
+### Patch Changes
+
+- Updated dependencies [c1215d4]
+  - @routar/core@1.8.0
+
 ## 1.7.0
 
 ### Minor Changes
