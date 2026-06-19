@@ -6,3 +6,4 @@ dist
 next-env.d.ts
 **/.omc
 /docs
+_pagefind/
