@@ -1,7 +1,10 @@
 import type { ApiTypes } from "@routar/core";
 import { createApi, defineRouter, endpoint } from "@routar/core";
+import { createMswHandlers } from "@routar/msw";
 import { createQueries } from "@routar/react-query";
+import { HttpResponse } from "msw";
 import { z } from "zod";
+import { LOCAL_API_URL } from "../lib/constants";
 import { localExecutor } from "../lib/executors/local";
 
 export const TodoRawSchema = z.object({
@@ -102,6 +105,10 @@ export const todoQuery = createQueries(todoApi, {
     create: (_, q) => ({ invalidates: [q.getList.queryKey()] }),
     remove: (_, q) => ({ invalidates: [q.getList.queryKey()] }),
   },
+});
+
+export const todoMSWHandlers = createMswHandlers(TodoRouter, LOCAL_API_URL, {
+  getList: () => HttpResponse.json([{ id: 1 }]),
 });
 
 export type TodoApiTypes = ApiTypes<typeof todoApi>;

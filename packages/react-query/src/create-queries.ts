@@ -142,12 +142,21 @@ function buildQueries(
           fn,
           root,
           name,
+          spec.path,
           endpointDefault,
           infinite?.[name],
           buckets,
           qRef,
         )
-      : makeMutationAccessor(fn, root, name, endpointDefault, buckets, qRef);
+      : makeMutationAccessor(
+          fn,
+          root,
+          name,
+          spec.path,
+          endpointDefault,
+          buckets,
+          qRef,
+        );
   }
 
   return out;
@@ -199,6 +208,7 @@ function makeQueryAccessor(
   fn: (params?: unknown, signal?: AbortSignal) => Promise<unknown>,
   root: string[],
   name: string,
+  path: string,
   endpointDefault: EndpointDefault | undefined,
   infiniteConfig: InfiniteConfig | undefined,
   buckets: BucketMap | null,
@@ -208,7 +218,7 @@ function makeQueryAccessor(
     // In flatten mode `params` is flat; the envelope drives both fetch and key.
     const envelope = normalize(params, buckets);
     return queryOptions({
-      queryKey: buildQueryKey(root, name, envelope),
+      queryKey: buildQueryKey(root, path, envelope),
       queryFn: ({ signal }) => fn(envelope, signal),
       ...resolveDefault(endpointDefault, params, qRef),
       ...options,
@@ -216,7 +226,7 @@ function makeQueryAccessor(
   };
   // queryKey helper stays on the envelope params (flatten-independent), so SSR
   // and CSR keys match regardless of call style.
-  accessor.queryKey = (params?: unknown) => buildQueryKey(root, name, params);
+  accessor.queryKey = (params?: unknown) => buildQueryKey(root, path, params);
 
   const infinite = (params?: unknown, override?: Record<string, unknown>) => {
     // Contract = per-endpoint config (createQueries) overlaid with per-call opts.
@@ -245,7 +255,7 @@ function makeQueryAccessor(
     // both the key and the fetch (the pageParam builder still targets envelope).
     const envelope = normalize(params, buckets);
     return infiniteQueryOptions({
-      queryKey: buildInfiniteKey(root, name, envelope),
+      queryKey: buildInfiniteKey(root, path, envelope),
       queryFn: ({
         pageParam: page,
         signal,
@@ -263,7 +273,7 @@ function makeQueryAccessor(
     } as unknown as Parameters<typeof infiniteQueryOptions>[0]);
   };
   infinite.queryKey = (params?: unknown) =>
-    buildInfiniteKey(root, name, params);
+    buildInfiniteKey(root, path, params);
   accessor.infinite = infinite;
 
   return accessor;
@@ -275,11 +285,12 @@ function makeMutationAccessor(
   fn: (vars?: unknown) => Promise<unknown>,
   root: string[],
   name: string,
+  path: string,
   endpointDefault: EndpointDefault | undefined,
   buckets: BucketMap | null,
   qRef: Queries<RouterEndpoints>,
 ) {
-  const mutationKey = [...root, name];
+  const mutationKey = [...root, path];
 
   const accessor = (options: Record<string, unknown> = {}) => {
     // Resolve the default lazily — a dynamic default needs the populated qRef.

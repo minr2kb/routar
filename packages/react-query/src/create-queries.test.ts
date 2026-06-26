@@ -50,7 +50,7 @@ describe("createQueries — queries", () => {
     const opts = q.getList({ query: { userId: 1 } });
     expect(opts.queryKey as unknown).toEqual([
       "todos",
-      "getList",
+      "/",
       { query: { userId: 1 } },
     ]);
   });
@@ -58,7 +58,7 @@ describe("createQueries — queries", () => {
   it("omits the params element when called with no params", () => {
     const { api } = makeApi();
     const q = createQueries(api);
-    expect(q.getList().queryKey as unknown).toEqual(["todos", "getList"]);
+    expect(q.getList().queryKey as unknown).toEqual(["todos", "/"]);
   });
 
   it(".queryKey() helper matches the generated key", () => {
@@ -66,7 +66,7 @@ describe("createQueries — queries", () => {
     const q = createQueries(api);
     expect(q.getDetail.queryKey({ path: { id: 5 } }) as unknown).toEqual([
       "todos",
-      "getDetail",
+      "/:id",
       { path: { id: 5 } },
     ]);
   });
@@ -99,7 +99,7 @@ describe("createQueries — queries", () => {
     const { api } = makeApi();
     const q = createQueries(api, { key: "todo" });
     expect(q.$key).toEqual(["todo"]);
-    expect(q.getList().queryKey as unknown).toEqual(["todo", "getList"]);
+    expect(q.getList().queryKey as unknown).toEqual(["todo", "/"]);
   });
 });
 
@@ -119,8 +119,8 @@ describe("createQueries — mutations", () => {
       create,
       $router: TodoMutationRouter,
     } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>);
-    expect(q.create.mutationKey).toEqual(["todos", "create"]);
-    expect(q.create().mutationKey).toEqual(["todos", "create"]);
+    expect(q.create.mutationKey).toEqual(["todos", "/"]);
+    expect(q.create().mutationKey).toEqual(["todos", "/"]);
   });
 
   it("mutationFn delegates to the api client with vars", async () => {
@@ -194,11 +194,11 @@ describe("createQueries — nested routers", () => {
 
     expect(q.$key).toEqual(["users"]);
     expect(q.todos.$key).toEqual(["users", "todos"]);
-    expect(q.getList().queryKey as unknown).toEqual(["users", "getList"]);
+    expect(q.getList().queryKey as unknown).toEqual(["users", "/"]);
     expect(q.todos.getList().queryKey as unknown).toEqual([
       "users",
       "todos",
-      "getList",
+      "/",
     ]);
   });
 
@@ -212,7 +212,7 @@ describe("createQueries — nested routers", () => {
     expect(q.todos.getList.infinite.queryKey() as unknown).toEqual([
       "users",
       "todos",
-      "getList",
+      "/",
       "infinite",
     ]);
   });
@@ -283,10 +283,10 @@ describe("createQueries — infinite accessor", () => {
     expect(
       q.getList.infinite({ query: { userId: 1 } }, infiniteOpts())
         .queryKey as unknown,
-    ).toEqual(["todos", "getList", "infinite", { query: { userId: 1 } }]);
+    ).toEqual(["todos", "/", "infinite", { query: { userId: 1 } }]);
     expect(q.getList.infinite.queryKey() as unknown).toEqual([
       "todos",
-      "getList",
+      "/",
       "infinite",
     ]);
   });
@@ -343,7 +343,7 @@ describe("createQueries — infinite via config (+ per-call override)", () => {
     const opts = q.getList.infinite({ query: { userId: 1 } });
     expect(opts.queryKey as unknown).toEqual([
       "todos",
-      "getList",
+      "/",
       "infinite",
       { query: { userId: 1 } },
     ]);
@@ -411,7 +411,7 @@ describe("createQueries — per-endpoint defaults (C4)", () => {
     );
     const opts = q.create();
     expect((opts as { gcTime?: number }).gcTime).toBe(1234);
-    expect(opts.mutationKey).toEqual(["todos", "create"]);
+    expect(opts.mutationKey).toEqual(["todos", "/"]);
     expect(typeof opts.mutationFn).toBe("function");
   });
 
@@ -484,7 +484,7 @@ describe("createQueries — dynamic defaults (function form)", () => {
     // dynamic default routes invalidates into meta.invalidates, using q.$key
     expect((q.create() as any).meta?.invalidates).toEqual([["todos"]]);
     // q passed to the default is the fully-built object (same key helpers)
-    expect(capturedQ.create.mutationKey).toEqual(["todos", "create"]);
+    expect(capturedQ.create.mutationKey).toEqual(["todos", "/"]);
     expect(capturedQ.$key).toEqual(["todos"]);
   });
 
@@ -595,7 +595,7 @@ describe("createQueries — flatten", () => {
     const q = createQueries(api, { flatten: true });
     expect(q.getDetail({ id: 5 } as never).queryKey as unknown).toEqual([
       "todos",
-      "getDetail",
+      "/:id",
       { path: { id: 5 } },
     ]);
   });
@@ -618,7 +618,7 @@ describe("createQueries — flatten", () => {
     const opts = q.getDetail({ path: { id: 9 } });
     expect(opts.queryKey as unknown).toEqual([
       "todos",
-      "getDetail",
+      "/:id",
       { path: { id: 9 } },
     ]);
     const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
@@ -701,7 +701,7 @@ describe("createQueries — POST-as-query override (SE-9)", () => {
     const opts = q.query({ body: { term: "abc" } });
     expect(opts.queryKey as unknown).toEqual([
       "search",
-      "query",
+      "/",
       { body: { term: "abc" } },
     ]);
     expect(typeof opts.queryFn).toBe("function");
@@ -736,7 +736,7 @@ describe("createQueries — POST-as-query override (SE-9)", () => {
     // `create` was not promoted → still a mutation accessor.
     expect((q.create as { mutationKey: unknown }).mutationKey).toEqual([
       "search",
-      "create",
+      "/",
     ]);
   });
 });
@@ -783,7 +783,7 @@ describe("createQueries — POST-as-query override, nested routers (SE-9 regress
     // Top-level promoted endpoint is a query accessor.
     expect(q.search({ body: { term: "a" } }).queryKey as unknown).toEqual([
       "api",
-      "search",
+      "/search",
       { body: { term: "a" } },
     ]);
     expect(typeof q.search.infinite).toBe("function");
@@ -792,7 +792,7 @@ describe("createQueries — POST-as-query override, nested routers (SE-9 regress
     expect(q.sub.search({ body: { term: "b" } }).queryKey as unknown).toEqual([
       "api",
       "sub",
-      "search",
+      "/search",
       { body: { term: "b" } },
     ]);
     expect(typeof q.sub.search.infinite).toBe("function");

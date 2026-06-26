@@ -19,34 +19,32 @@ function isEmptyParams(params: unknown): boolean {
 }
 
 /**
- * Builds a query key of shape `[...root, endpointName, params]`.
+ * Builds a query key of shape `[...root, path, params]`.
  * When `params` is empty (`undefined`, `null`, or `{}`), the trailing element is
  * omitted so that the generated `queryOptions` key and the standalone
  * `.queryKey()` key are always identical regardless of `()` vs `({})` call style.
  */
 export function buildQueryKey(
   root: readonly string[],
-  endpointName: string,
+  path: string,
   params: unknown,
 ): unknown[] {
-  return isEmptyParams(params)
-    ? [...root, endpointName]
-    : [...root, endpointName, params];
+  return isEmptyParams(params) ? [...root, path] : [...root, path, params];
 }
 
 /**
- * Builds an infinite query key of shape `[...root, endpointName, "infinite", params]`.
+ * Builds an infinite query key of shape `[...root, path, "infinite", params]`.
  * The `"infinite"` segment keeps it distinct from the standard query key while
- * staying a prefix-child of `[...root, endpointName]`, so invalidating the
+ * staying a prefix-child of `[...root, path]`, so invalidating the
  * standard key (or the domain `$key`) also covers the infinite variant. Empty
  * params are normalized exactly like {@link buildQueryKey}.
  */
 export function buildInfiniteKey(
   root: readonly string[],
-  endpointName: string,
+  path: string,
   params: unknown,
 ): unknown[] {
   return isEmptyParams(params)
-    ? [...root, endpointName, "infinite"]
-    : [...root, endpointName, "infinite", params];
+    ? [...root, path, "infinite"]
+    : [...root, path, "infinite", params];
 }
