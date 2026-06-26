@@ -1,5 +1,12 @@
 # @routar/react-query
 
+## 1.8.1
+
+### Patch Changes
+
+- f36a48d: Refactor `queryKey` and `mutationKey` generation to use the endpoint's `path` instead of its `name`. This is a breaking change for users relying on the previous key structure for manual invalidation.
+  - @routar/core@1.8.1
+
 ## 1.8.0
 
 ### Patch Changes
