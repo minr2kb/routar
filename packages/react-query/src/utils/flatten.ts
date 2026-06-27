@@ -34,11 +34,29 @@ interface ShapeCarrier {
   shape: Record<string, unknown>;
 }
 
+/**
+ * Duck-typed interface for wrapper schemas that expose their inner schema via
+ * `.unwrap()` — covers `ZodOptional`, `ZodNullable`, and any schema following
+ * the same convention. We call `.unwrap()` so that a bucket declared as
+ * `z.object({…}).optional()` still yields its inner shape instead of returning
+ * `null` (because `ZodOptional` itself has no `.shape`).
+ */
+interface Unwrappable {
+  unwrap(): unknown;
+}
+
 function getShape(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null) return null;
   const shape = (value as Partial<ShapeCarrier>).shape;
-  if (typeof shape !== "object" || shape === null) return null;
-  return shape as Record<string, unknown>;
+  if (typeof shape === "object" && shape !== null) {
+    return shape as Record<string, unknown>;
+  }
+  // Wrapped schema (ZodOptional, ZodNullable, …) — unwrap and retry.
+  const unwrap = (value as Partial<Unwrappable>).unwrap;
+  if (typeof unwrap === "function") {
+    return getShape(unwrap.call(value));
+  }
+  return null;
 }
 
 /**

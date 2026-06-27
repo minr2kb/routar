@@ -152,6 +152,22 @@ describe("type-level", () => {
     flat.getDetail.queryKey({ path: { id: 1 } });
   });
 
+  it("flatten: true includes query-only params (optional query bucket bug)", () => {
+    const flat = createQueries(api, { flatten: true });
+
+    // getList has request: { query: z.object({ userId, _page? }).optional() }
+    // With the bug, Flatten<{ query?: T }> = {} — userId is not required.
+    // With the fix, Flatten<{ query?: T }> = { userId: number; _page?: number }.
+    flat.getList({ userId: 1 });
+    flat.getList({ userId: 1, _page: 2 });
+
+    // @ts-expect-error userId is required in the query schema
+    flat.getList({ _page: 1 });
+
+    // @ts-expect-error envelope form should be rejected under flatten
+    flat.getList({ query: { userId: 1 } });
+  });
+
   it("collision endpoint keeps the envelope param shape even under flatten", () => {
     const CollisionRouter = defineRouter("/items", {
       replace: endpoint({

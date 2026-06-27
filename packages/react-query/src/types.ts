@@ -32,25 +32,45 @@ export type DeepPartial<T> = T extends (infer U)[]
 type Envelope = { path?: object; query?: object; body?: unknown };
 
 /**
+ * Extracts a bucket's value type from `R`, stripping `undefined`. Returns
+ * `never` when the bucket key is absent. This handles both required
+ * (`{ query: T }`) and optional (`{ query?: T }`) bucket shapes from
+ * {@link BucketKey} without relying on `R extends { query: infer Q }`, which
+ * only matches *required* properties and silently returns `{}` for optional
+ * ones.
+ */
+type GetBucket<R, K extends string> = NonNullable<K extends keyof R ? R[K] : never>;
+
+/**
+ * Maps a bucket value to its object form for spreading into the flat shape:
+ * - `never` (absent bucket) → `{}`
+ * - non-object scalar (e.g. array, string) → `{}` (can't be spread)
+ * - object type → the object itself
+ */
+type BucketFlat<T> = [T] extends [never] ? {} : T extends object ? T : {};
+
+/**
  * Flattens the three request buckets into a single object type. A non-object
  * `body` (e.g. `z.array`/`z.string`) contributes `{}` here and is separately
  * blocked from flattening by {@link BodyFlattenable}. The intersections with
  * `{}` are intentional — an absent bucket should contribute nothing to the
  * merged shape.
+ *
+ * Uses {@link GetBucket} instead of `R extends { query: infer Q }` so that
+ * optional bucket properties (`{ query?: T }` produced by `.optional()` Zod
+ * schemas) are correctly included — the `infer` pattern only matches required
+ * properties and would silently drop optional query/path fields.
  */
-export type Flatten<R extends Envelope> = (R extends { path: infer P }
-  ? P
-  : {}) &
-  (R extends { query: infer Q } ? Q : {}) &
-  (R extends { body: infer B } ? (B extends object ? B : {}) : {});
+export type Flatten<R extends Envelope> =
+  BucketFlat<GetBucket<R, "path">> &
+  BucketFlat<GetBucket<R, "query">> &
+  BucketFlat<GetBucket<R, "body">>;
 
 type KeysOf<T> = T extends object ? keyof T : never;
-type PathK<R> = R extends { path: infer P } ? KeysOf<P> : never;
-type QueryK<R> = R extends { query: infer Q } ? KeysOf<Q> : never;
-type BodyK<R> = R extends { body: infer B }
-  ? B extends object
-    ? KeysOf<B>
-    : never
+type PathK<R> = KeysOf<GetBucket<R, "path">>;
+type QueryK<R> = KeysOf<GetBucket<R, "query">>;
+type BodyK<R> = GetBucket<R, "body"> extends object
+  ? KeysOf<GetBucket<R, "body">>
   : never;
 
 /**
@@ -74,13 +94,13 @@ export type HasOverlap<R extends Envelope> = [PathK<R> & QueryK<R>] extends [
  * False when `body` is present but not a plain object (e.g. `z.array`/`z.string`)
  * — such a body can't be spread into the flat shape, so the envelope is kept.
  */
-export type BodyFlattenable<R extends Envelope> = R extends { body: infer B }
-  ? B extends object
-    ? B extends readonly unknown[]
+export type BodyFlattenable<R extends Envelope> = [GetBucket<R, "body">] extends [never]
+  ? true
+  : GetBucket<R, "body"> extends object
+    ? GetBucket<R, "body"> extends readonly unknown[]
       ? false
       : true
-    : false
-  : true;
+    : false;
 
 /**
  * The accessor params type under `flatten: true`: the flattened shape when the
