@@ -1,6 +1,6 @@
 {
   "name": "@routar/msw",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "MSW v2 handler factory for routar routers — generate typed mock handlers from RouterDef",
   "keywords": [
     "api",
