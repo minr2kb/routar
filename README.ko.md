@@ -287,6 +287,41 @@ createApi(executor, todoRouter, {
 
 ---
 
+### `createParser(spec)`
+
+`createApi`의 서버-사이드 짝입니다. 클라이언트가 쓰는 것과 **같은** `endpoint()` 스펙에서 validate-or-throw 요청/응답 파서를 뽑아내므로, 서버에서 계약과 어긋나는 두 번째 Zod 스키마를 손으로 짤 필요가 없습니다.
+
+```ts
+import { createParser } from '@routar/core';
+
+const createParserFor = createParser(todoRouter.endpoints.create);
+```
+
+`parseResponse(raw)`(항상)와 `parseRequest({ path?, query?, body? })`(스펙에 `request`가 있을 때만)를 반환합니다. 둘 다 잘못된 입력에는 **원본 에러**(`ZodError` / `StandardSchemaError`)를 그대로 throw합니다. `parseResponse`는 순수 `response` 스키마로 검증하며 `adapter`는 실행하지 **않습니다**(그건 클라이언트-사이드).
+
+**HTTP 관심사가 전혀 없습니다** — 상태코드도, 에러 포맷팅도 없습니다. 프레임워크의 요청 객체에서 `{ path, query, body }` envelope를 직접 조립하고 잘못된 요청이 무엇이 될지 정하므로, 같은 파서가 Next.js Route Handler, Hono, Express 등 어디서든 동작합니다:
+
+```ts
+// Next.js Route Handler
+export async function POST(req: NextRequest) {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: await req.json() });
+    return Response.json(createTodo(body), { status: 201 });
+  } catch (err) {
+    if (err instanceof ZodError) return Response.json({ error: err.flatten() }, { status: 400 });
+    throw err;
+  }
+}
+
+// path 파라미터는 스펙의 request.path 스키마가 coerce — 수동 Number(id) 불필요
+const updateParser = createParser(todoRouter.endpoints.update);
+const { path, body } = await updateParser.parseRequest({ path: { id }, body: await req.json() });
+```
+
+스펙에 `request`가 없으면(순수 GET) `parseRequest`가 없습니다 — 접근하면 컴파일 에러입니다.
+
+---
+
 ### `createExecutor(transport, options?)`
 
 `@routar/axios`와 `@routar/ky` 내부에서 사용하는 저수준 팩토리입니다. 임의의 HTTP 클라이언트를 연결할 때 사용하세요.

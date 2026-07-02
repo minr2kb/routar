@@ -43,5 +43,5 @@ export type {
 export { serializeParams } from "./utils/params.js";
 // utilities (exported for executor implementors)
 export { joinPaths, resolvePath } from "./utils/path.js";
-export { runValidator } from "./utils/run-validator.js";
+export { createParser, runValidator } from "./utils/run-validator.js";
 export { StandardSchemaError, ValidationError } from "./utils/validate.js";

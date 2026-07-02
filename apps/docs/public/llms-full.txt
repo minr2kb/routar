@@ -247,6 +247,60 @@ type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title
 
 ---
 
+## createParser(spec) — @routar/core
+
+The server-side counterpart to `createApi`. `createApi` validates on the **client**; `createParser` gives the **server** the same guarantees from the *same* endpoint spec, so you never hand-write a second Zod schema that silently drifts from the contract.
+
+```ts
+function createParser<TSpec extends EndpointSpec>(spec: TSpec): Parser<TSpec>
+```
+
+Pass a spec created by `endpoint()` (e.g. `router.endpoints.create`). It returns an object whose shape depends on the spec:
+
+- `parseResponse(raw: unknown)` — **always present.** Validates `raw` against `spec.response`. Returns `Promise<ValidatorOutput<response>>`. Does **not** run the endpoint's `adapter` (that is client-side post-processing), so its output is the raw schema output, not `ApiTypes<…>['response']`.
+- `parseRequest(raw: { path?, query?, body? })` — **present only when the spec has a `request`.** Validates the request envelope you assemble from your framework's request object. Returns `Promise<R>` (the composed request output). When the spec has no `request`, this method is absent and accessing it is a compile error.
+
+Both delegate to the same `runValidator` the client uses: valid input resolves to the parsed value; invalid input **throws the original error** (a Zod `ZodError`, or a `StandardSchemaError` for Standard Schema validators) unchanged.
+
+> The conditional `parseRequest` relies on `endpoint()`'s return type, where `request` is required. If you hand-annotate a spec as `EndpointSpec`, `request` becomes optional (`| undefined`) and `parseRequest` silently drops from the type (it still runs) — the same `endpoint()`-return-type contract `createApi` already depends on.
+
+**No HTTP concerns.** `createParser` does no status-code mapping and no error formatting — turning a thrown `ZodError` into a `400`/`422` is the calling app's job, which is exactly what makes it framework-agnostic.
+
+```ts
+import { createParser } from '@routar/core';
+import { TodoRouter } from '@/remote/services/todo';
+
+const listParser = createParser(TodoRouter.endpoints.getList);
+const createParserFor = createParser(TodoRouter.endpoints.create);
+
+// Next.js Route Handler — assemble the { path, query, body } envelope yourself
+export async function POST(req: NextRequest) {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: await req.json() });
+    return Response.json(createTodo(body), { status: 201 });
+  } catch (err) {
+    if (err instanceof ZodError) return Response.json({ error: err.flatten() }, { status: 400 });
+    throw err;
+  }
+}
+
+// path params: the spec's request.path schema coerces the raw string id — no manual Number(id)
+const updateParser = createParser(TodoRouter.endpoints.update);
+const { path, body } = await updateParser.parseRequest({ path: { id }, body: await req.json() });
+
+// same parser, different glue — Hono / Express work identically
+app.post('/todos', async (c) => {
+  const { body } = await createParserFor.parseRequest({ body: await c.req.json() });
+  return c.json(createTodo(body), 201);
+});
+
+// validate the response too — confirm the server produced contract-shaped data (adapter NOT applied)
+const detailParser = createParser(TodoRouter.endpoints.getDetail);
+return ok(await detailParser.parseResponse(rowFromDb));
+```
+
+---
+
 ## createExecutor(transportFn, options?)
 
 Low-level factory used internally by all executor packages. Use to integrate any HTTP client. `options.plugins` is an array of `ExecutorPlugin` applied in declaration order (first is outermost). `options.unwrap` is `(raw: unknown) => unknown` — transforms the raw response before schema validation, useful for unwrapping envelope shapes like `{ data: T }`. It runs as the innermost `onResponse` hook (after the transport returns, before any plugin `onResponse` and before `createApi` validation), and is inherited by `createFetchExecutor`, `@routar/axios`, and `@routar/ky`.

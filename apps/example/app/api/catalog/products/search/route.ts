@@ -1,19 +1,19 @@
+import { createParser } from "@routar/core";
 import type { NextRequest } from "next/server";
-import { z } from "zod";
-import { ok, parseBody } from "../../../_lib/http";
+import { CatalogRouter } from "@/remote/services/catalog";
+import { badRequestFrom, ok } from "../../../_lib/http";
 import { searchProducts } from "../../_store";
 
 // POST-as-query: the search criteria live in the request body. A static segment
-// (`/search`) takes precedence over the sibling `[id]` dynamic route.
-const SearchBody = z.object({
-  q: z.string(),
-  _page: z.number().optional(),
-  _limit: z.number().optional(),
-});
+// (`/search`) takes precedence over the sibling `[id]` dynamic route. The parser
+// comes from the shared router spec, so the body contract can't drift.
+const searchParser = createParser(CatalogRouter.endpoints.products.endpoints.search);
 
 export async function POST(req: NextRequest) {
-  const parsed = await parseBody(req, SearchBody);
-  if (!parsed.ok) return parsed.res;
-  const { q, _page, _limit } = parsed.data;
-  return ok(searchProducts(q, _page, _limit));
+  try {
+    const { body } = await searchParser.parseRequest({ body: await req.json() });
+    return ok(searchProducts(body.q, body._page, body._limit));
+  } catch (err) {
+    return badRequestFrom(err);
+  }
 }

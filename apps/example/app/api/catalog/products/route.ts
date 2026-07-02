@@ -1,23 +1,33 @@
+import { createParser } from "@routar/core";
 import type { NextRequest } from "next/server";
-import { z } from "zod";
-import { created, ok, parseBody, parseQuery } from "../../_lib/http";
+import { CatalogRouter } from "@/remote/services/catalog";
+import { badRequestFrom, created, ok } from "../../_lib/http";
 import { createProduct, listProducts } from "../_store";
 
-const ListQuery = z.object({ categoryId: z.coerce.number().optional() });
-const CreateBody = z.object({
-  name: z.string(),
-  price: z.number(),
-  categoryId: z.number(),
-});
+// Parsers derived from the shared router spec — the same schema the client
+// enforces now validates the server too. No hand-rewritten request schemas, so
+// contract and implementation can't drift apart.
+const listParser = createParser(CatalogRouter.endpoints.products.endpoints.getList);
+const createParserFor = createParser(CatalogRouter.endpoints.products.endpoints.create);
 
-export function GET(req: NextRequest) {
-  const parsed = parseQuery(req.nextUrl.searchParams, ListQuery);
-  if (!parsed.ok) return parsed.res;
-  return ok(listProducts(parsed.data.categoryId));
+export async function GET(req: NextRequest) {
+  try {
+    const { query } = await listParser.parseRequest({
+      query: Object.fromEntries(req.nextUrl.searchParams.entries()),
+    });
+    return ok(listProducts(query?.categoryId));
+  } catch (err) {
+    return badRequestFrom(err);
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const parsed = await parseBody(req, CreateBody);
-  if (!parsed.ok) return parsed.res;
-  return created(createProduct(parsed.data));
+  try {
+    const { body } = await createParserFor.parseRequest({
+      body: await req.json(),
+    });
+    return created(createProduct(body));
+  } catch (err) {
+    return badRequestFrom(err);
+  }
 }

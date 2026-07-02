@@ -1,29 +1,33 @@
+import { createParser } from "@routar/core";
 import type { NextRequest } from "next/server";
-import { z } from "zod";
-import { TodoRawSchema } from "@/remote/services/todo";
-import { created, ok, parseBody, parseQuery } from "../_lib/http";
+import { TodoRouter } from "@/remote/services/todo";
+import { badRequestFrom, created, ok } from "../_lib/http";
 import { createTodo, getAllTodos } from "./_store";
 
-const ListQuerySchema = z.object({
-  userId: z.coerce.number().optional(),
-  completed: z
-    .enum(["true", "false"])
-    .transform((v) => v === "true")
-    .optional(),
-  _limit: z.coerce.number().optional(),
-  _page: z.coerce.number().optional(),
-});
+// Parsers derived from the shared router spec — the same schema the client
+// enforces now validates the server too. No hand-rewritten request schemas, so
+// contract and implementation can't drift apart.
+const listParser = createParser(TodoRouter.endpoints.getList);
+const createParserFor = createParser(TodoRouter.endpoints.create);
 
-const CreateBodySchema = TodoRawSchema.omit({ id: true });
-
-export function GET(req: NextRequest) {
-  const parsed = parseQuery(req.nextUrl.searchParams, ListQuerySchema);
-  if (!parsed.ok) return parsed.res;
-  return ok(getAllTodos(parsed.data));
+export async function GET(req: NextRequest) {
+  try {
+    const { query } = await listParser.parseRequest({
+      query: Object.fromEntries(req.nextUrl.searchParams.entries()),
+    });
+    return ok(getAllTodos(query));
+  } catch (err) {
+    return badRequestFrom(err);
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const parsed = await parseBody(req, CreateBodySchema);
-  if (!parsed.ok) return parsed.res;
-  return created(createTodo(parsed.data));
+  try {
+    const { body } = await createParserFor.parseRequest({
+      body: await req.json(),
+    });
+    return created(createTodo(body));
+  } catch (err) {
+    return badRequestFrom(err);
+  }
 }

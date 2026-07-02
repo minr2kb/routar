@@ -1,0 +1,121 @@
+---
+title: createParser()
+description: 엔드포인트 스펙에서 프레임워크 무관한 validate-or-throw 요청/응답 파서를 만듭니다 — createApi의 서버-사이드 짝.
+---
+
+# `createParser(spec)`
+
+`createApi`는 **클라이언트**에서 검증합니다. `createParser`는 *같은* 엔드포인트 스펙으로
+**서버**에 동일한 보장을 줍니다: 서버에서 Zod 스키마를 손으로 다시 짜는(계약과 조용히
+어긋나는) 대신, 라우터에서 파서를 직접 뽑아 씁니다.
+
+```ts
+import { createParser } from '@routar/core'
+import { TodoRouter } from '@/remote/services/todo'
+
+const createParserFor = createParser(TodoRouter.endpoints.create)
+
+// 서버 프레임워크 글루 — { path, query, body } envelope를 직접 조립
+const { body } = await createParserFor.parseRequest({ body: await req.json() })
+//      ^? { title: string; completed: boolean; userId: number }  (검증됨)
+```
+
+## 시그니처
+
+```ts
+function createParser<TSpec extends EndpointSpec>(spec: TSpec): Parser<TSpec>
+```
+
+| 파라미터 | 타입 | 설명 |
+|-------|------|-------------|
+| `spec` | `EndpointSpec` | [`endpoint()`](/ko/api-reference/endpoint)로 만든 엔드포인트 스펙 — 예: `router.endpoints.create`. |
+
+**[`endpoint()`](/ko/api-reference/endpoint)로 만든 스펙을 넘기세요.** 아래 조건부
+`parseRequest`는 `endpoint()`의 반환 타입(`request`가 required 필드)에 의존합니다. 스펙을
+`EndpointSpec`으로 직접 annotate하면 `request`가 optional(`| undefined`)이 되어 (런타임에는
+동작하지만) 타입에서 `parseRequest`가 조용히 사라집니다 — 이는
+[`createApi`](/ko/api-reference/create-api)가 이미 의존하는 것과 동일한
+`endpoint()` 반환-타입 계약입니다.
+
+## 반환값
+
+`createParser`는 스펙에 따라 shape이 달라지는 객체를 반환합니다:
+
+| 메서드 | 존재 조건 | 설명 |
+|--------|--------------|-------------|
+| `parseResponse(raw: unknown)` | 항상 | `raw`를 `spec.response`로 검증. `Promise<ValidatorOutput<response>>` 반환. |
+| `parseRequest(raw: { path?, query?, body? })` | 스펙에 `request`가 있을 때만 | 요청 envelope 검증. 합성된 요청 출력 `R`에 대해 `Promise<R>` 반환. |
+
+둘 다 클라이언트가 쓰는 것과 동일한 `runValidator`에 위임합니다: 유효한 입력은 파싱된 값으로
+resolve되고, 잘못된 입력은 **원본 에러**(Zod `ZodError`, Standard Schema 검증기의 경우
+`StandardSchemaError`)를 그대로 throw합니다.
+
+### `parseRequest`는 스펙에 따라 좁혀집니다
+
+엔드포인트에 `request`가 **없으면**(파라미터 없는 순수 `GET`), 반환 객체에 `parseRequest`가
+**없습니다** — 접근하면 컴파일 에러입니다:
+
+```ts
+// 스펙에 `request`가 없는 순수 GET
+const ping = createParser(endpoint({ method: 'GET', path: '/', response: PingSchema }))
+ping.parseResponse(data)   // ✅
+ping.parseRequest({})      // ❌ 컴파일 에러 — 프로퍼티 없음
+```
+
+엔드포인트에 `request`가 **있으면** `parseRequest`가 존재하고 타입이 붙습니다. 프레임워크의
+요청 객체에서 `{ path, query, body }` envelope를 직접 조립합니다 — routar는 그것을 어떻게
+읽는지 관여하지 않습니다:
+
+```ts
+const update = createParser(TodoRouter.endpoints.update)
+const { path, body } = await update.parseRequest({
+  path: { id: params.id },      // string → 스펙의 path 스키마가 coerce
+  body: await req.json(),
+})
+```
+
+## HTTP 관심사 없음
+
+`createParser`는 상태코드 매핑도, 에러 포맷팅도 **하지 않습니다**. throw된 `ZodError`를
+`400`/`422`로 바꾸는 건 호출하는 앱의 몫이며 — 이것이 바로 프레임워크 무관성을 만듭니다.
+Next.js Route Handler, Hono, Express 등 어디서든 동작합니다:
+
+```ts
+// Next.js Route Handler
+try {
+  const { body } = await createParserFor.parseRequest({ body: await req.json() })
+  return Response.json(createTodo(body), { status: 201 })
+} catch (err) {
+  if (err instanceof ZodError) return Response.json({ error: err.flatten() }, { status: 400 })
+  throw err
+}
+```
+
+```ts
+// Hono / Express — 같은 파서, 다른 글루
+app.post('/todos', async (c) => {
+  const { body } = await createParserFor.parseRequest({ body: await c.req.json() })
+  return c.json(createTodo(body), 201)
+})
+```
+
+## `parseResponse`는 adapter를 실행하지 않습니다
+
+`parseResponse`는 **순수 `response` 스키마**로 검증하며 엔드포인트의
+[`adapter`](/ko/api-reference/endpoint#adapter)를 **적용하지 않습니다**. 출력은 adapter
+출력(`ApiTypes<…>['response']`)이 아니라 `ValidatorOutput<response>`입니다. `adapter`는
+클라이언트 후처리이고 — 서버의 역할은 계약에 맞는 데이터를 만들었는지 확인하는 것뿐입니다:
+
+```ts
+const { getDetail } = TodoRouter.endpoints
+const parser = createParser(getDetail)
+
+// 원본 response 스키마로 검증 — adapter(label 등)는 적용 안 됨
+const todo = await parser.parseResponse(rowFromDb)
+```
+
+## 함께 보기
+
+- [`endpoint()`](/ko/api-reference/endpoint) — 넘길 스펙을 정의
+- [`createApi()`](/ko/api-reference/create-api) — 클라이언트-사이드 짝
+- [서버-사이드 검증](/ko/guides/server-side-validation) — 전체 Route Handler 워크스루

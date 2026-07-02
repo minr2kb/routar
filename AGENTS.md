@@ -191,6 +191,36 @@ createApi(executor, todoRouter, {
 });
 ```
 
+### Server-side validation with `createParser`
+
+`createApi` validates on the client. `createParser(spec)` gives the **server** the same guarantees from the *same* endpoint spec — no second hand-written Zod schema that drifts from the contract. It returns `parseResponse(raw)` (always) and `parseRequest({ path?, query?, body? })` (only when the spec has a `request`). Both throw the **original error** (`ZodError` / `StandardSchemaError`) on invalid input; `parseResponse` validates the pure `response` schema and does **not** run the `adapter`.
+
+It has **no HTTP concerns** (no status codes, no error formatting) — that mapping is the app's job, which is what makes it framework-agnostic:
+
+```ts
+import { createParser } from '@routar/core';
+import { todoRouter } from './todo';
+
+const createParserFor = createParser(todoRouter.endpoints.create);
+
+// Next.js Route Handler — you assemble the envelope and decide the status code
+export async function POST(req: Request) {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: await req.json() });
+    return Response.json(createTodo(body), { status: 201 });
+  } catch (err) {
+    if (err instanceof ZodError) return Response.json({ error: err.flatten() }, { status: 400 });
+    throw err;
+  }
+}
+
+// path params are coerced by the spec's request.path schema — no manual Number(id)
+const updateParser = createParser(todoRouter.endpoints.update);
+const { path, body } = await updateParser.parseRequest({ path: { id }, body: await req.json() });
+```
+
+The identical parser works outside Next.js (Hono, Express, …) — only the glue that reads the request and writes the response changes. When the spec has no `request` (a plain GET), `parseRequest` is absent and accessing it is a compile error.
+
 ## Testing with MSW
 
 ```ts

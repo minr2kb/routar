@@ -1,0 +1,188 @@
+---
+title: Server-side Validation
+description: Reuse the endpoint contract on the server with createParser — one schema validates both the client request and the server handler, so they can't drift apart.
+---
+
+# Server-side Validation
+
+routar makes the **client** enforce the endpoint contract. But the endpoint is
+only half the story: your **server** still has to validate the incoming request.
+The common trap is to hand-write a second Zod schema in the Route Handler:
+
+```ts
+// ❌ the drift trap — a second schema, maintained by hand
+const CreateBodySchema = z.object({
+  title: z.string().min(1),
+  completed: z.boolean().default(false),
+  userId: z.number().default(1),
+})
+```
+
+The moment the endpoint's `request.body` changes, this copy is stale — the
+client sends the new shape and the server rejects (or silently accepts) it. The
+contract and its server implementation have drifted.
+
+`createParser` closes the gap: it derives the request/response parsers straight
+from the **same** endpoint spec the client uses, so there is exactly one schema.
+
+## `createParser`
+
+`createParser(spec)` takes an endpoint spec (created by
+[`endpoint()`](/en/api-reference/endpoint)) and returns:
+
+- `parseRequest({ path?, query?, body? })` — present when the spec has a
+  `request`. Validates the request envelope, returns the parsed value, **throws
+  the original error** on invalid input.
+- `parseResponse(raw)` — always present. Validates against the `response`
+  schema. (It does **not** run the `adapter` — that's client-side.)
+
+It has **no HTTP concerns**: no status codes, no error formatting. That is what
+makes it framework-agnostic. You assemble the `{ path, query, body }` envelope
+from your framework's request object, and you decide what an invalid request
+becomes.
+
+## Next.js Route Handler example
+
+The demo app defines the todo contract once in `remote/services/todo.ts`:
+
+```ts
+export const TodoRouter = defineRouter('/todos', {
+  getList: endpoint({
+    method: 'GET',
+    path: '/',
+    request: { query: z.object({ userId: z.coerce.number().optional() /* … */ }).optional() },
+    response: z.array(TodoRawSchema),
+    adapter: (raw) => raw.map(toTodoItem),
+  }),
+  create: endpoint({
+    method: 'POST',
+    path: '/',
+    request: { body: z.object({ title: z.string().min(1), completed: z.boolean().default(false), userId: z.number().default(1) }) },
+    response: TodoRawSchema,
+    adapter: toTodoItem,
+  }),
+  // getDetail / update / remove …
+})
+```
+
+The Route Handler pulls its parsers from that router — no second schema:
+
+```ts
+// app/api/todos/route.ts
+import { createParser } from '@routar/core'
+import { TodoRouter } from '@/remote/services/todo'
+import { badRequestFrom, created, ok } from '../_lib/http'
+import { createTodo, getAllTodos } from './_store'
+
+const listParser = createParser(TodoRouter.endpoints.getList)
+const createParserFor = createParser(TodoRouter.endpoints.create)
+
+export async function GET(req: NextRequest) {
+  try {
+    const { query } = await listParser.parseRequest({
+      query: Object.fromEntries(req.nextUrl.searchParams.entries()),
+    })
+    return ok(getAllTodos(query))
+  } catch (err) {
+    return badRequestFrom(err)
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: await req.json() })
+    return created(createTodo(body))
+  } catch (err) {
+    return badRequestFrom(err)
+  }
+}
+```
+
+Path params work the same way — the spec's `request.path` schema coerces the raw
+string `id`, so there is no manual `Number(id)`:
+
+```ts
+// app/api/todos/[id]/route.ts
+const updateParser = createParser(TodoRouter.endpoints.update)
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  try {
+    const { path, body } = await updateParser.parseRequest({
+      path: { id },              // string → coerced to number by the spec
+      body: await req.json(),
+    })
+    const todo = updateTodo(path.id, body)
+    return todo ? ok(todo) : notFound()
+  } catch (err) {
+    return badRequestFrom(err)
+  }
+}
+```
+
+## Status codes are the app's job
+
+`parseRequest` throws the original `ZodError`; **you** decide it becomes a `400`.
+That mapping lives in a tiny app-owned helper, not in routar:
+
+```ts
+// app/api/_lib/http.ts
+import { z } from 'zod'
+
+export function badRequestFrom(err: unknown): NextResponse {
+  if (err instanceof z.ZodError)
+    return NextResponse.json({ error: err.flatten() }, { status: 400 })
+  throw err // not a validation error → a real bug, don't swallow it
+}
+```
+
+Keeping the status mapping out of the parser is deliberate: routar never assumes
+a transport, so the same parser serves any framework.
+
+## Framework-agnostic
+
+Because there are no HTTP concerns baked in, the identical parser works outside
+Next.js. Only the glue that reads the request and writes the response changes:
+
+```ts
+// Hono
+import { Hono } from 'hono'
+const app = new Hono()
+
+app.post('/todos', async (c) => {
+  const { body } = await createParserFor.parseRequest({ body: await c.req.json() })
+  return c.json(createTodo(body), 201)
+})
+```
+
+```ts
+// Express
+app.post('/todos', async (req, res) => {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: req.body })
+    res.status(201).json(createTodo(body))
+  } catch (err) {
+    if (err instanceof ZodError) return res.status(400).json({ error: err.flatten() })
+    throw err
+  }
+})
+```
+
+## Validating the response too
+
+`parseResponse` lets the server confirm it produced data that matches the
+contract before sending it — the same schema the client will parse. Remember it
+returns `ValidatorOutput<response>` (the raw schema output), **not** the
+`adapter` output, since the adapter is client-side post-processing.
+
+```ts
+const detailParser = createParser(TodoRouter.endpoints.getDetail)
+const row = await db.todos.find(id)
+return ok(await detailParser.parseResponse(row)) // throws if the row breaks the contract
+```
+
+## See also
+
+- [`createParser()`](/en/api-reference/create-parser) — full API reference
+- [`endpoint()`](/en/api-reference/endpoint) — defines the shared contract
+- [Error Handling](/en/guides/error-handling) — how routar normalizes client-side errors

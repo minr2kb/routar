@@ -1,0 +1,125 @@
+---
+title: createParser()
+description: Build framework-agnostic, validate-or-throw request/response parsers from an endpoint spec — the server-side counterpart to createApi.
+---
+
+# `createParser(spec)`
+
+`createApi` validates on the **client**. `createParser` gives the **server** the
+same guarantees from the *same* endpoint spec: instead of hand-writing a second
+Zod schema on the server (which silently drifts from the contract), you derive
+the parsers directly from the router.
+
+```ts
+import { createParser } from '@routar/core'
+import { TodoRouter } from '@/remote/services/todo'
+
+const createParserFor = createParser(TodoRouter.endpoints.create)
+
+// server framework glue — assemble the { path, query, body } envelope yourself
+const { body } = await createParserFor.parseRequest({ body: await req.json() })
+//      ^? { title: string; completed: boolean; userId: number }  (validated)
+```
+
+## Signature
+
+```ts
+function createParser<TSpec extends EndpointSpec>(spec: TSpec): Parser<TSpec>
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `spec` | `EndpointSpec` | An endpoint spec created by [`endpoint()`](/en/api-reference/endpoint) — e.g. `router.endpoints.create`. |
+
+**Pass a spec created by [`endpoint()`](/en/api-reference/endpoint).** The
+conditional `parseRequest` (below) relies on `endpoint()`'s return type, where
+`request` is a required field. If you hand-annotate a spec as
+`EndpointSpec`, `request` becomes optional (`| undefined`) and `parseRequest`
+silently drops out of the type (though it still runs) — the same
+`endpoint()`-return-type contract [`createApi`](/en/api-reference/create-api)
+already depends on.
+
+## Return value
+
+`createParser` returns an object whose shape depends on the spec:
+
+| Method | When present | Description |
+|--------|--------------|-------------|
+| `parseResponse(raw: unknown)` | Always | Validates `raw` against `spec.response`. Returns `Promise<ValidatorOutput<response>>`. |
+| `parseRequest(raw: { path?, query?, body? })` | Only when the spec has a `request` | Validates the request envelope. Returns `Promise<R>` where `R` is the composed request output. |
+
+Both delegate to the same `runValidator` the client uses: valid input resolves
+to the parsed value; invalid input **throws the original error** (a Zod
+`ZodError`, or a `StandardSchemaError` for Standard Schema validators) unchanged.
+
+### `parseRequest` narrows by the spec
+
+When the endpoint has **no** `request` (a plain `GET` with no params), the
+returned object has **no** `parseRequest` — accessing it is a compile error:
+
+```ts
+// a plain GET with no `request` in its spec
+const ping = createParser(endpoint({ method: 'GET', path: '/', response: PingSchema }))
+ping.parseResponse(data)   // ✅
+ping.parseRequest({})      // ❌ compile error — property does not exist
+```
+
+When the endpoint **has** a `request`, `parseRequest` is present and typed. You
+assemble the `{ path, query, body }` envelope from your framework's request
+object — routar has no opinion about how you read it:
+
+```ts
+const update = createParser(TodoRouter.endpoints.update)
+const { path, body } = await update.parseRequest({
+  path: { id: params.id },      // string → coerced by the spec's path schema
+  body: await req.json(),
+})
+```
+
+## No HTTP concerns
+
+`createParser` does **no** status-code mapping and **no** error formatting.
+Turning a thrown `ZodError` into a `400`/`422` is the calling app's job — which
+is exactly what makes it framework-agnostic. It works under Next.js Route
+Handlers, Hono, Express, or anything else:
+
+```ts
+// Next.js Route Handler
+try {
+  const { body } = await createParserFor.parseRequest({ body: await req.json() })
+  return Response.json(createTodo(body), { status: 201 })
+} catch (err) {
+  if (err instanceof ZodError) return Response.json({ error: err.flatten() }, { status: 400 })
+  throw err
+}
+```
+
+```ts
+// Hono / Express — same parser, different glue
+app.post('/todos', async (c) => {
+  const { body } = await createParserFor.parseRequest({ body: await c.req.json() })
+  return c.json(createTodo(body), 201)
+})
+```
+
+## `parseResponse` does not run the adapter
+
+`parseResponse` validates against the **pure `response` schema** and does **not**
+apply the endpoint's [`adapter`](/en/api-reference/endpoint#adapter). Its output
+is `ValidatorOutput<response>`, not the adapter output
+(`ApiTypes<…>['response']`). The `adapter` is client-side post-processing — the
+server's job is only to confirm it produced data that matches the contract:
+
+```ts
+const { getDetail } = TodoRouter.endpoints
+const parser = createParser(getDetail)
+
+// validated against the raw response schema — adapter (label, etc.) NOT applied
+const todo = await parser.parseResponse(rowFromDb)
+```
+
+## See also
+
+- [`endpoint()`](/en/api-reference/endpoint) — defines the spec you pass in
+- [`createApi()`](/en/api-reference/create-api) — the client-side counterpart
+- [Server-side Validation](/en/guides/server-side-validation) — the full Route Handler walkthrough

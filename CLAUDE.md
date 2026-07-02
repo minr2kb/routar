@@ -83,7 +83,7 @@ endpoint() → defineRouter() → createApi(executor, router) → typed API clie
 | `utils/path.ts` | `joinPaths`, `resolvePath` (`:param` substitution) |
 | `utils/params.ts` | `serializeParams` → `URLSearchParams` |
 | `utils/validate.ts` | `ValidationError`, `StandardSchemaError` |
-| `utils/run-validator.ts` | `runValidator(validator, data)` — validate-or-throw for `.parse` **or** `~standard` (shared by createApi + `@routar/msw`) |
+| `utils/run-validator.ts` | `runValidator(validator, data)` — validate-or-throw for `.parse` **or** `~standard` (shared by createApi + `@routar/msw`); `createParser(spec)` — server-side `{ parseRequest?, parseResponse }` factory from an `endpoint()` spec (conditional `parseRequest` on `request` presence, `parseResponse` skips the adapter), HTTP-agnostic (status mapping is the caller's job) |
 | `utils/compose-request.ts` | `composeRequest(buckets)` — composes the `{ path?, query?, body? }` request buckets into an envelope `request` validator (carries Zod-like `.shape` for flatten) |
 
 ### `apps/example` structure
@@ -122,7 +122,7 @@ components/
 - Infinite queries (GET-only): declare the pagination contract once in `createQueries({ infinite: { <ep>: { initialPageParam, getNextPageParam, pageParam } } })` — nested routers supported (the map mirrors the router shape); call `<domain>Query.<ep>.infinite(params?)` at the call site (base params only); the routar-specific `pageParam` builder `(page) => partialRequest` maps the page param to a partial request (deep-merged into base params, replaces `queryFn`); key gets an `"infinite"` segment: `[...root, endpointName, "infinite", params?]` (prefix-child of the standard key — standard-key invalidation also covers it)
 - Invalidation: pure by default; opt-in `invalidates: [<domain>Query.<endpoint>.queryKey()]` (prefer narrow scope) or `[<domain>Query.$key]` (whole domain — costly, use sparingly) requires `routarMutationCache` wired in `QueryClient`; without wiring, `invalidates` does nothing
 
-**Shared contract pattern (todo):** `TodoRawSchema` exported from `services/todo.ts` is imported by Route Handlers — same Zod schema validates both the server response and the client parse.
+**Shared contract pattern (todo):** the todo Route Handlers derive their request validation straight from the shared router via `createParser(TodoRouter.endpoints.<ep>)` (`app/api/todos/route.ts`, `app/api/todos/[id]/route.ts`) — no hand-written per-handler request schemas, so contract and server can't drift. `parseRequest` throws the original `ZodError`; the app-owned `badRequestFrom` helper in `app/api/_lib/http.ts` maps it to a 400 (status mapping stays the app's job — `createParser` is HTTP-agnostic). `TodoRawSchema` is still exported from `services/todo.ts` and imported by `_store.ts` as the underlying row type. (Catalog routes still use the manual `parseBody`/`parseQuery` helpers — those are the pre-`createParser` pattern, kept for contrast.)
 
 ### PathParams enforcement
 

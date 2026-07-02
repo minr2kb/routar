@@ -5,5 +5,6 @@ export default {
   "react-query": "TanStack Query",
   "custom-executor": "Custom Executor",
   "error-handling": "Error Handling",
+  "server-side-validation": "Server-side Validation",
   "mocking": "Mocking with MSW",
 };

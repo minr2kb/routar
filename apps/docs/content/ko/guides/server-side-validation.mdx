@@ -1,0 +1,186 @@
+---
+title: 서버-사이드 검증
+description: createParser로 엔드포인트 계약을 서버에서 재사용 — 하나의 스키마가 클라이언트 요청과 서버 핸들러를 모두 검증하므로 둘이 어긋나지 않습니다.
+---
+
+# 서버-사이드 검증
+
+routar는 **클라이언트**가 엔드포인트 계약을 강제하게 합니다. 하지만 엔드포인트는 절반에
+불과합니다: **서버**도 들어오는 요청을 검증해야 합니다. 흔한 함정은 Route Handler에서
+Zod 스키마를 손으로 하나 더 짜는 것입니다:
+
+```ts
+// ❌ 드리프트 함정 — 손으로 유지하는 두 번째 스키마
+const CreateBodySchema = z.object({
+  title: z.string().min(1),
+  completed: z.boolean().default(false),
+  userId: z.number().default(1),
+})
+```
+
+엔드포인트의 `request.body`가 바뀌는 순간 이 복사본은 낡습니다 — 클라이언트는 새 shape을
+보내는데 서버는 거부하거나(혹은 조용히 받아들이거나) 합니다. 계약과 그 서버 구현이
+어긋난 것입니다.
+
+`createParser`가 이 틈을 메웁니다: 클라이언트가 쓰는 것과 **같은** 엔드포인트 스펙에서
+요청/응답 파서를 바로 뽑아내므로 스키마는 정확히 하나뿐입니다.
+
+## `createParser`
+
+`createParser(spec)`는 ([`endpoint()`](/ko/api-reference/endpoint)로 만든) 엔드포인트 스펙을
+받아 다음을 반환합니다:
+
+- `parseRequest({ path?, query?, body? })` — 스펙에 `request`가 있을 때 존재. 요청 envelope를
+  검증하고 파싱된 값을 반환하며, 잘못된 입력에는 **원본 에러를 그대로 throw**합니다.
+- `parseResponse(raw)` — 항상 존재. `response` 스키마로 검증합니다. (`adapter`는 실행하지
+  **않습니다** — 그건 클라이언트-사이드입니다.)
+
+**HTTP 관심사가 전혀 없습니다**: 상태코드도, 에러 포맷팅도 없습니다. 이것이 프레임워크
+무관성을 만듭니다. 프레임워크의 요청 객체에서 `{ path, query, body }` envelope를 직접
+조립하고, 잘못된 요청이 무엇이 될지는 여러분이 정합니다.
+
+## Next.js Route Handler 예제
+
+데모 앱은 todo 계약을 `remote/services/todo.ts`에 한 번 정의합니다:
+
+```ts
+export const TodoRouter = defineRouter('/todos', {
+  getList: endpoint({
+    method: 'GET',
+    path: '/',
+    request: { query: z.object({ userId: z.coerce.number().optional() /* … */ }).optional() },
+    response: z.array(TodoRawSchema),
+    adapter: (raw) => raw.map(toTodoItem),
+  }),
+  create: endpoint({
+    method: 'POST',
+    path: '/',
+    request: { body: z.object({ title: z.string().min(1), completed: z.boolean().default(false), userId: z.number().default(1) }) },
+    response: TodoRawSchema,
+    adapter: toTodoItem,
+  }),
+  // getDetail / update / remove …
+})
+```
+
+Route Handler는 그 라우터에서 파서를 꺼내옵니다 — 두 번째 스키마 없이:
+
+```ts
+// app/api/todos/route.ts
+import { createParser } from '@routar/core'
+import { TodoRouter } from '@/remote/services/todo'
+import { badRequestFrom, created, ok } from '../_lib/http'
+import { createTodo, getAllTodos } from './_store'
+
+const listParser = createParser(TodoRouter.endpoints.getList)
+const createParserFor = createParser(TodoRouter.endpoints.create)
+
+export async function GET(req: NextRequest) {
+  try {
+    const { query } = await listParser.parseRequest({
+      query: Object.fromEntries(req.nextUrl.searchParams.entries()),
+    })
+    return ok(getAllTodos(query))
+  } catch (err) {
+    return badRequestFrom(err)
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: await req.json() })
+    return created(createTodo(body))
+  } catch (err) {
+    return badRequestFrom(err)
+  }
+}
+```
+
+Path 파라미터도 동일합니다 — 스펙의 `request.path` 스키마가 원본 문자열 `id`를 coerce하므로
+수동 `Number(id)`가 필요 없습니다:
+
+```ts
+// app/api/todos/[id]/route.ts
+const updateParser = createParser(TodoRouter.endpoints.update)
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  try {
+    const { path, body } = await updateParser.parseRequest({
+      path: { id },              // string → 스펙이 number로 coerce
+      body: await req.json(),
+    })
+    const todo = updateTodo(path.id, body)
+    return todo ? ok(todo) : notFound()
+  } catch (err) {
+    return badRequestFrom(err)
+  }
+}
+```
+
+## 상태코드는 앱의 몫
+
+`parseRequest`는 원본 `ZodError`를 throw하고, 그것이 `400`이 되도록 정하는 건 **여러분**입니다.
+그 매핑은 routar가 아니라 앱이 소유한 작은 헬퍼에 있습니다:
+
+```ts
+// app/api/_lib/http.ts
+import { z } from 'zod'
+
+export function badRequestFrom(err: unknown): NextResponse {
+  if (err instanceof z.ZodError)
+    return NextResponse.json({ error: err.flatten() }, { status: 400 })
+  throw err // 검증 에러가 아니면 → 진짜 버그, 삼키지 말 것
+}
+```
+
+상태 매핑을 파서 밖에 두는 건 의도적입니다: routar는 전송(transport)을 가정하지 않으므로
+같은 파서가 어떤 프레임워크에도 쓰입니다.
+
+## 프레임워크 무관
+
+HTTP 관심사가 내장되어 있지 않으므로 동일한 파서가 Next.js 밖에서도 동작합니다. 요청을 읽고
+응답을 쓰는 글루만 달라집니다:
+
+```ts
+// Hono
+import { Hono } from 'hono'
+const app = new Hono()
+
+app.post('/todos', async (c) => {
+  const { body } = await createParserFor.parseRequest({ body: await c.req.json() })
+  return c.json(createTodo(body), 201)
+})
+```
+
+```ts
+// Express
+app.post('/todos', async (req, res) => {
+  try {
+    const { body } = await createParserFor.parseRequest({ body: req.body })
+    res.status(201).json(createTodo(body))
+  } catch (err) {
+    if (err instanceof ZodError) return res.status(400).json({ error: err.flatten() })
+    throw err
+  }
+})
+```
+
+## 응답도 검증하기
+
+`parseResponse`로 서버는 보내기 전에 계약에 맞는 데이터를 만들었는지 확인할 수 있습니다 —
+클라이언트가 파싱할 것과 같은 스키마로요. adapter는 클라이언트 후처리이므로,
+`parseResponse`는 adapter 출력이 아니라 `ValidatorOutput<response>`(원본 스키마 출력)를
+반환한다는 점을 기억하세요.
+
+```ts
+const detailParser = createParser(TodoRouter.endpoints.getDetail)
+const row = await db.todos.find(id)
+return ok(await detailParser.parseResponse(row)) // row가 계약을 어기면 throw
+```
+
+## 함께 보기
+
+- [`createParser()`](/ko/api-reference/create-parser) — 전체 API 레퍼런스
+- [`endpoint()`](/ko/api-reference/endpoint) — 공유 계약 정의
+- [에러 처리](/ko/guides/error-handling) — routar가 클라이언트-사이드 에러를 정규화하는 방법
