@@ -219,7 +219,7 @@ useMutation(
 
 ---
 
-## `routarMutationCache(getClient)`
+## `routarMutationCache(getClient, overrides?)`
 
 `mutation.meta`에 저장된 `invalidates`를 처리하는 `MutationCache` 팩토리입니다. `QueryClient` 생성 시 한 번만 배선하세요.
 
@@ -238,12 +238,19 @@ queryClient = new QueryClient({
 | 파라미터 | 타입 | 설명 |
 |---------|------|------|
 | `getClient` | `() => QueryClient` | `QueryClient` 인스턴스 getter (생성 시점의 순환 참조 방지) |
+| `overrides` | `Omit<MutationCacheConfig, 'onSuccess'>` (선택) | `onError`, `onSettled`, `onMutate` 등 다른 `MutationCache` 콜백을 그대로 전달합니다. `onSuccess`는 라이브러리가 관리하므로 타입에서 제외됩니다 — `invalidates` 로직을 손으로 재구현하지 않고도 전역 에러 토스트 같은 걸 붙일 수 있습니다. |
 
 ### 동작
 
 모든 뮤테이션 성공 후, `routarMutationCache`는 `mutation.meta.invalidates`를 읽고 각 항목에 대해 `queryClient.invalidateQueries`를 호출합니다. `meta`에 `invalidates`가 없는 뮤테이션은 영향을 받지 않습니다.
 
 `invalidates`와 기본 `onSuccess` 콜백을 함께 사용할 수 있으며 둘 다 실행됩니다.
+
+```ts
+routarMutationCache(() => queryClient, {
+  onError: (error) => notifyMutationNetworkError(error),
+})
+```
 
 ---
 

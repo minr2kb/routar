@@ -1,8 +1,8 @@
-import type {
-  QueryClientConfig,
-  QueryKey,
-} from "@tanstack/react-query";
+import type { QueryClientConfig, QueryKey } from "@tanstack/react-query";
 import { MutationCache, QueryClient } from "@tanstack/react-query";
+
+// MutationCache's constructor config type isn't exported by @tanstack/react-query, so derive it.
+type MutationCacheConfig = NonNullable<ConstructorParameters<typeof MutationCache>[0]>;
 
 let cacheWired = false;
 
@@ -30,12 +30,25 @@ export function isRoutarMutationCacheWired(): boolean {
  *   mutationCache: routarMutationCache(() => queryClient),
  * });
  * ```
+ *
+ * `overrides` forwards any other {@link MutationCache} callback (e.g.
+ * `onError` for a global network-error toast) without having to reimplement
+ * the invalidate logic yourself. `onSuccess` stays library-owned and is
+ * omitted from the type:
+ *
+ * ```ts
+ * routarMutationCache(() => queryClient, {
+ *   onError: (error) => notifyMutationNetworkError(error),
+ * });
+ * ```
  */
 export function routarMutationCache(
   getQueryClient: () => QueryClient,
+  overrides?: Omit<MutationCacheConfig, "onSuccess">,
 ): MutationCache {
   cacheWired = true;
   return new MutationCache({
+    ...overrides,
     onSuccess: (_data, _vars, _onMutateResult, mutation) => {
       const invalidates = mutation.meta?.invalidates as QueryKey[] | undefined;
       if (!invalidates?.length) return;

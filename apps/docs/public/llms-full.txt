@@ -698,7 +698,7 @@ The field written by `pageParam` must exist in the endpoint's request schema —
 
 Key: `todoQuery.getList.infinite.queryKey(params?)` → `["todos", "getList", "infinite", params?]`. This is a prefix-child of the standard key `["todos", "getList"]`, so invalidating the standard key or the domain `$key` also covers the infinite variant. For no-param endpoints, call `.infinite()` without arguments.
 
-**Invalidation — pure by default.** Mutations invalidate nothing unless you declare target keys with `invalidates` and wire `routarMutationCache(getClient)` once at `QueryClient` creation. Without wiring, `invalidates` does nothing; in development a one-time `console.warn` is logged.
+**Invalidation — pure by default.** Mutations invalidate nothing unless you declare target keys with `invalidates` and wire `routarMutationCache(getClient, overrides?)` once at `QueryClient` creation. Without wiring, `invalidates` does nothing; in development a one-time `console.warn` is logged.
 
 Prefer **narrow** invalidation — use `todoQuery.getList.queryKey()` (the specific key affected) rather than `todoQuery.$key` (whole domain). Reserve `$key` only when a mutation truly invalidates every query in the domain; it refetches all active lists and details, which can be costly.
 
@@ -715,6 +715,14 @@ queryClient = new QueryClient({
 useMutation(todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] }));
 // whole-domain only when truly needed
 useMutation(todoQuery.create({ invalidates: [todoQuery.$key] }));
+```
+
+Pass a second `overrides` argument (`Omit<MutationCacheConfig, 'onSuccess'>`) to forward any other `MutationCache` callback — `onError`, `onSettled`, `onMutate`, …. `onSuccess` stays library-owned (it runs the `invalidates` logic), so you can add e.g. a global error toast without reimplementing invalidation:
+
+```ts
+routarMutationCache(() => queryClient, {
+  onError: (error) => notifyMutationNetworkError(error),
+});
 ```
 
 Without the wiring, `invalidates` is ignored — use a native `onSuccess` instead.

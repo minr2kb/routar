@@ -350,6 +350,8 @@ queryClient = new QueryClient({
 });
 ```
 
+`routarMutationCache(getClient, overrides?)` accepts an optional second arg (`Omit<MutationCacheConfig, 'onSuccess'>`) to forward other `MutationCache` callbacks — e.g. a global `onError` toast — without reimplementing the `invalidates` logic. `onSuccess` stays library-owned and cannot be overridden.
+
 Prefer **narrow invalidation** — use `todoQuery.getList.queryKey()` (specific key) rather than `todoQuery.$key` (whole domain). Reserve `$key` only when a mutation truly invalidates every query in the domain; it refetches all active lists and details.
 
 Without this wiring, `invalidates` is ignored — handle invalidation in a native `onSuccess` instead.

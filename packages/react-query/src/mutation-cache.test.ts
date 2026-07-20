@@ -50,6 +50,41 @@ describe("routarMutationCache", () => {
 
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it("forwards overrides.onError while invalidate still runs on success", () => {
+    const qc = new QueryClient();
+    const invalidateSpy = mock(() => {});
+    qc.invalidateQueries = invalidateSpy as unknown as typeof qc.invalidateQueries;
+    const onErrorSpy = mock(() => {});
+
+    const cache = routarMutationCache(() => qc, { onError: onErrorSpy });
+
+    const fakeMutation = { meta: { invalidates: [["todos"]] } };
+    cache.config.onSuccess?.(
+      undefined,
+      undefined,
+      undefined,
+      fakeMutation as never,
+      undefined as never,
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["todos"] });
+
+    const error = new Error("network down");
+    cache.config.onError?.(
+      error,
+      undefined,
+      undefined,
+      undefined as never,
+      undefined as never,
+    );
+    expect(onErrorSpy).toHaveBeenCalledWith(
+      error,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
 });
 
 describe("routarQueryClient (SE-8)", () => {

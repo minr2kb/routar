@@ -219,7 +219,7 @@ Prefer narrow invalidation — target the specific key(s) affected (e.g. `todoQu
 
 ---
 
-## `routarMutationCache(getClient)`
+## `routarMutationCache(getClient, overrides?)`
 
 A `MutationCache` factory that processes `invalidates` stored in `mutation.meta`. Wire it once when creating your `QueryClient`.
 
@@ -238,12 +238,19 @@ queryClient = new QueryClient({
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `getClient` | `() => QueryClient` | A getter for the `QueryClient` instance (avoids circular reference at construction time) |
+| `overrides` | `Omit<MutationCacheConfig, 'onSuccess'>` (optional) | Any other `MutationCache` callback (`onError`, `onSettled`, `onMutate`, …), forwarded as-is. `onSuccess` stays library-owned and is omitted from the type — implement a global error toast, for example, without reimplementing the `invalidates` logic yourself. |
 
 ### Behaviour
 
 After every successful mutation, `routarMutationCache` reads `mutation.meta.invalidates` and calls `queryClient.invalidateQueries` for each entry. Mutations without `invalidates` in their `meta` are unaffected.
 
 You can still combine `invalidates` with a native `onSuccess` callback — both run.
+
+```ts
+routarMutationCache(() => queryClient, {
+  onError: (error) => notifyMutationNetworkError(error),
+})
+```
 
 ---
 
