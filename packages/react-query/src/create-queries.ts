@@ -275,7 +275,17 @@ function makeQueryAccessor(
 
   const infinite = (params?: unknown, override?: Record<string, unknown>) => {
     // Contract = per-endpoint config (createQueries) overlaid with per-call opts.
-    const merged = { ...infiniteConfig, ...override };
+    // headers merge shallowly here too (override wins on key collision), same as
+    // the general defaults/call-site merge below.
+    const {
+      callOpts: configCallOpts,
+      restDefault: restConfig,
+      rest: restOverride,
+    } = mergeCallOptions(
+      infiniteConfig as (RoutarCallOptions & Record<string, unknown>) | undefined,
+      override as (RoutarCallOptions & Record<string, unknown>) | undefined,
+    );
+    const merged = { ...restConfig, ...restOverride };
     const { pageParam, initialPageParam, getNextPageParam, ...rest } =
       merged as {
         pageParam?: (p: unknown) => Record<string, unknown>;
@@ -300,12 +310,13 @@ function makeQueryAccessor(
     // both the key and the fetch (the pageParam builder still targets envelope).
     const envelope = normalize(params, buckets);
     // Same priority as the plain query accessor: defaults < infiniteConfig/override
-    // (headers merge shallowly — the infiniteConfig/override side wins on collision).
+    // (headers merge shallowly at each level — the higher-priority side wins on collision).
     const { callOpts, restDefault, rest: restOptions } = mergeCallOptions(
       resolveDefault(endpointDefault, params, qRef) as
         | (RoutarCallOptions & Record<string, unknown>)
         | undefined,
-      rest as (RoutarCallOptions & Record<string, unknown>) | undefined,
+      { ...rest, ...configCallOpts } as RoutarCallOptions &
+        Record<string, unknown>,
     );
     return infiniteQueryOptions({
       queryKey: buildInfiniteKey(root, path, envelope),

@@ -507,6 +507,32 @@ describe("createQueries — per-call headers/timeout", () => {
       },
     );
   });
+
+  it("infinite: call-site override headers win over infinite-config headers (shallow merge)", async () => {
+    const { api, getList } = makeApi([{ id: 1 }]);
+    const q = createQueries(api, {
+      infinite: {
+        getList: {
+          ...infiniteOpts(),
+          headers: { "X-Tenant-Id": "config", "X-Trace": "c" },
+        },
+      },
+    });
+    const opts = q.getList.infinite(
+      { query: { userId: 1 } },
+      { headers: { "X-Tenant-Id": "override" } },
+    );
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ pageParam: 2, signal: undefined });
+    expect(getList).toHaveBeenCalledWith(
+      { query: { userId: 1, _page: 2 } },
+      {
+        headers: { "X-Tenant-Id": "override", "X-Trace": "c" },
+        timeout: undefined,
+        signal: undefined,
+      },
+    );
+  });
 });
 
 describe("createQueries — per-endpoint defaults (C4)", () => {
@@ -766,6 +792,35 @@ describe("createQueries — flatten", () => {
     const envelope = { body: [{ title: "x" }] };
     await mutationFn(envelope);
     expect(bulk).toHaveBeenCalledWith(envelope);
+  });
+
+  it("flatten: true → infinite({ id }) accepts flat params and resolves envelope at queryFn", async () => {
+    const { api, getDetail } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const opts = q.getDetail.infinite(
+      { id: 5 },
+      {
+        initialPageParam: 1,
+        getNextPageParam: () => undefined,
+        pageParam: (page) => ({ path: { id: page } }),
+      },
+    );
+
+    // Verify queryKey is built from the envelope
+    expect(opts.queryKey as unknown).toEqual([
+      "todos",
+      "/:id",
+      "infinite",
+      { path: { id: 5 } },
+    ]);
+
+    // Verify queryFn is called with the envelope merged with pageParam
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ pageParam: 3, signal: undefined });
+    expect(getDetail).toHaveBeenCalledWith(
+      { path: { id: 3 } },
+      undefined,
+    );
   });
 });
 

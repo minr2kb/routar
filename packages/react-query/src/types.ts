@@ -365,20 +365,31 @@ export type InfiniteConfigMap<TEndpoints extends RouterEndpoints, TQO = {}> = {
  * must be supplied at the call site (otherwise it throws at runtime). Page param
  * is typed as `number` — for cursor pagination, cast at the call site.
  */
-export interface InfiniteAccessor<TParams, TPage> {
-  (
-    params?: TParams,
-    options?: Partial<InfiniteAccessorOptions<TPage, TParams, number>>,
-  ): InfiniteAccessorResult<TPage, number>;
+export type InfiniteAccessor<
+  TParams,
+  TPage,
+  TFlatten extends boolean = false,
+> = (ParamsOptional<ApplyFlatten<TParams, TFlatten>> extends true
+  ? (
+      params?: ApplyFlatten<TParams, TFlatten>,
+      options?: Partial<InfiniteAccessorOptions<TPage, TParams, number>>,
+    ) => InfiniteAccessorResult<TPage, number>
+  : (
+      params: ApplyFlatten<TParams, TFlatten>,
+      options?: Partial<InfiniteAccessorOptions<TPage, TParams, number>>,
+    ) => InfiniteAccessorResult<TPage, number>) & {
   queryKey: (params?: TParams) => QueryKey;
-}
+};
 
 /**
  * A GET endpoint exposed as a query-options factory.
  *
- * `TFlatten` controls only the *call* params: when `true`, the accessor accepts
- * the flattened request shape ({@link Safe}). The `.queryKey()` helper and
- * `.infinite` always stay on the envelope params, so SSR/CSR keys match.
+ * `TFlatten` controls the *call* params for both the accessor and `.infinite`:
+ * when `true`, both accept the flattened request shape ({@link Safe}), matching
+ * the runtime (`.infinite` normalizes flat params through the same `buckets`
+ * logic as the plain accessor). The `.queryKey()` / `.infinite.queryKey()`
+ * helpers always stay on the envelope params, so SSR/CSR keys match regardless
+ * of call style.
  */
 export type QueryAccessor<TParams, TData, TFlatten extends boolean = false> =
   (ParamsOptional<ApplyFlatten<TParams, TFlatten>> extends true
@@ -392,7 +403,7 @@ export type QueryAccessor<TParams, TData, TFlatten extends boolean = false> =
       ) => QueryAccessorResult<TData>) & {
     queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
     /** Infinite-query variant. Declare the contract via `createQueries({ infinite })`. */
-    infinite: InfiniteAccessor<TParams, TData>;
+    infinite: InfiniteAccessor<TParams, TData, TFlatten>;
   };
 
 /** Mutation options plus the declarative `invalidates` sugar and routar call options. */
