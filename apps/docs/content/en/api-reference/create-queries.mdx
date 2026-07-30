@@ -61,7 +61,7 @@ todoQuery.getList({ done: true })         // instead of { query: { done: true } 
 ```
 
 - **Fallback to envelope:** an endpoint whose buckets collide on a key (e.g. `path.id` + `body.id`) or whose `body` is not a plain object (`z.array`, `z.string`, …) keeps the envelope shape. The types enforce this per endpoint.
-- **Keys are always envelope-based:** `.queryKey()`, `.mutationKey`, and `.infinite.queryKey()` are flatten-independent, so SSR and CSR keys match regardless of call style. `flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope.
+- **`.queryKey()` and `.infinite.queryKey()` follow `flatten` too** — same flat params as the accessor call. Whichever shape you call from (the accessor itself, or these key helpers directly), the key is always built from the normalized envelope underneath, so it's identical either way. `.mutationKey` is unaffected (a static array, not a function — mutations have no per-call param-based key). `flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope.
 
 ### POST-as-query (`queryEndpoints`)
 

@@ -657,7 +657,7 @@ todoQuery.update({ id, title });           // instead of { path: { id }, body: {
 todoQuery.getList({ done: true });         // instead of { query: { done: true } }
 ```
 
-`flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope. An endpoint whose buckets collide on a key (e.g. `path.id` + `body.id`) or whose `body` is not a plain object (`z.array`, `z.string`, …) keeps the envelope shape; the types enforce this per endpoint. Keys are always envelope-based (`.queryKey()`, `.mutationKey`, `.infinite.queryKey()` are flatten-independent), so SSR and CSR keys match regardless of which call style each side uses.
+`flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope. An endpoint whose buckets collide on a key (e.g. `path.id` + `body.id`) or whose `body` is not a plain object (`z.array`, `z.string`, …) keeps the envelope shape; the types enforce this per endpoint. `.queryKey()` and `.infinite.queryKey()` follow `flatten` too (same flat params as the accessor call) but always normalize to the envelope internally before building the key, so SSR and CSR keys match regardless of which call style each side uses. `.mutationKey` is unaffected (a static array, not a function).
 
 **Per-call `headers` / `timeout`:** query, mutation, and `.infinite` accessors all accept `headers`/`timeout` in their options object — the same shape as core's `EndpointCallOptions` — forwarded to the underlying endpoint call.
 

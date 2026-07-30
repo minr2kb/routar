@@ -269,9 +269,10 @@ function makeQueryAccessor(
       ...rest,
     });
   };
-  // queryKey helper stays on the envelope params (flatten-independent), so SSR
-  // and CSR keys match regardless of call style.
-  accessor.queryKey = (params?: unknown) => buildQueryKey(root, path, params);
+  // Normalizes through the same buckets as the accessor call, so the key matches
+  // regardless of whether it's read off a call or built via this helper directly.
+  accessor.queryKey = (params?: unknown) =>
+    buildQueryKey(root, path, normalize(params, buckets));
 
   const infinite = (params?: unknown, override?: Record<string, unknown>) => {
     // Contract = per-endpoint config (createQueries) overlaid with per-call opts.
@@ -340,7 +341,7 @@ function makeQueryAccessor(
     } as unknown as Parameters<typeof infiniteQueryOptions>[0]);
   };
   infinite.queryKey = (params?: unknown) =>
-    buildInfiniteKey(root, path, params);
+    buildInfiniteKey(root, path, normalize(params, buckets));
   accessor.infinite = infinite;
 
   return accessor;

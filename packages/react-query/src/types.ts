@@ -378,18 +378,18 @@ export type InfiniteAccessor<
       params: ApplyFlatten<TParams, TFlatten>,
       options?: Partial<InfiniteAccessorOptions<TPage, TParams, number>>,
     ) => InfiniteAccessorResult<TPage, number>) & {
-  queryKey: (params?: TParams) => QueryKey;
+  queryKey: (params?: ApplyFlatten<TParams, TFlatten>) => QueryKey;
 };
 
 /**
  * A GET endpoint exposed as a query-options factory.
  *
- * `TFlatten` controls the *call* params for both the accessor and `.infinite`:
- * when `true`, both accept the flattened request shape ({@link Safe}), matching
- * the runtime (`.infinite` normalizes flat params through the same `buckets`
- * logic as the plain accessor). The `.queryKey()` / `.infinite.queryKey()`
- * helpers always stay on the envelope params, so SSR/CSR keys match regardless
- * of call style.
+ * `TFlatten` controls the *params* shape everywhere on this accessor — the call
+ * itself, `.queryKey()`, `.infinite()`, and `.infinite.queryKey()` all switch to
+ * the flattened request shape ({@link Safe}) together, matching the runtime
+ * (every one of them normalizes through the same `buckets` logic). The
+ * resulting query key is always built from the normalized envelope, so it's
+ * identical regardless of which of these you called it from.
  */
 export type QueryAccessor<TParams, TData, TFlatten extends boolean = false> =
   (ParamsOptional<ApplyFlatten<TParams, TFlatten>> extends true
@@ -401,7 +401,9 @@ export type QueryAccessor<TParams, TData, TFlatten extends boolean = false> =
         params: ApplyFlatten<TParams, TFlatten>,
         options?: QueryAccessorOptions<TData>,
       ) => QueryAccessorResult<TData>) & {
-    queryKey: (params?: TParams) => DataTag<QueryKey, TData, DefaultError>;
+    queryKey: (
+      params?: ApplyFlatten<TParams, TFlatten>,
+    ) => DataTag<QueryKey, TData, DefaultError>;
     /** Infinite-query variant. Declare the contract via `createQueries({ infinite })`. */
     infinite: InfiniteAccessor<TParams, TData, TFlatten>;
   };

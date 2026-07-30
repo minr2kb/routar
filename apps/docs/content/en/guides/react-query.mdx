@@ -90,7 +90,7 @@ This is purely a **call-site convenience** — `flatten` lives on `createQueries
 
 - **Off by default** — opt in per `createQueries`.
 - **Endpoints that can't flatten fall back to the envelope automatically.** If two buckets collide on a key (e.g. both `path.id` and `body.id` exist) or the `body` is not a plain object (`z.array`, `z.string`, …), that accessor keeps the envelope shape — the types enforce this, so you can't accidentally write an ambiguous flat call.
-- **The query key is always built from the envelope.** `.queryKey()` / `.mutationKey` / `.infinite.queryKey()` are flatten-independent, so SSR and CSR keys match no matter which call style each side uses. You can prefetch on the server with flat params and read on the client with flat params and the keys still converge.
+- **The query key is always built from the normalized envelope.** `.queryKey()` / `.infinite.queryKey()` follow `flatten` too (same flat params as the accessor call), but internally they always normalize to the envelope before building the key — so SSR and CSR keys match no matter which call style each side uses. You can prefetch on the server with flat params and read on the client with flat params and the keys still converge. `.mutationKey` is unaffected (a static array, not a function).
 
 ## Error typing
 

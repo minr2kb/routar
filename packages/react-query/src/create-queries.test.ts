@@ -748,6 +748,33 @@ describe("createQueries — flatten", () => {
     ]);
   });
 
+  it("flatten: true → .queryKey() accepts flat params and matches the accessor's own key", () => {
+    const { api } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const expected = ["todos", "/:id", { path: { id: 5 } }];
+    expect(q.getDetail.queryKey({ id: 5 }) as unknown).toEqual(expected);
+    expect(q.getDetail({ id: 5 }).queryKey as unknown).toEqual(expected);
+  });
+
+  it("flatten: true → .infinite.queryKey() accepts flat params and matches .infinite()'s own key", () => {
+    const { api } = makeFlattenApi();
+    const q = createQueries(api, { flatten: true });
+    const expected = ["todos", "/:id", "infinite", { path: { id: 5 } }];
+    expect(q.getDetail.infinite.queryKey({ id: 5 }) as unknown).toEqual(
+      expected,
+    );
+    expect(
+      q.getDetail.infinite(
+        { id: 5 },
+        {
+          initialPageParam: 1,
+          getNextPageParam: () => undefined,
+          pageParam: (page) => ({ path: { id: page } }),
+        },
+      ).queryKey as unknown,
+    ).toEqual(expected);
+  });
+
   it("flatten multi-bucket: update({ id, title }) → { path: { id }, body: { title } }", async () => {
     const { api, update } = makeFlattenApi();
     const q = createQueries(api, { flatten: true });

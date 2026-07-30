@@ -148,7 +148,9 @@ describe("type-level", () => {
       onSuccess: () => {},
     });
 
-    // queryKey helper stays on the envelope (flatten-independent), so SSR keys match.
+    // queryKey helper now follows flatten too, matching the accessor call shape.
+    flat.getDetail.queryKey({ id: 1 });
+    // @ts-expect-error flat mode rejects the envelope form for queryKey too
     flat.getDetail.queryKey({ path: { id: 1 } });
   });
 

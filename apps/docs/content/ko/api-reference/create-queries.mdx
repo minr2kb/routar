@@ -61,7 +61,7 @@ todoQuery.getList({ done: true })         // { query: { done: true } } 대신
 ```
 
 - **envelope 폴백:** 버킷이 같은 키로 충돌하거나(예: `path.id` + `body.id`) `body`가 plain object가 아닌(`z.array`, `z.string` 등) 엔드포인트는 envelope 형태를 유지합니다. 타입이 엔드포인트별로 이를 강제합니다.
-- **키는 항상 envelope 기준:** `.queryKey()`, `.mutationKey`, `.infinite.queryKey()`는 flatten과 무관하므로, 호출 방식과 상관없이 SSR과 CSR 키가 일치합니다. `flatten`은 `createQueries`에만 있는 호출 편의 옵션 — routar 클라이언트와 HTTP 계약은 항상 envelope를 사용합니다.
+- **`.queryKey()`와 `.infinite.queryKey()`도 `flatten`을 따릅니다** — accessor 호출과 동일하게 flat 파라미터를 받습니다. accessor를 직접 호출하든 이 키 헬퍼를 따로 호출하든, 내부적으로는 항상 정규화된 envelope로부터 키를 만들기 때문에 어느 쪽으로 불러도 키가 동일합니다. `.mutationKey`는 영향 없음(함수가 아니라 정적 배열 — 뮤테이션엔 콜별 파라미터 기반 키가 없음). `flatten`은 `createQueries`에만 있는 호출 편의 옵션 — routar 클라이언트와 HTTP 계약은 항상 envelope를 사용합니다.
 
 ### POST-as-query (`queryEndpoints`)
 
