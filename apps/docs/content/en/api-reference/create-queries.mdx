@@ -189,6 +189,18 @@ todoQuery.update({ onSuccess: () => { /* ... */ } })
 todoQuery.create.mutationKey  // ["todos", "create"]
 ```
 
+### Per-call `headers` / `timeout`
+
+Query, mutation, and infinite-query accessors all accept `headers`/`timeout` in their options object, forwarded to the endpoint call (same shape as core's `EndpointCallOptions`):
+
+```ts
+useSuspenseQuery(todoQuery.getDetail({ id: '1' }, { headers: { 'X-Tenant-Id': tenantId } }))
+useMutation(todoQuery.create({ headers: { 'Idempotency-Key': key }, timeout: 30_000 }))
+useSuspenseInfiniteQuery(todoQuery.getList.infinite(params, { headers: { ... } }))
+```
+
+Also settable per-endpoint via `createQueries({ defaults })` / `createQueries({ infinite })` — call-site `headers`/`timeout` win, and `headers` merge shallowly (call-site key wins on collision, other default keys are kept).
+
 ### Domain key (`$key`)
 
 Every level of the accessor object exposes `$key` — the root segments for that domain or sub-domain:

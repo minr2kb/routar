@@ -281,6 +281,13 @@ useMutation(todoQuery.update({ invalidates: [todoQuery.getList.queryKey()] }));
 
 Signatures: query accessor `(params?, queryOptions?) => queryOptions`; mutation accessor `(options?) => mutationOptions`, where `options` also accepts `invalidates?: QueryKey[]`.
 
+**Per-call `headers` / `timeout`:** the options object of every accessor (query, mutation, and `.infinite`) also accepts `headers`/`timeout` (core's `EndpointCallOptions` shape), forwarded to the underlying endpoint call. Also settable per-endpoint via `defaults` / `infinite` config — call-site `headers`/`timeout` win, and `headers` merge shallowly over the default.
+
+```ts
+useSuspenseQuery(todoQuery.getDetail({ path: { id } }, { headers: { 'X-Tenant-Id': tenantId } }));
+useMutation(todoQuery.create({ headers: { 'Idempotency-Key': key }, timeout: 30_000 }));
+```
+
 Keys: `todoQuery.<endpoint>.queryKey(params?)`, `todoQuery.<endpoint>.mutationKey`, `todoQuery.$key` (domain root). Shape is `[root, endpointName, params?]`; the root is derived from the router prefix (override with `createQueries(api, { key })`).
 
 **Per-endpoint defaults:** pass `defaults` to set option defaults per endpoint name — merged before per-call options (per-call wins). Nested routers supported (the map mirrors the router shape). Mutation endpoints support all mutation options including `invalidates`. Each default value may be a **static object** or a **function** `(params, q) => options`, evaluated lazily per call — `q` is the fully-built queries object (use its key helpers for `invalidates`), `params` is the call params for a query accessor or `undefined` for a mutation accessor:

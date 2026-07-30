@@ -252,11 +252,24 @@ export type EndpointParams<TSpec> = TSpec extends {
   ? R
   : void;
 
-/** Query-only options (everything TanStack accepts except key/fn). */
+/**
+ * Per-call transport options forwarded to the underlying endpoint function —
+ * mirrors core's `EndpointCallOptions` (minus `signal`, which TanStack already
+ * manages for queries).
+ */
+export interface RoutarCallOptions {
+  /** Per-call headers, merged over any `defaults`/`infinite` config (call-site wins). */
+  headers?: Record<string, string>;
+  /** Per-call timeout (ms) — aborts with `TimeoutError` if exceeded. */
+  timeout?: number;
+}
+
+/** Query-only options (everything TanStack accepts except key/fn), plus routar call options. */
 export type QueryAccessorOptions<TData> = Omit<
   UseQueryOptions<TData, DefaultError, TData, QueryKey>,
   "queryKey" | "queryFn"
->;
+> &
+  RoutarCallOptions;
 
 /** The shape returned by a query accessor — matches TanStack's `queryOptions()`.
  * `queryFn` explicitly excludes `SkipToken` so the result is assignable to
@@ -295,12 +308,13 @@ export type InfiniteAccessorOptions<TPage, TParams, TPageParam> = Omit<
     TPageParam
   >,
   "queryKey" | "queryFn" | "initialPageParam" | "getNextPageParam"
-> & {
-  initialPageParam: TPageParam;
-  getNextPageParam: GetNextPageParamFunction<TPageParam, TPage>;
-  /** Maps a page param to the partial request merged into the base params. */
-  pageParam: (pageParam: TPageParam) => DeepPartial<TParams>;
-};
+> &
+  RoutarCallOptions & {
+    initialPageParam: TPageParam;
+    getNextPageParam: GetNextPageParamFunction<TPageParam, TPage>;
+    /** Maps a page param to the partial request merged into the base params. */
+    pageParam: (pageParam: TPageParam) => DeepPartial<TParams>;
+  };
 
 /** The shape returned by an infinite accessor — matches `infiniteQueryOptions()`. */
 export type InfiniteAccessorResult<TPage, TPageParam> = Omit<
@@ -381,11 +395,12 @@ export type QueryAccessor<TParams, TData, TFlatten extends boolean = false> =
     infinite: InfiniteAccessor<TParams, TData>;
   };
 
-/** Mutation options plus the declarative `invalidates` sugar. */
+/** Mutation options plus the declarative `invalidates` sugar and routar call options. */
 export type RoutarMutationOptions<TData, TVars> = Omit<
   UseMutationOptions<TData, DefaultError, TVars>,
   "mutationFn" | "mutationKey"
-> & { invalidates?: QueryKey[] };
+> &
+  RoutarCallOptions & { invalidates?: QueryKey[] };
 
 /**
  * A non-GET endpoint exposed as a mutation-options factory.

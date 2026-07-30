@@ -189,6 +189,18 @@ todoQuery.update({ onSuccess: () => { /* ... */ } })
 todoQuery.create.mutationKey  // ["todos", "create"]
 ```
 
+### 콜사이트 `headers` / `timeout`
+
+쿼리, 뮤테이션, 무한 쿼리 접근자 모두 옵션 객체에 `headers`/`timeout`을 넣을 수 있으며, 엔드포인트 호출로 그대로 전달됩니다(core의 `EndpointCallOptions`와 동일한 형태):
+
+```ts
+useSuspenseQuery(todoQuery.getDetail({ id: '1' }, { headers: { 'X-Tenant-Id': tenantId } }))
+useMutation(todoQuery.create({ headers: { 'Idempotency-Key': key }, timeout: 30_000 }))
+useSuspenseInfiniteQuery(todoQuery.getList.infinite(params, { headers: { ... } }))
+```
+
+`createQueries({ defaults })` / `createQueries({ infinite })`로 엔드포인트별 기본값도 설정 가능 — 콜사이트의 `headers`/`timeout`이 우선하며, `headers`는 얕은 병합(콜사이트 키가 충돌 시 승리, 나머지 기본 키는 유지)됩니다.
+
 ### 도메인 키 (`$key`)
 
 접근자 객체의 모든 레벨에서 `$key`를 제공합니다 — 해당 도메인 또는 하위 도메인의 루트 세그먼트입니다:

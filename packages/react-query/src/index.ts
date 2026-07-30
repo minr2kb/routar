@@ -13,5 +13,6 @@ export type {
   QueryAccessorOptions,
   QueryAccessorResult,
   QueryEndpointsMap,
+  RoutarCallOptions,
   RoutarMutationOptions,
 } from "./types.js";

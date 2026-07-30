@@ -1,5 +1,6 @@
 import {
   type ApiClientWithRouter,
+  type EndpointCallOptions,
   type EndpointSpec,
   isRouterDef,
   type RouterEndpoints,
@@ -10,6 +11,7 @@ import type {
   CreateQueriesOptions,
   Queries,
   QueryEndpointsMap,
+  RoutarCallOptions,
 } from "./types.js";
 import {
   type BucketMap,
@@ -130,7 +132,7 @@ function buildQueries(
     const spec = entry as EndpointSpec<any, any, any>;
     const fn = apiNode[name] as (
       params?: unknown,
-      signal?: AbortSignal,
+      signalOrOptions?: AbortSignal | EndpointCallOptions,
     ) => Promise<unknown>;
     const endpointDefault = defaults?.[name];
     // Capture flatten buckets once per endpoint; `null`/non-flattenable → identity.
@@ -204,8 +206,44 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** `undefined` when neither is set, so the bare-`signal` fast path is preserved. */
+function extractCallOpts(
+  headers: Record<string, string> | undefined,
+  timeout: number | undefined,
+): EndpointCallOptions | undefined {
+  return headers || timeout !== undefined ? { headers, timeout } : undefined;
+}
+
+/**
+ * Splits `headers`/`timeout` out of a default and a call-site options object,
+ * merging them (headers shallowly — call-site wins on key collision; timeout
+ * overrides). Returns the merged {@link EndpointCallOptions} plus each side's
+ * remaining (TanStack-facing) options, still to be spread in priority order.
+ */
+function mergeCallOptions(
+  defaults: (RoutarCallOptions & Record<string, unknown>) | undefined,
+  call: (RoutarCallOptions & Record<string, unknown>) | undefined,
+): {
+  callOpts: EndpointCallOptions | undefined;
+  restDefault: Record<string, unknown>;
+  rest: Record<string, unknown>;
+} {
+  const { headers: defaultHeaders, timeout: defaultTimeout, ...restDefault } =
+    defaults ?? {};
+  const { headers: callHeaders, timeout: callTimeout, ...rest } = call ?? {};
+  const headers =
+    defaultHeaders || callHeaders
+      ? { ...defaultHeaders, ...callHeaders }
+      : undefined;
+  const timeout = callTimeout ?? defaultTimeout;
+  return { callOpts: extractCallOpts(headers, timeout), restDefault, rest };
+}
+
 function makeQueryAccessor(
-  fn: (params?: unknown, signal?: AbortSignal) => Promise<unknown>,
+  fn: (
+    params?: unknown,
+    signalOrOptions?: AbortSignal | EndpointCallOptions,
+  ) => Promise<unknown>,
   root: string[],
   name: string,
   path: string,
@@ -217,11 +255,18 @@ function makeQueryAccessor(
   const accessor = (params?: unknown, options?: Record<string, unknown>) => {
     // In flatten mode `params` is flat; the envelope drives both fetch and key.
     const envelope = normalize(params, buckets);
+    const { callOpts, restDefault, rest } = mergeCallOptions(
+      resolveDefault(endpointDefault, params, qRef) as
+        | (RoutarCallOptions & Record<string, unknown>)
+        | undefined,
+      options as (RoutarCallOptions & Record<string, unknown>) | undefined,
+    );
     return queryOptions({
       queryKey: buildQueryKey(root, path, envelope),
-      queryFn: ({ signal }) => fn(envelope, signal),
-      ...resolveDefault(endpointDefault, params, qRef),
-      ...options,
+      queryFn: ({ signal }) =>
+        fn(envelope, callOpts ? { ...callOpts, signal } : signal),
+      ...restDefault,
+      ...rest,
     });
   };
   // queryKey helper stays on the envelope params (flatten-independent), so SSR
@@ -254,6 +299,14 @@ function makeQueryAccessor(
     // In flatten mode the base params are flat → normalize to the envelope for
     // both the key and the fetch (the pageParam builder still targets envelope).
     const envelope = normalize(params, buckets);
+    // Same priority as the plain query accessor: defaults < infiniteConfig/override
+    // (headers merge shallowly — the infiniteConfig/override side wins on collision).
+    const { callOpts, restDefault, rest: restOptions } = mergeCallOptions(
+      resolveDefault(endpointDefault, params, qRef) as
+        | (RoutarCallOptions & Record<string, unknown>)
+        | undefined,
+      rest as (RoutarCallOptions & Record<string, unknown>) | undefined,
+    );
     return infiniteQueryOptions({
       queryKey: buildInfiniteKey(root, path, envelope),
       queryFn: ({
@@ -264,12 +317,15 @@ function makeQueryAccessor(
         signal: AbortSignal;
       }) => {
         const base = isPlainObject(envelope) ? envelope : {};
-        return fn(deepMerge(base, pageParam(page)), signal);
+        return fn(
+          deepMerge(base, pageParam(page)),
+          callOpts ? { ...callOpts, signal } : signal,
+        );
       },
       initialPageParam,
       getNextPageParam,
-      ...resolveDefault(endpointDefault, params, qRef),
-      ...rest,
+      ...restDefault,
+      ...restOptions,
     } as unknown as Parameters<typeof infiniteQueryOptions>[0]);
   };
   infinite.queryKey = (params?: unknown) =>
@@ -282,7 +338,10 @@ function makeQueryAccessor(
 let warnedUnwiredInvalidates = false;
 
 function makeMutationAccessor(
-  fn: (vars?: unknown) => Promise<unknown>,
+  fn: (
+    vars?: unknown,
+    options?: EndpointCallOptions,
+  ) => Promise<unknown>,
   root: string[],
   name: string,
   path: string,
@@ -298,28 +357,38 @@ function makeMutationAccessor(
     const {
       invalidates: defaultInvalidates,
       meta: defaultMeta,
-      ...restDefault
+      ...restDefaultAll
     } = (resolveDefault(endpointDefault, undefined, qRef) ?? {}) as {
       invalidates?: unknown[];
       meta?: Record<string, unknown>;
-    } & Record<string, unknown>;
+    } & RoutarCallOptions &
+      Record<string, unknown>;
 
     const {
       invalidates: callInvalidates,
       meta: callMeta,
-      ...rest
+      ...restAll
     } = options as {
       invalidates?: unknown[];
       meta?: Record<string, unknown>;
-    } & Record<string, unknown>;
+    } & RoutarCallOptions &
+      Record<string, unknown>;
 
     // Call-site invalidates wins; fall back to default.
     const invalidates = callInvalidates ?? defaultInvalidates;
+    // Headers merge shallowly (call-site wins on key collision); timeout overrides.
+    const { callOpts, restDefault, rest } = mergeCallOptions(
+      restDefaultAll,
+      restAll,
+    );
 
     const merged: Record<string, unknown> = {
       mutationKey,
       // In flatten mode vars are flat → normalize to the envelope before fetch.
-      mutationFn: (vars: unknown) => fn(normalize(vars, buckets)),
+      mutationFn: (vars: unknown) => {
+        const normalized = normalize(vars, buckets);
+        return callOpts ? fn(normalized, callOpts) : fn(normalized);
+      },
       ...restDefault,
       ...rest,
     };

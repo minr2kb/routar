@@ -659,6 +659,16 @@ todoQuery.getList({ done: true });         // instead of { query: { done: true }
 
 `flatten` is a call-site convenience on `createQueries` only — the routar client and HTTP contract always use the envelope. An endpoint whose buckets collide on a key (e.g. `path.id` + `body.id`) or whose `body` is not a plain object (`z.array`, `z.string`, …) keeps the envelope shape; the types enforce this per endpoint. Keys are always envelope-based (`.queryKey()`, `.mutationKey`, `.infinite.queryKey()` are flatten-independent), so SSR and CSR keys match regardless of which call style each side uses.
 
+**Per-call `headers` / `timeout`:** query, mutation, and `.infinite` accessors all accept `headers`/`timeout` in their options object — the same shape as core's `EndpointCallOptions` — forwarded to the underlying endpoint call.
+
+```ts
+useSuspenseQuery(todoQuery.getDetail({ id: '1' }, { headers: { 'X-Tenant-Id': tenantId } }));
+useMutation(todoQuery.create({ headers: { 'Idempotency-Key': key }, timeout: 30_000 }));
+useSuspenseInfiniteQuery(todoQuery.getList.infinite(params, { headers: { /* ... */ } }));
+```
+
+Also settable per-endpoint via `createQueries({ defaults })` / `createQueries({ infinite })`; call-site `headers`/`timeout` win, and `headers` merge shallowly over the default (call-site key wins on collision, other default keys are kept).
+
 **Error typing:** `error` is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment TanStack's `Register` interface once — no `createQueries` change needed, accessors pick it up automatically:
 
 ```ts

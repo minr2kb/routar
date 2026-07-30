@@ -387,6 +387,128 @@ describe("createQueries — infinite via config (+ per-call override)", () => {
   });
 });
 
+describe("createQueries — per-call headers/timeout", () => {
+  it("query: forwards headers/timeout alongside the signal", async () => {
+    const { api, getDetail } = makeApi([], { id: 9 });
+    const q = createQueries(api);
+    const opts = q.getDetail(
+      { path: { id: 9 } },
+      { headers: { "X-Tenant-Id": "t1" }, timeout: 5000 },
+    );
+    const ac = new AbortController();
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ signal: ac.signal });
+    expect(getDetail).toHaveBeenCalledWith(
+      { path: { id: 9 } },
+      { headers: { "X-Tenant-Id": "t1" }, timeout: 5000, signal: ac.signal },
+    );
+  });
+
+  it("query: falls back to the bare signal when no headers/timeout are set", async () => {
+    const { api, getDetail } = makeApi([], { id: 9 });
+    const q = createQueries(api);
+    const opts = q.getDetail({ path: { id: 9 } });
+    const ac = new AbortController();
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ signal: ac.signal });
+    expect(getDetail).toHaveBeenCalledWith({ path: { id: 9 } }, ac.signal);
+  });
+
+  it("query: call-site headers win over the endpoint default (shallow merge)", async () => {
+    const { api, getDetail } = makeApi([], { id: 9 });
+    const q = createQueries(api, {
+      defaults: {
+        getDetail: { headers: { "X-Tenant-Id": "default", "X-Trace": "d" } },
+      },
+    });
+    const opts = q.getDetail(
+      { path: { id: 9 } },
+      { headers: { "X-Tenant-Id": "override" } },
+    );
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ signal: undefined });
+    expect(getDetail).toHaveBeenCalledWith(
+      { path: { id: 9 } },
+      {
+        headers: { "X-Tenant-Id": "override", "X-Trace": "d" },
+        timeout: undefined,
+        signal: undefined,
+      },
+    );
+  });
+
+  it("mutation: forwards headers/timeout to the api call", async () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries({
+      create,
+      $router: TodoMutationRouter,
+    } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>);
+    const opts = q.create({
+      headers: { "Idempotency-Key": "abc" },
+      timeout: 3000,
+    });
+    const mutationFn = opts.mutationFn as (vars: any) => Promise<unknown>;
+    await mutationFn({ body: { title: "x" } });
+    expect(create).toHaveBeenCalledWith(
+      { body: { title: "x" } },
+      { headers: { "Idempotency-Key": "abc" }, timeout: 3000 },
+    );
+  });
+
+  it("mutation: omits routar options from the mutation options object itself", () => {
+    const create = mock(async () => ({ id: 1 }));
+    const q = createQueries({
+      create,
+      $router: TodoMutationRouter,
+    } as unknown as ApiClientWithRouter<typeof TodoMutationRouter.endpoints>);
+    const opts = q.create({ headers: { "X-Foo": "bar" }, timeout: 1000 }) as Record<
+      string,
+      unknown
+    >;
+    expect(opts.headers).toBeUndefined();
+    expect(opts.timeout).toBeUndefined();
+  });
+
+  it("infinite: forwards headers/timeout alongside the page signal", async () => {
+    const { api, getList } = makeApi([{ id: 1 }]);
+    const q = createQueries(api);
+    const opts = q.getList.infinite(
+      { query: { userId: 1 } },
+      { ...infiniteOpts(), headers: { "X-Tenant-Id": "t1" } },
+    );
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    const ac = new AbortController();
+    await queryFn({ pageParam: 2, signal: ac.signal });
+    expect(getList).toHaveBeenCalledWith(
+      { query: { userId: 1, _page: 2 } },
+      { headers: { "X-Tenant-Id": "t1" }, timeout: undefined, signal: ac.signal },
+    );
+  });
+
+  it("infinite: call-site headers win over the endpoint default (shallow merge)", async () => {
+    const { api, getList } = makeApi([{ id: 1 }]);
+    const q = createQueries(api, {
+      defaults: {
+        getList: { headers: { "X-Tenant-Id": "default", "X-Trace": "d" } },
+      },
+    });
+    const opts = q.getList.infinite(
+      { query: { userId: 1 } },
+      { ...infiniteOpts(), headers: { "X-Tenant-Id": "override" } },
+    );
+    const queryFn = opts.queryFn as (ctx: any) => Promise<unknown>;
+    await queryFn({ pageParam: 2, signal: undefined });
+    expect(getList).toHaveBeenCalledWith(
+      { query: { userId: 1, _page: 2 } },
+      {
+        headers: { "X-Tenant-Id": "override", "X-Trace": "d" },
+        timeout: undefined,
+        signal: undefined,
+      },
+    );
+  });
+});
+
 describe("createQueries — per-endpoint defaults (C4)", () => {
   it("merges a query default, and a per-call option overrides it", () => {
     const { api } = makeApi();

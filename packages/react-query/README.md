@@ -70,6 +70,18 @@ export const todoQuery = createQueries(todoApi, {
 - Nested routers are supported — the map mirrors the router shape (e.g. `{ users: { getPosts: { ... } } }`).
 - For mutation endpoints, the value is mutation options (minus `invalidates`); `mutationFn` and `mutationKey` are still set by the library.
 
+## Per-call `headers` / `timeout`
+
+Query, mutation, and infinite accessors all accept `headers`/`timeout` in their options object (the same shape as core's `EndpointCallOptions`), forwarded to the underlying endpoint call:
+
+```ts
+useSuspenseQuery(todoQuery.getDetail({ path: { id } }, { headers: { "X-Tenant-Id": tenantId } }));
+useMutation(todoQuery.create({ headers: { "Idempotency-Key": key }, timeout: 30_000 }));
+useSuspenseInfiniteQuery(todoQuery.getList.infinite({ query: { _limit: 10 } }, { headers }));
+```
+
+They can also be set per-endpoint via `defaults` (and the `infinite` config). Call-site `headers`/`timeout` win, and `headers` merge shallowly over the default (the call-site key wins on collision; other default keys are kept).
+
 ## Error typing
 
 `error` in query/mutation results is typed as TanStack's `DefaultError`. To narrow it to `HttpError` globally, augment TanStack's `Register` interface once in your project — no change to `createQueries` is needed, accessors pick it up automatically:
