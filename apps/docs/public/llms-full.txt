@@ -804,6 +804,26 @@ export const todoApi = createApi(apiExecutor, todoRouter); // one client, works 
 
 ---
 
+## Recommended Project Structure
+
+Keep the API layer in a `remote/` folder, one file per domain:
+
+```
+remote/
+  lib/
+    executor.ts        # executor(s), one per environment
+  services/
+    todo.ts             # one file per domain: defineRouter + endpoint()s + createApi (+ createQueries)
+```
+
+- `remote/lib/executor.ts` — all executors, one per environment (SSR/CSR separate unless `dispatchExecutor` covers both)
+- `remote/services/<domain>.ts` — single source of truth per domain: `defineRouter` + `endpoint()`s + `createApi` (+ `createQueries`)
+- Nested domains → nested routers, not a second top-level service file
+
+Everything above `remote/` is project-specific — see `apps/example` in the routar repo.
+
+---
+
 ## Anti-Patterns
 
 ```ts

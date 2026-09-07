@@ -51,6 +51,12 @@ Two machine-readable documentation files are available at the root of this site:
 
 These follow the [llms.txt standard](https://llmstxt.org). You can point any AI tool directly at these URLs for up-to-date routar documentation.
 
+## Context7
+
+routar is indexed on [Context7](https://context7.com/minr2kb/routar), so AI coding assistants with the Context7 MCP server configured (Cursor, Claude Code, Windsurf, …) can pull up-to-date routar docs directly into context — no manual copy-pasting of `llms.txt`.
+
+Once the Context7 MCP server is set up, add "use context7" to your prompt and the assistant resolves routar's docs automatically. Without it, point the assistant at `/llms-full.txt` directly (see above).
+
 ## AGENTS.md
 
 [`AGENTS.md`](https://github.com/minr2kb/routar/blob/main/AGENTS.md) at the repository root is a reference guide for AI agents. It covers the core patterns, executor selection, SSR/CSR setup, MSW testing, and common anti-patterns.

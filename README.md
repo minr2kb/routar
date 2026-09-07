@@ -122,6 +122,8 @@ routar ships with resources for AI coding assistants:
 | `llms-full.txt` | [`/llms-full.txt`](https://routar.vercel.app/llms-full.txt) | Full API reference with examples |
 | `AGENTS.md` | [AGENTS.md](./AGENTS.md) | Guide for AI agents in routar-consumer projects |
 
+routar is also indexed on [Context7](https://context7.com/minr2kb/routar), so AI coding assistants with the Context7 MCP configured can pull up-to-date routar docs directly into context.
+
 JSDoc `@example` blocks are included in every published `.d.ts` file, so Copilot and Cursor give routar-specific suggestions out of the box.
 
 ---

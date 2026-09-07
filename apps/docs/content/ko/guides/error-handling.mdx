@@ -1,6 +1,6 @@
 ---
 title: 에러 처리
-description: ValidationError, HttpError, TimeoutError 처리 — 모든 executor에서 트랜스포트 에러는 HttpError로 정규화됩니다.
+description: ValidationError, HttpError, TimeoutError 처리. 모든 executor에서 트랜스포트 에러는 HttpError로 정규화됩니다.
 ---
 
 # 에러 처리
@@ -10,7 +10,7 @@ description: ValidationError, HttpError, TimeoutError 처리 — 모든 executor
 | 에러 | 패키지 | throw 시점 |
 |-------|---------|------------|
 | `ValidationError` | `@routar/core` | 요청 또는 응답 검증 실패 |
-| `HttpError` | `@routar/core` | 서버가 비-2xx 상태 반환 (모든 executor — fetch, Axios, ky) |
+| `HttpError` | `@routar/core` | 서버가 비-2xx 상태 반환 (모든 executor: fetch, Axios, ky) |
 | `TimeoutError` | `@routar/core` | `createFetchExecutor`의 `timeout` 초과 |
 
 모든 트랜스포트는 HTTP 실패를 `HttpError`로 정규화합니다. Axios와 ky executor는 각자의 네이티브 에러(`AxiosError`, ky `HTTPError`)를 잡아 응답에서 `status`·`statusText`·`body`를 채운 `HttpError`로 다시 throw합니다. 원본 트랜스포트 에러는 `err.cause`에 보존되므로 필요할 때 `AxiosError` 고유 필드에 접근할 수 있습니다.
@@ -51,7 +51,7 @@ try {
   await todoApi.getDetail({ path: { id: 1 } })
 } catch (err) {
   if (err instanceof HttpError) {
-    // 어떤 executor든 — 비-2xx 응답
+    // 어떤 executor든: 비-2xx 응답
     console.log(err.status, err.body)
   }
 }
@@ -73,7 +73,7 @@ try {
 }
 ```
 
-`onError` 플러그인도 동일하게 정규화된 `HttpError`를 받으므로 플러그인 코드 역시 트랜스포트에 무관합니다. (응답이 없는 에러 — 네트워크 실패나 취소 — 는 정규화할 HTTP 상태가 없으므로 원본 그대로 다시 throw됩니다.)
+`onError` 플러그인도 동일하게 정규화된 `HttpError`를 받으므로 플러그인 코드 역시 트랜스포트에 무관합니다. (응답이 없는 에러, 즉 네트워크 실패나 취소는 정규화할 HTTP 상태가 없으므로 원본 그대로 다시 throw됩니다.)
 
 ## 서버 에러만 재시도
 

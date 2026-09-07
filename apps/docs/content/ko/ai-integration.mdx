@@ -5,18 +5,18 @@ description: 코드 작성은 이제 저렴합니다. 일관되게 유지하는 
 
 # AI 통합
 
-코드 작성은 이제 저렴합니다. 일관되게 유지하는 것은 여전히 비쌉니다 — AI가 더 많은 코드를 더 빠르게 생성할수록 이 차이는 커집니다. 이 페이지는 AI 시대에서 routar의 가치와 AI 코딩 어시스턴트(Claude Code, Copilot, Cursor)가 routar를 인식하게 만드는 머신 리더블 리소스를 다룹니다.
+코드 작성은 이제 저렴합니다. 일관되게 유지하는 것은 여전히 비쌉니다. AI가 더 많은 코드를 더 빠르게 생성할수록 이 차이는 커집니다. 이 페이지는 AI 시대에서 routar의 가치와 AI 코딩 어시스턴트(Claude Code, Copilot, Cursor)가 routar를 인식하게 만드는 머신 리더블 리소스를 다룹니다.
 
 ## 보일러플레이트가 적을수록, drift도 적습니다
 
-코드 작성은 이제 저렴합니다 — AI가 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성합니다. API가 변경될 때 그 코드를 일관되게 유지하는 것은 여전히 비쌉니다.
+코드 작성은 이제 저렴합니다. AI가 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성합니다. API가 변경될 때 그 코드를 일관되게 유지하는 것은 여전히 비쌉니다.
 
-routar 없이는 하나의 API 엔드포인트가 보통 5개의 개별 표현으로 존재합니다: fetch 함수, TypeScript 타입, query key, query hook, MSW mock. 엔드포인트를 변경하면 — 5곳을 수정하거나, drift를 배포하거나.
+routar 없이는 하나의 API 엔드포인트가 보통 5개의 개별 표현으로 존재합니다: fetch 함수, TypeScript 타입, query key, query hook, MSW mock. 엔드포인트를 변경하면 5곳을 수정하거나, drift를 배포하거나 둘 중 하나입니다.
 
 routar는 그 5개 표현을 하나의 `endpoint()` 정의로 압축합니다. 클라이언트 함수·TypeScript 타입·TanStack Query key·MSW 핸들러가 모두 자동으로 파생됩니다:
 
 ```ts
-// 하나의 계약 — 나머지는 모두 파생
+// 하나의 계약: 나머지는 모두 파생
 const todoRouter = defineRouter('/todos', {
   getDetail: endpoint({
     method: 'GET',
@@ -26,7 +26,7 @@ const todoRouter = defineRouter('/todos', {
   }),
 })
 
-// 타입 클라이언트, query key, MSW 핸들러 — 모두 일관, 중복 없음
+// 타입 클라이언트, query key, MSW 핸들러: 모두 일관, 중복 없음
 export const todoQuery = createQueries(createApi(executor, todoRouter))
 ```
 
@@ -34,20 +34,26 @@ export const todoQuery = createQueries(createApi(executor, todoRouter))
 
 이를 경계에서 강화하는 몇 가지 속성:
 
-- **컴파일 타임 path-param 강제** — 호출에서 `:param`이 빠지거나 이름이 바뀌면 런타임이 아니라 타입체크에서 실패합니다.
-- **런타임 응답 검증** — 백엔드가 변경되면, `undefined`가 조용히 전파되기 전에 경계에서 스키마가 잡아냅니다.
-- **단일 진실 공급원** — 클라이언트·타입·query key·MSW mock이 모두 같은 정의에서 파생됩니다. 불일치가 숨을 곳이 줄어듭니다.
+- **컴파일 타임 path-param 강제**: 호출에서 `:param`이 빠지거나 이름이 바뀌면 런타임이 아니라 타입체크에서 실패합니다.
+- **런타임 응답 검증**: 백엔드가 변경되면, `undefined`가 조용히 전파되기 전에 경계에서 스키마가 잡아냅니다.
+- **단일 진실 공급원**: 클라이언트·타입·query key·MSW mock이 모두 같은 정의에서 파생됩니다. 불일치가 숨을 곳이 줄어듭니다.
 
-보일러플레이트가 적다는 것은 단순히 덜 쓴다는 의미가 아닙니다. 같은 사실에 대한 표현이 줄어드는 것 — 그만큼 drift가 발생할 곳도 줄어듭니다.
+보일러플레이트가 적다는 것은 단순히 덜 쓴다는 의미가 아닙니다. 같은 사실에 대한 표현이 줄어드는 만큼, 그만큼 drift가 발생할 곳도 줄어듭니다.
 
 ## llms.txt
 
 | URL | 목적 |
 |-----|---------|
-| [`/llms.txt`](/llms.txt) | 간결한 API 인덱스 — 한 줄 설명이 포함된 모든 내보내기 |
+| [`/llms.txt`](/llms.txt) | 간결한 API 인덱스: 한 줄 설명이 포함된 모든 내보내기 |
 | [`/llms-full.txt`](/llms-full.txt) | 시그니처와 코드 예제가 포함된 전체 API 레퍼런스 |
 
 이 파일들은 [llms.txt 표준](https://llmstxt.org)을 따릅니다.
+
+## Context7
+
+routar는 [Context7](https://context7.com/minr2kb/routar)에 등록되어 있어, Context7 MCP 서버가 설정된 AI 코딩 어시스턴트(Cursor, Claude Code, Windsurf 등)는 최신 routar 문서를 컨텍스트로 바로 가져올 수 있습니다. `llms.txt`를 수동으로 복사할 필요가 없습니다.
+
+Context7 MCP 서버가 설정되어 있다면 프롬프트에 "use context7"만 추가하면 됩니다. 설정되어 있지 않다면 위의 `/llms-full.txt`를 직접 참조하도록 안내하세요.
 
 ## AGENTS.md
 

@@ -9,13 +9,28 @@ import { PackageInstall } from '../../components/PackageInstall'
 
 ## 설치
 
-**fetch 사용** (core에 내장 — 추가 의존성 없음):
+**fetch 사용** (core에 내장, 추가 의존성 없음):
 
 <PackageInstall packages={['@routar/core']} />
 
 **Axios 사용:**
 
 <PackageInstall packages={['@routar/core', '@routar/axios', 'axios']} />
+
+## AI 에이전트로 설치하기
+
+Cursor, Claude Code 등 AI 코딩 어시스턴트에 아래 내용을 붙여넣으세요:
+
+> routar(`@routar/core`)를 이 프로젝트의 API 클라이언트로 추가해줘. 먼저 최신 routar
+> 문서를 가져와. Context7 MCP가 설정되어 있으면 `use context7`로, 아니면
+> https://routar.vercel.app/llms-full.txt 를 직접 fetch해서. package.json에서 기존
+> HTTP 클라이언트를 확인해서, `axios`가 이미 의존성에 있으면 `@routar/axios`를,
+> `ky`가 있으면 `@routar/ky`를, 둘 다 없으면 내장 fetch executor를 사용해. 그다음
+> Zod 스키마로 API 모델을 정의하고, `endpoint()` + `defineRouter()`로 엔드포인트를
+> 묶고, 선택한 executor + `createApi()`로 타입 클라이언트를 만들어줘.
+> `@tanstack/react-query`가 이미 의존성에 있다면 `@routar/react-query` 연동은 바로
+> 하지 말고 나한테 먼저 물어봐(query key/provider 설정 전체를 건드리는 작업이라
+> 별도 단계로 진행해야 해).
 
 ## 빠른 시작
 
@@ -74,7 +89,7 @@ const todo  = await todoApi.getDetail({ path: { id: 1 } })
 const next  = await todoApi.create({ body: { title: 'buy milk' } })
 ```
 
-모든 반환 타입은 완전히 추론됩니다 — 타입 어노테이션이 필요 없습니다.
+모든 반환 타입은 완전히 추론됩니다. 타입 어노테이션이 필요 없습니다.
 
 ### AbortSignal
 
@@ -109,6 +124,6 @@ const executor = createAxiosExecutor(
 
 ## 다음 단계
 
-- [API 레퍼런스](/ko/api-reference) — 모든 내보내기에 대한 전체 문서
-- [Executor](/ko/executors) — fetch vs. axios, SSR/CSR 패턴
-- [가이드](/ko/guides) — SSR/CSR, 커스텀 executor, 에러 처리
+- [API 레퍼런스](/ko/api-reference): 모든 내보내기에 대한 전체 문서
+- [Executor](/ko/executors): fetch vs. axios, SSR/CSR 패턴
+- [가이드](/ko/guides): SSR/CSR, 커스텀 executor, 에러 처리

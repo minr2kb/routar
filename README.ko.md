@@ -10,7 +10,7 @@
 [![Coverage](https://codecov.io/gh/minr2kb/routar/branch/main/graph/badge.svg)](https://codecov.io/gh/minr2kb/routar)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**스키마 기반 HTTP API 클라이언트 — 엔드-투-엔드 타입 안정성과 런타임 검증을 제공합니다.**
+**스키마 기반 HTTP API 클라이언트. 엔드-투-엔드 타입 안정성과 런타임 검증을 제공합니다.**
 
 API를 한 번 정의하고 어떤 전송 계층, 환경, HTTP 클라이언트에서도 재사용하세요.
 
@@ -42,16 +42,16 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 
 ## 특징
 
-- **엔드-투-엔드 타입 추론** — 요청 파라미터, 응답 형태, 어댑터 출력까지 `any` 없이 전부 추론
-- **런타임 검증** — Zod, Valibot, Yup, `.parse()`를 가진 객체, 또는 모든 [Standard Schema](https://standardschema.dev)(`~standard`, 예: ArkType)로 요청·응답 검증
-- **drift 관찰** — `validate: 'warn'` + `onValidationError`로 장애 없이 스키마 drift 리포트
-- **전송 계층 독립** — 한 줄 변경으로 `fetch`, axios, 또는 커스텀 HTTP 클라이언트로 교체
-- **per-call 옵션** — `(params, { signal, headers, timeout })`로 요청별 헤더·타임아웃(전송 계층 독립)
-- **플러그인 시스템** — request/response/error 훅을 가진 이름 있는 플러그인; `retry`와 `timeout`은 first-class 옵션
-- **명확한 엔드포인트 정의** — `request`는 `{ path, query, body }` 개별 validator 맵으로 선언
-- **중첩 라우터** — URL 구조를 타입 시스템에 그대로 반영
-- **경로 파라미터 강제** — path param이 없는데 `path: '/:id'`를 쓰면 컴파일 에러
-- **SSR/CSR 지원** — 동일한 엔드포인트 스펙, 환경에 따라 다른 executor
+- **엔드-투-엔드 타입 추론**: 요청 파라미터, 응답 형태, 어댑터 출력까지 `any` 없이 전부 추론
+- **런타임 검증**: Zod, Valibot, Yup, `.parse()`를 가진 객체, 또는 모든 [Standard Schema](https://standardschema.dev)(`~standard`, 예: ArkType)로 요청·응답 검증
+- **drift 관찰**: `validate: 'warn'` + `onValidationError`로 장애 없이 스키마 drift 리포트
+- **전송 계층 독립**: 한 줄 변경으로 `fetch`, axios, 또는 커스텀 HTTP 클라이언트로 교체
+- **per-call 옵션**: `(params, { signal, headers, timeout })`로 요청별 헤더·타임아웃(전송 계층 독립)
+- **플러그인 시스템**: request/response/error 훅을 가진 이름 있는 플러그인; `retry`와 `timeout`은 first-class 옵션
+- **명확한 엔드포인트 정의**: `request`는 `{ path, query, body }` 개별 validator 맵으로 선언
+- **중첩 라우터**: URL 구조를 타입 시스템에 그대로 반영
+- **경로 파라미터 강제**: path param이 없는데 `path: '/:id'`를 쓰면 컴파일 에러
+- **SSR/CSR 지원**: 동일한 엔드포인트 스펙, 환경에 따라 다른 executor
 
 ---
 
@@ -62,7 +62,7 @@ const next  = await todoApi.create({ body: { title: 'buy milk' } }); // Todo
 | `@routar/core` | 엔드포인트 정의, 라우터, API 클라이언트, 플러그인 시스템, 네이티브 `fetch` executor |
 | `@routar/axios` | Axios 기반 Executor |
 | `@routar/ky` | [ky](https://github.com/sindresorhus/ky) 기반 Executor |
-| `@routar/react-query` | TanStack Query 바인딩 — 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리 생성 |
+| `@routar/react-query` | TanStack Query 바인딩: 라우터에서 타입이 적용된 `queryOptions` / `mutationOptions` 팩토리 생성 |
 
 ---
 
@@ -85,16 +85,16 @@ export const todoQuery = createQueries(todoApi)
 ```
 
 ```tsx
-// 쿼리 — useSuspenseQuery, prefetchQuery 등
+// 쿼리: useSuspenseQuery, prefetchQuery 등
 const { data } = useSuspenseQuery(todoQuery.getList())
 
-// 뮤테이션 — 선언적 무효화 포함
+// 뮤테이션: 선언적 무효화 포함
 const { mutate } = useMutation(
   todoQuery.create({ invalidates: [todoQuery.getList.queryKey()] })
 )
 ```
 
-선언적 `invalidates`를 활성화하려면 `QueryClient` 생성 시 `routarMutationCache`를 한 번 배선하세요 — 또는 자동 배선되는 `routarQueryClient()`를 사용하세요:
+선언적 `invalidates`를 활성화하려면 `QueryClient` 생성 시 `routarMutationCache`를 한 번 배선하세요. 또는 자동 배선되는 `routarQueryClient()`를 사용하세요:
 
 ```ts
 import { routarQueryClient } from '@routar/react-query'
@@ -111,6 +111,22 @@ useSuspenseQuery(searchQuery.search({ body: { term: 'routar' } })) // body가 qu
 
 ---
 
+## AI 통합
+
+routar는 AI 코딩 어시스턴트를 위한 리소스를 함께 제공합니다:
+
+| 리소스 | 위치 | 목적 |
+|--------|------|------|
+| `llms.txt` | [`/llms.txt`](https://routar.vercel.app/llms.txt) | LLM 도구(Context7 등)를 위한 간결한 API 인덱스 |
+| `llms-full.txt` | [`/llms-full.txt`](https://routar.vercel.app/llms-full.txt) | 예제가 포함된 전체 API 레퍼런스 |
+| `AGENTS.md` | [AGENTS.md](./AGENTS.md) | routar를 사용하는 프로젝트의 AI 에이전트를 위한 가이드 |
+
+routar는 [Context7](https://context7.com/minr2kb/routar)에도 등록되어 있어, Context7 MCP가 설정된 AI 코딩 어시스턴트는 최신 routar 문서를 바로 컨텍스트로 가져올 수 있습니다.
+
+모든 배포된 `.d.ts` 파일에 JSDoc `@example` 블록이 포함되어 있어, Copilot과 Cursor가 별도 설정 없이도 routar에 맞는 제안을 제공합니다.
+
+---
+
 ## routar를 쓰지 말아야 할 때
 
 routar는 **프론트엔드 팀이 API 스키마를 직접 소유하고 관리할 때** 적합합니다.
@@ -119,8 +135,8 @@ routar는 **프론트엔드 팀이 API 스키마를 직접 소유하고 관리�
 
 | 상황 | 더 나은 선택 |
 |------|-------------|
-| 이미 OpenAPI / Swagger 스펙이 있는 경우 | [orval](https://orval.dev/) 또는 [hey-api](https://heyapi.dev/) — 스펙에서 클라이언트 자동 생성 |
-| 백엔드·프론트엔드 공유 계약이 필요한 경우 | [ts-rest](https://ts-rest.com/) 또는 [oRPC](https://orpc.unnoq.com/) — 양쪽이 동일한 스키마 공유 |
+| 이미 OpenAPI / Swagger 스펙이 있는 경우 | [orval](https://orval.dev/) 또는 [hey-api](https://heyapi.dev/): 스펙에서 클라이언트 자동 생성 |
+| 백엔드·프론트엔드 공유 계약이 필요한 경우 | [ts-rest](https://ts-rest.com/) 또는 [oRPC](https://orpc.unnoq.com/): 양쪽이 동일한 스키마 공유 |
 | RPC 스타일 풀스택 타입 안정성이 필요한 경우 | [tRPC](https://trpc.io/) |
 
 ---
@@ -173,7 +189,7 @@ const todoRouter = defineRouter('/todos', {
 const executor = createFetchExecutor('https://api.example.com');
 const todoApi  = createApi(executor, todoRouter);
 
-// 클라이언트에서 타입 추출 — 중복 없음
+// 클라이언트에서 타입 추출, 중복 없음
 type TodoApiTypes   = ApiTypes<typeof todoApi>;
 type Todo           = TodoApiTypes['getDetail']['response']; // { id: number; title: string; completed: boolean }
 type CreateRequest  = TodoApiTypes['create']['request'];     // { body: { title: string } }
@@ -188,7 +204,7 @@ type CreateRequest  = TodoApiTypes['create']['request'];     // { body: { title:
 단일 엔드포인트를 정의합니다. `adapter`에 대한 완전한 타입 추론을 캐스팅 없이 제공합니다.
 
 ```ts
-// adapter 사용 — raw는 response 스키마에서 추론됨
+// adapter 사용, raw는 response 스키마에서 추론됨
 endpoint({
   method: 'GET',
   path: '/',
@@ -197,17 +213,17 @@ endpoint({
 });
 ```
 
-**경로 파라미터 강제** — 경로 파라미터 불일치는 컴파일 에러입니다:
+**경로 파라미터 강제**: 경로 파라미터 불일치는 컴파일 에러입니다:
 
 ```ts
 // ✅
 endpoint({ path: '/:id', request: { path: z.object({ id: z.number() }) }, ... })
 
-// ❌ 컴파일 에러 — ':id'가 선언됐지만 request.path.id가 없음
+// ❌ 컴파일 에러: ':id'가 선언됐지만 request.path.id가 없음
 endpoint({ path: '/:id', request: { query: z.object({ q: z.string() }) }, ... })
 ```
 
-**Request 버킷** — `request`는 `{ path, query, body }` validator 맵입니다. `path`에 `:param` 세그먼트가 있으면 `request.path`가 필수입니다:
+**Request 버킷**: `request`는 `{ path, query, body }` validator 맵입니다. `path`에 `:param` 세그먼트가 있으면 `request.path`가 필수입니다:
 
 ```ts
 endpoint({
@@ -220,7 +236,7 @@ endpoint({
 })
 ```
 
-**Standard Schema** — `request`/`response`(및 각 버킷)는 `.parse()` 객체뿐 아니라 모든 `~standard` validator(ArkType, Zod 3.24+, Valibot 등)도 받습니다.
+**Standard Schema**: `request`/`response`(및 각 버킷)는 `.parse()` 객체뿐 아니라 모든 `~standard` validator(ArkType, Zod 3.24+, Valibot 등)도 받습니다.
 
 ---
 
@@ -251,7 +267,7 @@ await api.users.todos.getList({});                   // GET /api/users/todos
 
 ### `createApi(executor, router)`
 
-완전히 타입이 지정된 API 클라이언트를 생성합니다. 각 엔드포인트는 `(params, signalOrOptions?) => Promise<Response>` 형태의 비동기 함수가 됩니다 — 두 번째 인자는 `AbortSignal` 또는 `{ signal?, headers?, timeout? }` 옵션 객체입니다.
+완전히 타입이 지정된 API 클라이언트를 생성합니다. 각 엔드포인트는 `(params, signalOrOptions?) => Promise<Response>` 형태의 비동기 함수가 됩니다. 두 번째 인자는 `AbortSignal` 또는 `{ signal?, headers?, timeout? }` 옵션 객체입니다.
 
 ```ts
 // 세 가지 동등한 형태
@@ -276,7 +292,7 @@ await api.update({ path: { id: 1 }, body: { completed: true } }, {
 });
 ```
 
-**검증 모드** — `validate`는 `boolean | 'warn' | { request?, response? }`입니다. `'warn'`은 raw 데이터를 통과시키고 throw 대신 `onValidationError(err, ctx)`를 호출 — 장애 없이 스키마 drift 관찰:
+**검증 모드**: `validate`는 `boolean | 'warn' | { request?, response? }`입니다. `'warn'`은 raw 데이터를 통과시키고 throw 대신 `onValidationError(err, ctx)`를 호출합니다. 장애 없이 스키마 drift를 관찰할 수 있습니다:
 
 ```ts
 createApi(executor, todoRouter, {
@@ -299,7 +315,7 @@ const createParserFor = createParser(todoRouter.endpoints.create);
 
 `parseResponse(raw)`(항상)와 `parseRequest({ path?, query?, body? })`(스펙에 `request`가 있을 때만)를 반환합니다. 둘 다 잘못된 입력에는 **원본 에러**(`ZodError` / `StandardSchemaError`)를 그대로 throw합니다. `parseResponse`는 순수 `response` 스키마로 검증하며 `adapter`는 실행하지 **않습니다**(그건 클라이언트-사이드).
 
-**HTTP 관심사가 전혀 없습니다** — 상태코드도, 에러 포맷팅도 없습니다. 프레임워크의 요청 객체에서 `{ path, query, body }` envelope를 직접 조립하고 잘못된 요청이 무엇이 될지 정하므로, 같은 파서가 Next.js Route Handler, Hono, Express 등 어디서든 동작합니다:
+**HTTP 관심사가 전혀 없습니다.** 상태코드도, 에러 포맷팅도 없습니다. 프레임워크의 요청 객체에서 `{ path, query, body }` envelope를 직접 조립하고 잘못된 요청이 무엇이 될지 정하므로, 같은 파서가 Next.js Route Handler, Hono, Express 등 어디서든 동작합니다:
 
 ```ts
 // Next.js Route Handler
@@ -313,12 +329,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// path 파라미터는 스펙의 request.path 스키마가 coerce — 수동 Number(id) 불필요
+// path 파라미터는 스펙의 request.path 스키마가 coerce, 수동 Number(id) 불필요
 const updateParser = createParser(todoRouter.endpoints.update);
 const { path, body } = await updateParser.parseRequest({ path: { id }, body: await req.json() });
 ```
 
-스펙에 `request`가 없으면(순수 GET) `parseRequest`가 없습니다 — 접근하면 컴파일 에러입니다.
+스펙에 `request`가 없으면(순수 GET) `parseRequest`가 없습니다. 접근하면 컴파일 에러입니다.
 
 ---
 
@@ -342,7 +358,7 @@ const executor = createExecutor(
 
 ### `dispatchExecutor(resolver)`
 
-요청 시점에 전송 계층을 선택하는 executor를 만듭니다. SSR과 CSR을 하나의 API 클라이언트로 통합할 때 유용합니다 — `*ServerApi` 인스턴스를 중복으로 만들 필요가 없습니다.
+요청 시점에 전송 계층을 선택하는 executor를 만듭니다. SSR과 CSR을 하나의 API 클라이언트로 통합할 때 유용합니다. `*ServerApi` 인스턴스를 중복으로 만들 필요가 없습니다.
 
 `resolver`는 요청 옵션 전체를 받으므로 환경, URL 접두사, 인증 컨텍스트 등 런타임 조건에 따라 분기할 수 있습니다.
 
@@ -402,7 +418,7 @@ const correlationPlugin = definePlugin({
 | `plugins` | 선언 순서대로 적용되는 `ExecutorPlugin` 배열 (첫 번째가 가장 바깥쪽) |
 | `logger` | 내장 플러그인: 메서드, URL, 소요 시간 로깅 |
 
-`retry`와 `timeout`은 `createFetchExecutor`에서 사용합니다 — axios, ky는 각 라이브러리 인스턴스에서 설정합니다.
+`retry`와 `timeout`은 `createFetchExecutor`에서 사용합니다. axios, ky는 각 라이브러리 인스턴스에서 설정합니다.
 
 ---
 
@@ -412,7 +428,7 @@ const correlationPlugin = definePlugin({
 
 네이티브 `fetch` API를 사용합니다. 요청마다 동적 헤더가 필요한 SSR 환경에 적합합니다.
 
-`baseURL`은 정적 문자열뿐 아니라 매 요청마다 호출되는 동기/비동기 팩토리도 받습니다 — origin이 런타임 환경에 따라 달라질 때(예: 서버에서는 절대 URL, 클라이언트에서는 상대 경로) 유용합니다:
+`baseURL`은 정적 문자열뿐 아니라 매 요청마다 호출되는 동기/비동기 팩토리도 받습니다. origin이 런타임 환경에 따라 달라질 때(예: 서버에서는 절대 URL, 클라이언트에서는 상대 경로) 유용합니다:
 
 ```ts
 const executor = createFetchExecutor(
@@ -450,10 +466,10 @@ if (err instanceof HttpError) console.log(err.status, err.statusText, err.body);
 ```ts
 import { createAxiosExecutor } from '@routar/axios';
 
-// CSR — 공유 인스턴스
+// CSR: 공유 인스턴스
 const executor = createAxiosExecutor(axios.create({ baseURL: 'https://api.example.com' }));
 
-// SSR — 팩토리, 요청마다 새 인스턴스 생성
+// SSR: 팩토리, 요청마다 새 인스턴스 생성
 const executor = createAxiosExecutor(async () => {
   const token = await getServerToken();
   return axios.create({ baseURL: 'https://api.example.com', headers: { Authorization: `Bearer ${token}` } });
@@ -466,7 +482,7 @@ HTTP 실패는 (fetch executor와 동일하게) `HttpError`로 정규화됩니�
 
 ## SSR / CSR 패턴
 
-`dispatchExecutor`를 사용해 요청 시점에 올바른 전송 계층을 선택하세요 — `*ServerApi` 인스턴스 중복 없이 하나의 API 클라이언트가 두 환경 모두에서 동작합니다.
+`dispatchExecutor`를 사용해 요청 시점에 올바른 전송 계층을 선택하세요. `*ServerApi` 인스턴스 중복 없이 하나의 API 클라이언트가 두 환경 모두에서 동작합니다.
 
 ```ts
 import { dispatchExecutor } from '@routar/core';
@@ -485,7 +501,7 @@ export const apiExecutor = dispatchExecutor(() =>
   typeof window === 'undefined' ? serverExecutor : clientExecutor,
 );
 
-// remote/services/todo.ts — SSR과 CSR 모두에서 동작하는 하나의 클라이언트
+// remote/services/todo.ts: SSR과 CSR 모두에서 동작하는 하나의 클라이언트
 export const todoApi = createApi(apiExecutor, todoRouter);
 ```
 
@@ -526,7 +542,7 @@ type P = PathParams<'/:userId/posts/:postId'>; // 'userId' | 'postId'
 
 ## 프레임워크 없이 사용하기
 
-routar는 프레임워크 없이도 동작합니다 — 엔드포인트는 일반 비동기 함수입니다:
+routar는 프레임워크 없이도 동작합니다. 엔드포인트는 일반 비동기 함수입니다:
 
 ```ts
 const todoApi = createApi(createFetchExecutor('https://api.example.com'), todoRouter);
@@ -548,11 +564,11 @@ controller.abort();
 | 에러 | 패키지 | 발생 조건 |
 |------|--------|----------|
 | `ValidationError` | `@routar/core` | `request`/`response` 검증 실패 시(`validate: true`에서) |
-| `StandardSchemaError` | `@routar/core` | Standard Schema(`~standard`)가 이슈를 보고할 때 — `ValidationError`의 `cause`로 래핑되며 `issues` 배열 보존 |
+| `StandardSchemaError` | `@routar/core` | Standard Schema(`~standard`)가 이슈를 보고할 때: `ValidationError`의 `cause`로 래핑되며 `issues` 배열 보존 |
 | `TimeoutError` | `@routar/core` | executor `timeout` **또는** per-call `timeout` 초과 시 |
-| `HttpError` | `@routar/core` | 모든 executor(fetch, Axios, ky)가 2xx가 아닌 상태 코드 반환 시 — 원본 트랜스포트 에러는 `err.cause`에 보존 |
+| `HttpError` | `@routar/core` | 모든 executor(fetch, Axios, ky)가 2xx가 아닌 상태 코드 반환 시: 원본 트랜스포트 에러는 `err.cause`에 보존 |
 
-> `validate: 'warn'`에서는 검증 실패가 throw하지 **않습니다** — raw 값을 통과시키고 대신 `onValidationError`를 호출합니다.
+> `validate: 'warn'`에서는 검증 실패가 throw하지 **않습니다.** raw 값을 통과시키고 대신 `onValidationError`를 호출합니다.
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

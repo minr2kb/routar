@@ -1,13 +1,13 @@
 ---
 title: routar란?
-description: routar의 철학 — 스키마 우선 API 클라이언트가 왜 버그를 줄이고 DX를 향상시키며 코드를 단순하게 만드는지.
+description: routar의 철학, 스키마 우선 API 클라이언트가 왜 버그를 줄이고 DX를 향상시키며 코드를 단순하게 만드는지.
 ---
 
 import { Callout } from 'nextra/components'
 
 # routar란?
 
-모든 프론트엔드 프로젝트는 결국 API 레이어를 구축하게 됩니다. 대부분은 동일한 방식으로 시작합니다 — `fetch` 래퍼, TypeScript 제네릭, 아마도 Axios. 처음에는 괜찮아 보입니다. 그러다 코드베이스가 커지면 문제가 드러납니다.
+모든 프론트엔드 프로젝트는 결국 API 레이어를 구축하게 됩니다. 대부분은 동일한 방식으로 시작합니다: `fetch` 래퍼, TypeScript 제네릭, 아마도 Axios. 처음에는 괜찮아 보입니다. 그러다 코드베이스가 커지면 문제가 드러납니다.
 
 ## 일반적인 API 레이어의 문제점
 
@@ -67,12 +67,12 @@ const todoRouter = defineRouter('/todos', {
 })
 
 const clientApi = createApi(axiosExecutor, todoRouter)   // CSR
-const serverApi = createApi(fetchExecutor, todoRouter)   // SSR — 동일한 스키마, 중복 없음
+const serverApi = createApi(fetchExecutor, todoRouter)   // SSR: 동일한 스키마, 중복 없음
 ```
 
 ## AI 시대: 유지해야 할 것이 줄어듭니다
 
-코드 작성은 이제 저렴합니다. AI가 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성합니다. 하지만 생성된 코드가 많아질수록 같은 API 사실에 대한 표현도 늘어나고 — API가 변경될 때 drift가 발생할 곳도 더 많아집니다.
+코드 작성은 이제 저렴합니다. AI가 fetch 래퍼·타입·훅을 거의 0의 비용으로 생성합니다. 하지만 생성된 코드가 많아질수록 같은 API 사실에 대한 표현도 늘어나고, API가 변경될 때 drift가 발생할 곳도 더 많아집니다.
 
 routar는 표현의 수를 줄입니다. 하나의 `endpoint()`에서 클라이언트 함수·타입·query key·MSW mock이 자동으로 파생됩니다. 엔드포인트를 변경하면 한 곳만 수정하면 되고, downstream이 전부 따라옵니다. [AI 통합](/ko/ai-integration)에서 실제로 어떻게 활용되는지 확인하세요.
 
@@ -121,14 +121,14 @@ Component → services/<domain>.ts (createQueries → createApi) → executor
 ## 실제로 어떻게 보이는가
 
 ```ts
-// remote/services/todo.ts — 스펙, 타입, TanStack Query 인터페이스를 한 파일에 배치
+// remote/services/todo.ts: 스펙, 타입, TanStack Query 인터페이스를 한 파일에 배치
 export const todoApi = createApi(clientExecutor, todoRouter)
 export type TodoApiTypes = ApiTypes<typeof todoApi>
 export type TodoItem = TodoApiTypes['getDetail']['response']
 
 export const todoQuery = createQueries(todoApi)
 
-// Component — HTTP를 알지 못함
+// Component: HTTP를 알지 못함
 const { data } = useSuspenseQuery(todoQuery.getDetail({ path: { id } }))
 ```
 

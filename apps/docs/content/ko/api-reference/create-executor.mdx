@@ -39,7 +39,7 @@ const executor = createExecutor(
 
 ## envelope 응답 벗겨내기
 
-많은 API가 페이로드를 `{ data: T }` 같은 envelope로 감쌉니다. `unwrap`을 넘기면 `response` 스키마가 실행되기 전에 envelope를 벗겨낼 수 있습니다 — 별도의 플러그인 보일러플레이트가 필요 없습니다:
+많은 API가 페이로드를 `{ data: T }` 같은 envelope로 감쌉니다. `unwrap`을 넘기면 `response` 스키마가 실행되기 전에 envelope를 벗겨낼 수 있습니다. 별도의 플러그인 보일러플레이트가 필요 없습니다:
 
 ```ts
 const executor = createExecutor(transport, {

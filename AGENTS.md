@@ -82,6 +82,25 @@ export const apiExecutor = dispatchExecutor(() =>
 export const todoApi = createApi(apiExecutor, todoRouter);
 ```
 
+## Recommended Project Structure
+
+Keep the API layer in a `remote/` folder, one file per domain, so the endpoint contract, client, and query bindings never drift apart:
+
+```
+remote/
+  lib/
+    executor.ts        # executor(s), one per environment — see Executor Selection above
+  services/
+    todo.ts             # one file per domain: defineRouter + endpoint()s + createApi (+ createQueries)
+    user.ts
+```
+
+- **`remote/lib/executor.ts`** — all executors live here, one per environment. Keep SSR/CSR executors separate unless a single `dispatchExecutor` or factory `baseURL` covers both.
+- **`remote/services/<domain>.ts`** — one file per domain. Each file owns `defineRouter`, its `endpoint()`s, `createApi`, and (with `@routar/react-query`) `createQueries` — the single source of truth other files import from. Never redefine a router's shape elsewhere.
+- **Nested domains → nested routers**, not a second top-level service file (see Nested Routers below).
+
+Everything above `remote/` (pages, components, providers) is up to the project's own conventions — see `apps/example` in the routar repo for one way to wire it up.
+
 ## Key Patterns
 
 ### Path param enforcement

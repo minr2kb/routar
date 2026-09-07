@@ -17,6 +17,21 @@ import { PackageInstall } from '../../components/PackageInstall'
 
 <PackageInstall packages={['@routar/core', '@routar/axios', 'axios']} />
 
+## Set up with an AI agent
+
+Paste this into Cursor, Claude Code, or any AI coding assistant:
+
+> Add routar (`@routar/core`) as the API client for this project. First fetch the
+> latest routar docs — via Context7 (`use context7`) if that MCP server is set up,
+> otherwise fetch https://routar.vercel.app/llms-full.txt directly. Check
+> package.json for an existing HTTP client: use `@routar/axios` if `axios` is
+> already a dependency, `@routar/ky` if `ky` is, otherwise use the built-in fetch
+> executor. Then set it up: define Zod schemas for the API models, group endpoints
+> with `endpoint()` + `defineRouter()`, and build the typed client with the chosen
+> executor + `createApi()`. If `@tanstack/react-query` is already a dependency,
+> don't wire up `@routar/react-query` yet — ask me first, then follow up as a
+> separate step, since it touches query keys and provider setup across the app.
+
 ## Quick Start
 
 ### 1. Define your schema

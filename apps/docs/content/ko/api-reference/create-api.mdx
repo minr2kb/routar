@@ -64,7 +64,7 @@ await todoApi.create(
 
 ## 검증 모드
 
-`validate`는 요청/응답 스키마 실행 여부를 단계별로 제어합니다. 각 단계는 `true`(기본 — 검증 후 실패 시 throw), `false`(skip), `'warn'`을 받습니다:
+`validate`는 요청/응답 스키마 실행 여부를 단계별로 제어합니다. 각 단계는 `true`(기본, 검증 후 실패 시 throw), `false`(skip), `'warn'`을 받습니다:
 
 ```ts
 // 프로덕션 장애 없이 응답 drift 관찰
@@ -77,7 +77,7 @@ const api = createApi(executor, todoRouter, {
 })
 ```
 
-`'warn'` 모드는 parse 실패 시 **raw** 데이터를 그대로 통과시키고(장애 없음) throw 대신 `onValidationError(error, context)`를 호출합니다 — 전체 검증과 `validate: false` 사이의 drift 관찰 중간 지대입니다. `onValidationError`는 `true`(throw)나 `false`(skip)에서는 호출되지 않습니다.
+`'warn'` 모드는 parse 실패 시 **raw** 데이터를 그대로 통과시키고(장애 없음) throw 대신 `onValidationError(error, context)`를 호출합니다. 전체 검증과 `validate: false` 사이의 drift 관찰 중간 지대입니다. `onValidationError`는 `true`(throw)나 `false`(skip)에서는 호출되지 않습니다.
 
 ## SSR/CSR 패턴
 

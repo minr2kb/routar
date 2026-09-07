@@ -30,12 +30,12 @@ endpoint({
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'PATCH' \| 'DELETE'` | Yes | HTTP 메서드 |
 | `path` | `string` | Yes | 라우터 접두사에 상대적인 경로 |
 | `response` | `AnyValidator<T>` | Yes | 응답 검증 스키마. `.parse(data): T`를 가진 객체 또는 [Standard Schema](#standard-schema) |
-| `request` | `{ path?, query?, body? }` | No | 요청 스키마 — 각 부분을 개별 validator로 담은 [버킷 맵](#요청-버킷). `path`에 `:param`이 있으면 `request.path`가 필수입니다. |
+| `request` | `{ path?, query?, body? }` | No | 요청 스키마: 각 부분을 개별 validator로 담은 [버킷 맵](#요청-버킷). `path`에 `:param`이 있으면 `request.path`가 필수입니다. |
 | `adapter` | `(raw: T) => U` | No | 검증된 응답 변환 |
 
 ## 요청 버킷
 
-`request`는 각 부분의 개별 validator를 담은 `{ path?, query?, body? }` 맵입니다 — 부분당 validator 하나. routar가 버킷을 단일 내부 envelope로 합성하므로 호출부·query key·react-query flatten·MSW 모두 동일한 `{ path, query, body }` shape을 봅니다.
+`request`는 각 부분의 개별 validator를 담은 `{ path?, query?, body? }` 맵입니다. 부분당 validator 하나입니다. routar가 버킷을 단일 내부 envelope로 합성하므로 호출부·query key·react-query flatten·MSW 모두 동일한 `{ path, query, body }` shape을 봅니다.
 
 ```ts
 endpoint({
@@ -53,7 +53,7 @@ Path param 강제는 그대로 적용됩니다: `path`에 `:param`이 있으면 
 
 ## Standard Schema
 
-`request`/`response`(및 각 버킷)는 `.parse()`를 가진 객체 외에도 [Standard Schema](https://standardschema.dev)(`~standard` 인터페이스 — ArkType, Zod 3.24+, Valibot 등)를 받습니다. 런타임은 `.parse()`가 있으면 우선 사용하고 없으면 `~standard.validate`(sync/async)를 호출합니다. Standard Schema 이슈는 `StandardSchemaError`로 변환되어 `ValidationError`로 래핑됩니다.
+`request`/`response`(및 각 버킷)는 `.parse()`를 가진 객체 외에도 [Standard Schema](https://standardschema.dev)(`~standard` 인터페이스, ArkType, Zod 3.24+, Valibot 등)를 받습니다. 런타임은 `.parse()`가 있으면 우선 사용하고 없으면 `~standard.validate`(sync/async)를 호출합니다. Standard Schema 이슈는 `StandardSchemaError`로 변환되어 `ValidationError`로 래핑됩니다.
 
 ```ts
 import { type } from 'arktype'
@@ -61,7 +61,7 @@ import { type } from 'arktype'
 endpoint({
   method: 'GET',
   path: '/',
-  response: type({ id: 'number', title: 'string' }).array(), // ArkType — .parse 없음
+  response: type({ id: 'number', title: 'string' }).array(), // ArkType, .parse 없음
 })
 ```
 

@@ -78,12 +78,12 @@ const executor = createExecutor(transport, {
 동일한 플러그인을 작성하는 것보다 깔끔합니다:
 
 ```ts
-// 동작하지만 보일러플레이트가 많음 — `unwrap`을 권장
+// 동작하지만 보일러플레이트가 많음. `unwrap`을 권장
 const unwrapEnvelope = definePlugin({ onResponse: (res) => (res as { data?: unknown })?.data ?? res })
 const executor = createExecutor(transport, { plugins: [unwrapEnvelope] })
 ```
 
-`unwrap`은 가장 안쪽 `onResponse` 훅으로 실행됩니다 — transport가 반환된 직후, 모든 플러그인보다 먼저, 그리고 `response` 스키마가 페이로드를 검증하기 전에 실행됩니다. `createFetchExecutor`, `@routar/axios`, `@routar/ky`에서도 사용할 수 있습니다.
+`unwrap`은 가장 안쪽 `onResponse` 훅으로 실행됩니다. transport가 반환된 직후, 모든 플러그인보다 먼저, 그리고 `response` 스키마가 페이로드를 검증하기 전에 실행됩니다. `createFetchExecutor`, `@routar/axios`, `@routar/ky`에서도 사용할 수 있습니다.
 
 ## Validator 호환성
 
