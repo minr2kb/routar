@@ -9,6 +9,7 @@
     "start": "next start --port 3001"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "geist": "^1.7.1",
     "next": "^15.3.2",
     "nextra": "4.5.1",

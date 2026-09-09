@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import { Head } from "nextra/components";
 import "./globals.css";
 import "nextra-theme-docs/style.css";
@@ -7,7 +8,10 @@ export default function RootLayout({ children }) {
     // biome-ignore lint/a11y/useHtmlLang: ignore
     <html suppressHydrationWarning>
       <Head />
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
