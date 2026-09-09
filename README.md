@@ -17,6 +17,8 @@ Define your API once — reuse it across any transport, environment, or HTTP cli
 
 > Built for frontend teams that manage their own API schema — without waiting for backend coordination or OpenAPI specs.
 
+[See the example app](apps/example) — a full Next.js example with SSR/CSR and TanStack Query.
+
 ```ts
 import { z } from 'zod';
 import { endpoint, defineRouter, createApi } from '@routar/core';

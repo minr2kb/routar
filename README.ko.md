@@ -16,6 +16,8 @@ API를 한 번 정의하고 어떤 전송 계층, 환경, HTTP 클라이언트�
 
 > 백엔드 협업이나 OpenAPI 스펙 없이 API 스키마를 직접 관리하는 프론트엔드 팀을 위해 만들었습니다.
 
+[예제 앱 보기](apps/example) — SSR/CSR, TanStack Query까지 포함한 전체 Next.js 예제
+
 ```ts
 import { z } from 'zod';
 import { endpoint, defineRouter, createApi } from '@routar/core';
