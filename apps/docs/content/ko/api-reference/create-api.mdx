@@ -79,6 +79,26 @@ const api = createApi(executor, todoRouter, {
 
 `'warn'` 모드는 parse 실패 시 **raw** 데이터를 그대로 통과시키고(장애 없음) throw 대신 `onValidationError(error, context)`를 호출합니다. 전체 검증과 `validate: false` 사이의 drift 관찰 중간 지대입니다. `onValidationError`는 `true`(throw)나 `false`(skip)에서는 호출되지 않습니다.
 
+## 에러 응답 검증
+
+엔드포인트가 `errors`를 선언하면, `createApi`는 매칭되는 `HttpError.body`도 검증합니다:
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+    errors: {
+      404: z.object({ code: z.literal('NOT_FOUND') }),
+    },
+  }),
+})
+```
+
+유효한 에러 body는 검증된 `body`를 담은 `HttpError`로 다시 throw됩니다. 선언된 에러 body가 유효하지 않으면 `ValidationError`를 throw하거나, `'warn'` 모드에서는 `onValidationError`로 보고합니다. 선언되지 않은 상태 코드는 건드리지 않습니다.
+
 ## SSR/CSR 패턴
 
 ```ts

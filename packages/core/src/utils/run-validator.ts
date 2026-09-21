@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema.js";
 import type {
+  AnyEndpointSpec,
   AnyValidator,
-  EndpointSpec,
   RequestShape,
   Validator,
   ValidatorOutput,
@@ -40,7 +40,7 @@ export async function runValidator(
  * spec's `request` being a required, non-`undefined` field — which is exactly
  * what {@link endpoint} guarantees in its return type. See {@link createParser}.
  */
-type Parser<TSpec extends EndpointSpec<any, any, any>> = {
+type Parser<TSpec extends AnyEndpointSpec> = {
   parseResponse: (raw: unknown) => Promise<ValidatorOutput<TSpec["response"]>>;
 } & (TSpec["request"] extends AnyValidator<infer R>
   ? { parseRequest: (raw: RequestShape) => Promise<R> }
@@ -72,7 +72,7 @@ type Parser<TSpec extends EndpointSpec<any, any, any>> = {
  * apply the `adapter` — its output is `ValidatorOutput<TSpec["response"]>`, not
  * `InferResponse<TSpec>` (adapter is client-side post-processing).
  */
-export function createParser<TSpec extends EndpointSpec<any, any, any>>(
+export function createParser<TSpec extends AnyEndpointSpec>(
   spec: TSpec,
 ): Parser<TSpec> {
   const parseResponse = (raw: unknown) =>

@@ -1,11 +1,12 @@
 import type {
   AnyValidator,
+  HttpErrorStatusCode,
   HttpMethod,
   Validator,
   ValidatorOutput,
 } from "./types.js";
-import { composeRequest } from "./utils/compose-request.js";
 import type { RequestBuckets } from "./utils/compose-request.js";
+import { composeRequest } from "./utils/compose-request.js";
 
 /**
  * Extracts `:param` segment names from a path template string as a union of
@@ -42,9 +43,9 @@ type BucketKey<TKey extends string, TValidator> =
  * distributing and collapsing the whole intersection. A bucket whose validator
  * is `.optional()` contributes an optional key (see {@link BucketKey}).
  */
-type BucketRequestOutput<TPathParams, TQuery, TBody> = ([
-  TPathParams,
-] extends [never]
+type BucketRequestOutput<TPathParams, TQuery, TBody> = ([TPathParams] extends [
+  never,
+]
   ? {}
   : BucketKey<"path", TPathParams>) &
   ([TQuery] extends [never] ? {} : BucketKey<"query", TQuery>) &
@@ -73,6 +74,21 @@ type BucketRequestMap<TPath extends string, TPathParams, TQuery, TBody> = ([
  * intersection turns the removed form into a compile error instead.
  */
 type NoLegacyBuckets = { pathParams?: never; query?: never; body?: never };
+
+type ErrorValidatorMap = Partial<Record<number, AnyValidator>>;
+type ErrorStatusHints = Partial<Record<HttpErrorStatusCode, unknown>>;
+type NumericKey<TKey> = TKey extends number
+  ? TKey
+  : TKey extends `${infer TNumber extends number}`
+    ? TNumber
+    : never;
+type ErrorInput<TErrors> = TErrors extends undefined
+  ? undefined
+  : {
+      [K in keyof TErrors]: NumericKey<K> extends HttpErrorStatusCode
+        ? TErrors[K]
+        : never;
+    } & ErrorStatusHints;
 
 /**
  * Type-safe endpoint definition helper.
@@ -153,30 +169,40 @@ export function endpoint<
   TMethod extends HttpMethod,
   TResponse extends AnyValidator,
   TOut,
->(spec: {
+  TErrors extends ErrorValidatorMap | undefined = undefined,
+>(
+  spec: {
+    method: TMethod;
+    path: string;
+    response: TResponse;
+    adapter: (raw: ValidatorOutput<TResponse>) => TOut;
+    errors?: ErrorInput<TErrors>;
+  } & NoLegacyBuckets,
+): {
   method: TMethod;
   path: string;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
-} & NoLegacyBuckets): {
-  method: TMethod;
-  path: string;
-  response: TResponse;
-  adapter: (raw: ValidatorOutput<TResponse>) => TOut;
+  errors?: TErrors;
 };
 
 // no request + adapter X
 export function endpoint<
   TMethod extends HttpMethod,
   TResponse extends AnyValidator,
->(spec: {
+  TErrors extends ErrorValidatorMap | undefined = undefined,
+>(
+  spec: {
+    method: TMethod;
+    path: string;
+    response: TResponse;
+    errors?: ErrorInput<TErrors>;
+  } & NoLegacyBuckets,
+): {
   method: TMethod;
   path: string;
   response: TResponse;
-} & NoLegacyBuckets): {
-  method: TMethod;
-  path: string;
-  response: TResponse;
+  errors?: TErrors;
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -204,18 +230,21 @@ export function endpoint<
   TPathParams extends AnyValidator<Record<PathParams<TPath>, unknown>> = never,
   TQuery extends AnyValidator = never,
   TBody extends AnyValidator = never,
+  TErrors extends ErrorValidatorMap | undefined = undefined,
 >(spec: {
   method: TMethod;
   path: TPath;
   request: BucketRequestMap<TPath, TPathParams, TQuery, TBody>;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
+  errors?: ErrorInput<TErrors>;
 }): {
   method: TMethod;
   path: string;
   request: Validator<BucketRequestOutput<TPathParams, TQuery, TBody>>;
   response: TResponse;
   adapter: (raw: ValidatorOutput<TResponse>) => TOut;
+  errors?: TErrors;
 };
 
 // request bucket-map + adapter X
@@ -226,16 +255,19 @@ export function endpoint<
   TPathParams extends AnyValidator<Record<PathParams<TPath>, unknown>> = never,
   TQuery extends AnyValidator = never,
   TBody extends AnyValidator = never,
+  TErrors extends ErrorValidatorMap | undefined = undefined,
 >(spec: {
   method: TMethod;
   path: TPath;
   request: BucketRequestMap<TPath, TPathParams, TQuery, TBody>;
   response: TResponse;
+  errors?: ErrorInput<TErrors>;
 }): {
   method: TMethod;
   path: string;
   request: Validator<BucketRequestOutput<TPathParams, TQuery, TBody>>;
   response: TResponse;
+  errors?: TErrors;
 };
 
 export function endpoint(spec: Record<string, unknown>): unknown {

@@ -163,6 +163,7 @@ import type { ApiTypes } from '@routar/core';
 type TodoApiTypes  = ApiTypes<typeof todoApi>;
 type Todo          = TodoApiTypes['getDetail']['response'];
 type CreateRequest = TodoApiTypes['create']['request'];
+type DetailErrors  = TodoApiTypes['getDetail']['errors'];
 ```
 
 ### Request buckets
@@ -207,6 +208,22 @@ await todoApi.create({ body }, {
 createApi(executor, todoRouter, {
   validate: { response: 'warn' },
   onValidationError: (err, ctx) => report(ctx), // ctx: { kind, method, url, data }
+});
+```
+
+### Error response schemas
+
+Use `errors` to validate known non-2xx response bodies by status code. Matching failures still throw `HttpError`, but `err.body` is validated. If the declared error body fails validation, `createApi` throws `ValidationError` (or reports via `onValidationError` in `'warn'` mode). Undeclared statuses keep the original `HttpError`.
+
+```ts
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: { path: z.object({ id: z.number() }) },
+  response: TodoSchema,
+  errors: {
+    404: NotFoundSchema,
+  },
 });
 ```
 
@@ -436,6 +453,8 @@ try {
 ```
 
 All executors (fetch, Axios, ky) normalize HTTP failures to `HttpError`, so a single `instanceof HttpError` check is transport-agnostic. The original `AxiosError` / ky `HTTPError` is preserved on `err.cause`. Network failures / cancellations (no response) re-throw unchanged.
+
+Declared endpoint `errors` schemas validate matching `HttpError.body` values before rethrow; undeclared statuses remain unchanged.
 
 ## Anti-Patterns
 

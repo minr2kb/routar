@@ -1,10 +1,11 @@
+import { HttpError } from "./create-fetch-executor.js";
 import { isRouterDef } from "./define-router.js";
 import { TimeoutError } from "./middleware.js";
 import type { StandardSchemaV1 } from "./standard-schema.js";
 import type {
+  AnyEndpointSpec,
   CreateApiOptions,
   EndpointCallOptions,
-  EndpointSpec,
   ExecuteOptions,
   Executor,
   InferResponse,
@@ -19,8 +20,8 @@ import { runValidator } from "./utils/run-validator.js";
 import { ValidationError } from "./utils/validate.js";
 
 /** Callable type for a single endpoint on the generated API client. */
-type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
-  TSpec["request"] extends Validator<infer R>
+type EndpointFn<TSpec extends AnyEndpointSpec> =
+  (TSpec["request"] extends Validator<infer R>
     ? (
         params: R,
         options?: AbortSignal | EndpointCallOptions,
@@ -33,7 +34,7 @@ type EndpointFn<TSpec extends EndpointSpec<any, any, any>> =
       : (
           params?: RequestShape,
           options?: AbortSignal | EndpointCallOptions,
-        ) => Promise<InferResponse<TSpec>>;
+        ) => Promise<InferResponse<TSpec>>) & { readonly $spec: TSpec };
 
 /**
  * Fully-typed API client produced by {@link createApi}.
@@ -44,7 +45,7 @@ export type ApiClient<TEndpoints extends RouterEndpoints> = {
     infer TNestedEndpoints
   >
     ? ApiClient<TNestedEndpoints>
-    : TEndpoints[K] extends EndpointSpec<any, any, any>
+    : TEndpoints[K] extends AnyEndpointSpec
       ? EndpointFn<TEndpoints[K]>
       : never;
 };
@@ -233,12 +234,7 @@ function buildClient(
           entry.endpoints,
           options,
         )
-      : buildEndpointFn(
-          executor,
-          prefix,
-          entry as EndpointSpec<any, any, any>,
-          options,
-        );
+      : buildEndpointFn(executor, prefix, entry as AnyEndpointSpec, options);
   }
 
   return client;
@@ -247,10 +243,10 @@ function buildClient(
 function buildEndpointFn(
   executor: Executor,
   prefix: string,
-  spec: EndpointSpec<any, any, any>,
+  spec: AnyEndpointSpec,
   options: CreateApiOptions | undefined,
 ) {
-  return async (
+  const fn = async (
     params: RequestShape = {},
     signalOrOptions?: AbortSignal | EndpointCallOptions,
   ) => {
@@ -286,25 +282,29 @@ function buildEndpointFn(
       });
     }
 
-    const raw = await executeWithTimeout(executor, call.timeout, {
-      method: spec.method,
-      url,
-      params: validatedParams?.query as Record<string, unknown> | undefined,
-      body: validatedParams?.body,
-      headers: call.headers,
-      signal: call.signal,
-    });
-
     const resMode = validateMode(options, "response");
+    let raw: unknown;
+    try {
+      raw = await executeWithTimeout(executor, call.timeout, {
+        method: spec.method,
+        url,
+        params: validatedParams?.query as Record<string, unknown> | undefined,
+        body: validatedParams?.body,
+        headers: call.headers,
+        signal: call.signal,
+      });
+    } catch (err) {
+      await validateErrorBody(err, spec, resMode, options, url);
+    }
+
     let result: ValidatorOutput<typeof spec.response>;
     if (resMode === "off") {
       result = raw;
     } else {
       try {
-        result = (await runValidator(
-          spec.response,
-          raw,
-        )) as ValidatorOutput<typeof spec.response>;
+        result = (await runValidator(spec.response, raw)) as ValidatorOutput<
+          typeof spec.response
+        >;
       } catch (err) {
         const responseError = new ValidationError(
           "Response validation failed",
@@ -324,6 +324,44 @@ function buildEndpointFn(
 
     return spec.adapter ? spec.adapter(result) : result;
   };
+
+  Object.defineProperty(fn, "$spec", { value: spec, enumerable: false });
+  return fn;
+}
+
+async function validateErrorBody(
+  err: unknown,
+  spec: AnyEndpointSpec,
+  resMode: ResolvedMode,
+  options: CreateApiOptions | undefined,
+  url: string,
+): Promise<never> {
+  if (!(err instanceof HttpError) || resMode === "off") throw err;
+  const schema = spec.errors?.[err.status];
+  if (!schema) throw err;
+
+  try {
+    const body = await runValidator(schema, err.body);
+    throw new HttpError(err.status, err.statusText, body, {
+      url: err.url ?? url,
+      method: err.method ?? spec.method,
+      cause: err,
+    });
+  } catch (cause) {
+    if (cause instanceof HttpError) throw cause;
+    const validationError = new ValidationError(
+      "Error response validation failed",
+      cause,
+    );
+    if (resMode !== "warn") throw validationError;
+    options?.onValidationError?.(validationError, {
+      kind: "response",
+      method: spec.method,
+      url,
+      data: err.body,
+    });
+    throw err;
+  }
 }
 
 /**

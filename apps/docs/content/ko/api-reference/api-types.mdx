@@ -11,6 +11,7 @@ import type { ApiTypes } from '@routar/core'
 type TodoApiTypes = ApiTypes<typeof todoApi>
 type CreateRequest  = TodoApiTypes['create']['request']   // { body: { title: string } }
 type CreateResponse = TodoApiTypes['create']['response']  // Todo
+type DetailErrors   = TodoApiTypes['getDetail']['errors'] // { 404: NotFound }
 ```
 
 ## 사용 이유
@@ -27,9 +28,9 @@ type CreateTodoInput = ApiTypes<typeof todoApi>['create']['request']
 
 ```ts
 // {
-//   getList:   { request: {};                          response: Todo[] }
-//   getDetail: { request: { path: { id: number } };   response: Todo   }
-//   create:    { request: { body: { title: string } }; response: Todo  }
+//   getList:   { request: {};                          response: Todo[]; errors: {} }
+//   getDetail: { request: { path: { id: number } };   response: Todo;   errors: { 404: NotFound } }
+//   create:    { request: { body: { title: string } }; response: Todo;   errors: {} }
 // }
 ```
 

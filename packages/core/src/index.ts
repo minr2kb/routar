@@ -15,21 +15,26 @@ export type { PathParams } from "./define-endpoint.js";
 export { endpoint } from "./define-endpoint.js";
 // core functions
 export { defineRouter, isRouterDef } from "./define-router.js";
-// standard schema interop
-export type { StandardSchemaV1 } from "./standard-schema.js";
 // plugin
 export { definePlugin, logger, TimeoutError } from "./middleware.js";
+// standard schema interop
+export type { StandardSchemaV1 } from "./standard-schema.js";
 export type {
+  AnyEndpointSpec,
   AnyValidator,
   ApiTypes,
   CreateApiOptions,
   CreateExecutorOptions,
   EndpointCallOptions,
   EndpointSpec,
+  ErrorSchemas,
   ExecuteOptions,
   Executor,
   ExecutorPlugin,
+  HttpErrorStatusCode,
   HttpMethod,
+  HttpStatusCode,
+  InferErrors,
   InferResponse,
   RequestShape,
   RouterDef,

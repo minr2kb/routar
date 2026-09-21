@@ -1,5 +1,5 @@
 import type {
-  EndpointSpec,
+  AnyEndpointSpec,
   InferResponse,
   RouterDef,
   RouterEndpoints,
@@ -39,7 +39,9 @@ type Envelope = { path?: object; query?: object; body?: unknown };
  * only matches *required* properties and silently returns `{}` for optional
  * ones.
  */
-type GetBucket<R, K extends string> = NonNullable<K extends keyof R ? R[K] : never>;
+type GetBucket<R, K extends string> = NonNullable<
+  K extends keyof R ? R[K] : never
+>;
 
 /**
  * Maps a bucket value to its object form for spreading into the flat shape:
@@ -61,17 +63,15 @@ type BucketFlat<T> = [T] extends [never] ? {} : T extends object ? T : {};
  * schemas) are correctly included — the `infer` pattern only matches required
  * properties and would silently drop optional query/path fields.
  */
-export type Flatten<R extends Envelope> =
-  BucketFlat<GetBucket<R, "path">> &
+export type Flatten<R extends Envelope> = BucketFlat<GetBucket<R, "path">> &
   BucketFlat<GetBucket<R, "query">> &
   BucketFlat<GetBucket<R, "body">>;
 
 type KeysOf<T> = T extends object ? keyof T : never;
 type PathK<R> = KeysOf<GetBucket<R, "path">>;
 type QueryK<R> = KeysOf<GetBucket<R, "query">>;
-type BodyK<R> = GetBucket<R, "body"> extends object
-  ? KeysOf<GetBucket<R, "body">>
-  : never;
+type BodyK<R> =
+  GetBucket<R, "body"> extends object ? KeysOf<GetBucket<R, "body">> : never;
 
 /**
  * True when the same key appears in two or more buckets (e.g. `path.id` +
@@ -94,7 +94,9 @@ export type HasOverlap<R extends Envelope> = [PathK<R> & QueryK<R>] extends [
  * False when `body` is present but not a plain object (e.g. `z.array`/`z.string`)
  * — such a body can't be spread into the flat shape, so the envelope is kept.
  */
-export type BodyFlattenable<R extends Envelope> = [GetBucket<R, "body">] extends [never]
+export type BodyFlattenable<R extends Envelope> = [
+  GetBucket<R, "body">,
+] extends [never]
   ? true
   : GetBucket<R, "body"> extends object
     ? GetBucket<R, "body"> extends readonly unknown[]
@@ -108,11 +110,12 @@ export type BodyFlattenable<R extends Envelope> = [GetBucket<R, "body">] extends
  * collision or non-object body). The standalone `.queryKey()`/`.mutationKey`
  * helpers always stay on the envelope, independent of this.
  */
-export type Safe<R extends Envelope> = HasOverlap<R> extends true
-  ? R
-  : BodyFlattenable<R> extends true
-    ? Flatten<R>
-    : R;
+export type Safe<R extends Envelope> =
+  HasOverlap<R> extends true
+    ? R
+    : BodyFlattenable<R> extends true
+      ? Flatten<R>
+      : R;
 
 /**
  * Applies {@link Safe} only when `TFlatten` is `true` and the params are an
@@ -155,7 +158,7 @@ export type EndpointDefaults<
 > = {
   [K in keyof TEndpoints]?: TEndpoints[K] extends RouterDef<infer Nested>
     ? EndpointDefaults<Nested, TQ>
-    : TEndpoints[K] extends EndpointSpec<any, any, any>
+    : TEndpoints[K] extends AnyEndpointSpec
       ? EndpointDefaultValue<TQ>
       : never;
 };
@@ -173,7 +176,7 @@ export type EndpointDefaults<
 export type QueryEndpointsMap<TEndpoints extends RouterEndpoints> = {
   [K in keyof TEndpoints as TEndpoints[K] extends RouterDef<any>
     ? K
-    : TEndpoints[K] extends EndpointSpec<any, any, any>
+    : TEndpoints[K] extends AnyEndpointSpec
       ? TEndpoints[K]["method"] extends "GET"
         ? never
         : K
@@ -199,11 +202,7 @@ type QueryOverrideChild<TQO, K extends PropertyKey> = TQO extends object
   : {};
 
 /** True when endpoint spec `TSpec` (named `K`) should be a query accessor. */
-type IsQuery<TSpec, TQO, K extends PropertyKey> = TSpec extends EndpointSpec<
-  any,
-  any,
-  any
->
+type IsQuery<TSpec, TQO, K extends PropertyKey> = TSpec extends AnyEndpointSpec
   ? TSpec["method"] extends "GET"
     ? true
     : IsQueryOverride<TQO, K>
@@ -341,13 +340,13 @@ export type InfiniteConfigMap<TEndpoints extends RouterEndpoints, TQO = {}> = {
   // nested routers (recursed); drop plain mutation endpoints.
   [K in keyof TEndpoints as TEndpoints[K] extends RouterDef<any>
     ? K
-    : TEndpoints[K] extends EndpointSpec<any, any, any>
+    : TEndpoints[K] extends AnyEndpointSpec
       ? IsQuery<TEndpoints[K], TQO, K> extends true
         ? K
         : never
       : never]?: TEndpoints[K] extends RouterDef<infer Nested>
     ? InfiniteConfigMap<Nested, QueryOverrideChild<TQO, K>>
-    : TEndpoints[K] extends EndpointSpec<any, any, any>
+    : TEndpoints[K] extends AnyEndpointSpec
       ? InfiniteAccessorOptions<
           InferResponse<TEndpoints[K]>,
           EndpointParams<TEndpoints[K]>,
@@ -391,22 +390,25 @@ export type InfiniteAccessor<
  * resulting query key is always built from the normalized envelope, so it's
  * identical regardless of which of these you called it from.
  */
-export type QueryAccessor<TParams, TData, TFlatten extends boolean = false> =
-  (ParamsOptional<ApplyFlatten<TParams, TFlatten>> extends true
-    ? (
-        params?: ApplyFlatten<TParams, TFlatten>,
-        options?: QueryAccessorOptions<TData>,
-      ) => QueryAccessorResult<TData>
-    : (
-        params: ApplyFlatten<TParams, TFlatten>,
-        options?: QueryAccessorOptions<TData>,
-      ) => QueryAccessorResult<TData>) & {
-    queryKey: (
+export type QueryAccessor<
+  TParams,
+  TData,
+  TFlatten extends boolean = false,
+> = (ParamsOptional<ApplyFlatten<TParams, TFlatten>> extends true
+  ? (
       params?: ApplyFlatten<TParams, TFlatten>,
-    ) => DataTag<QueryKey, TData, DefaultError>;
-    /** Infinite-query variant. Declare the contract via `createQueries({ infinite })`. */
-    infinite: InfiniteAccessor<TParams, TData, TFlatten>;
-  };
+      options?: QueryAccessorOptions<TData>,
+    ) => QueryAccessorResult<TData>
+  : (
+      params: ApplyFlatten<TParams, TFlatten>,
+      options?: QueryAccessorOptions<TData>,
+    ) => QueryAccessorResult<TData>) & {
+  queryKey: (
+    params?: ApplyFlatten<TParams, TFlatten>,
+  ) => DataTag<QueryKey, TData, DefaultError>;
+  /** Infinite-query variant. Declare the contract via `createQueries({ infinite })`. */
+  infinite: InfiniteAccessor<TParams, TData, TFlatten>;
+};
 
 /** Mutation options plus the declarative `invalidates` sugar and routar call options. */
 export type RoutarMutationOptions<TData, TVars> = Omit<
@@ -421,7 +423,11 @@ export type RoutarMutationOptions<TData, TVars> = Omit<
  * `TFlatten` controls only the mutation *vars*: when `true`, `mutate` accepts the
  * flattened request shape ({@link Safe}). `.mutationKey` is unaffected.
  */
-export type MutationAccessor<TVars, TData, TFlatten extends boolean = false> = ((
+export type MutationAccessor<
+  TVars,
+  TData,
+  TFlatten extends boolean = false,
+> = ((
   options?: RoutarMutationOptions<TData, ApplyFlatten<TVars, TFlatten>>,
 ) => UseMutationOptions<TData, DefaultError, ApplyFlatten<TVars, TFlatten>>) & {
   mutationKey: QueryKey;
@@ -438,7 +444,7 @@ export type Queries<
 > = {
   [K in keyof TEndpoints]: TEndpoints[K] extends RouterDef<infer Nested>
     ? Queries<Nested, TFlatten, QueryOverrideChild<TQO, K>>
-    : TEndpoints[K] extends EndpointSpec<any, any, any>
+    : TEndpoints[K] extends AnyEndpointSpec
       ? IsQuery<TEndpoints[K], TQO, K> extends true
         ? QueryAccessor<
             EndpointParams<TEndpoints[K]>,

@@ -1,7 +1,7 @@
 import {
+  type AnyEndpointSpec,
   type ApiClientWithRouter,
   type EndpointCallOptions,
-  type EndpointSpec,
   isRouterDef,
   type RouterEndpoints,
 } from "@routar/core";
@@ -13,11 +13,7 @@ import type {
   QueryEndpointsMap,
   RoutarCallOptions,
 } from "./types.js";
-import {
-  type BucketMap,
-  captureBuckets,
-  toEnvelope,
-} from "./utils/flatten.js";
+import { type BucketMap, captureBuckets, toEnvelope } from "./utils/flatten.js";
 import {
   buildInfiniteKey,
   buildQueryKey,
@@ -129,7 +125,7 @@ function buildQueries(
       );
       continue;
     }
-    const spec = entry as EndpointSpec<any, any, any>;
+    const spec = entry as AnyEndpointSpec;
     const fn = apiNode[name] as (
       params?: unknown,
       signalOrOptions?: AbortSignal | EndpointCallOptions,
@@ -228,8 +224,11 @@ function mergeCallOptions(
   restDefault: Record<string, unknown>;
   rest: Record<string, unknown>;
 } {
-  const { headers: defaultHeaders, timeout: defaultTimeout, ...restDefault } =
-    defaults ?? {};
+  const {
+    headers: defaultHeaders,
+    timeout: defaultTimeout,
+    ...restDefault
+  } = defaults ?? {};
   const { headers: callHeaders, timeout: callTimeout, ...rest } = call ?? {};
   const headers =
     defaultHeaders || callHeaders
@@ -283,7 +282,9 @@ function makeQueryAccessor(
       restDefault: restConfig,
       rest: restOverride,
     } = mergeCallOptions(
-      infiniteConfig as (RoutarCallOptions & Record<string, unknown>) | undefined,
+      infiniteConfig as
+        | (RoutarCallOptions & Record<string, unknown>)
+        | undefined,
       override as (RoutarCallOptions & Record<string, unknown>) | undefined,
     );
     const merged = { ...restConfig, ...restOverride };
@@ -312,7 +313,11 @@ function makeQueryAccessor(
     const envelope = normalize(params, buckets);
     // Same priority as the plain query accessor: defaults < infiniteConfig/override
     // (headers merge shallowly at each level — the higher-priority side wins on collision).
-    const { callOpts, restDefault, rest: restOptions } = mergeCallOptions(
+    const {
+      callOpts,
+      restDefault,
+      rest: restOptions,
+    } = mergeCallOptions(
       resolveDefault(endpointDefault, params, qRef) as
         | (RoutarCallOptions & Record<string, unknown>)
         | undefined,
@@ -350,10 +355,7 @@ function makeQueryAccessor(
 let warnedUnwiredInvalidates = false;
 
 function makeMutationAccessor(
-  fn: (
-    vars?: unknown,
-    options?: EndpointCallOptions,
-  ) => Promise<unknown>,
+  fn: (vars?: unknown, options?: EndpointCallOptions) => Promise<unknown>,
   root: string[],
   name: string,
   path: string,

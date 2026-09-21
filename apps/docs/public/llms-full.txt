@@ -80,6 +80,7 @@ endpoint(spec: {
   };
   response: AnyValidator<unknown>;
   adapter?: (raw: ValidatorOutput<typeof response>) => unknown;
+  errors?: Partial<Record<HttpErrorStatusCode, AnyValidator<unknown>>>; // only configured error status codes are accepted
 }): EndpointSpec
 ```
 
@@ -93,6 +94,19 @@ endpoint({
     query: z.object({ q: z.string() }),
   },
   response: TodoSchema,
+});
+```
+
+**Error response schemas:** `errors` maps HTTP status codes to validators for non-2xx bodies. Executors still throw `HttpError`; when `createApi` catches a matching `HttpError`, it validates `err.body` before rethrowing. Invalid declared error bodies throw `ValidationError` (or call `onValidationError` under `'warn'`). Undeclared statuses are unchanged.
+
+```ts
+endpoint({
+  method: 'GET', path: '/:id',
+  request: { path: z.object({ id: z.number() }) },
+  response: TodoSchema,
+  errors: {
+    404: z.object({ code: z.literal('NOT_FOUND') }),
+  },
 });
 ```
 
@@ -243,6 +257,7 @@ import type { ApiTypes } from '@routar/core';
 type TodoApiTypes    = ApiTypes<typeof todoApi>;
 type Todo            = TodoApiTypes['getDetail']['response']; // { id: number; title: string; completed: boolean }
 type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title: string } }
+type DetailErrors    = TodoApiTypes['getDetail']['errors'];   // declared error body types by status
 ```
 
 ---
@@ -747,7 +762,7 @@ Without the wiring, `invalidates` is ignored — use a native `onSuccess` instea
 
 ### ApiTypes<TApi>
 
-Extracts `{ request, response }` types for every endpoint from an API client.
+Extracts `{ request, response, errors }` types for every endpoint from an API client.
 
 ```ts
 import type { ApiTypes } from '@routar/core';
@@ -756,6 +771,7 @@ type TodoApiTypes    = ApiTypes<typeof todoApi>;
 type Todo            = TodoApiTypes['getDetail']['response']; // { id: number; title: string; completed: boolean }
 type CreateRequest   = TodoApiTypes['create']['request'];     // { body: { title: string } }
 type GetListResponse = TodoApiTypes['getList']['response'];   // Todo[]
+type DetailErrors    = TodoApiTypes['getDetail']['errors'];   // { 404: NotFound } if declared, otherwise {}
 ```
 
 ### PathParams<TPath>
@@ -864,6 +880,8 @@ export const todoApi = createApi(dispatchExecutor(() =>
 | `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) gets a non-2xx response |
 
 All transports normalize HTTP failures to `HttpError`. The Axios and ky executors catch their native errors (`AxiosError`, ky `HTTPError`) and re-throw an `HttpError` with `status`/`statusText`/`body` populated from the response; the original transport error is preserved on `err.cause`. So a single `instanceof HttpError` check (and `onError` plugins) stay transport-agnostic. Network failures / cancellations (no response) are re-thrown unchanged.
+
+Endpoint `errors` schemas validate known non-2xx bodies by status code. Matching failures still throw `HttpError` with validated `.body`; invalid declared error bodies throw `ValidationError` unless response validation is in `'warn'` mode. `validate: false` skips declared error-body validation.
 
 ```ts
 import { TimeoutError, ValidationError, HttpError } from '@routar/core';

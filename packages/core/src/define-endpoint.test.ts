@@ -54,6 +54,61 @@ describe("endpoint() literal method", () => {
     type _check = Expect<Equal<typeof e.method, "DELETE">>;
     expect(e.method).toBe("DELETE");
   });
+
+  it("preserves declared error schemas", () => {
+    const e = endpoint({
+      method: "GET",
+      path: "/",
+      response: z.object({ id: z.number() }),
+      errors: {
+        404: z.object({ code: z.literal("NOT_FOUND") }),
+        409: z.object({ code: z.literal("CONFLICT") }),
+      },
+    });
+    type ErrorBody =
+      NonNullable<typeof e.errors>[404] extends z.ZodType<infer T> ? T : never;
+    type ConflictErrorBody =
+      NonNullable<typeof e.errors>[409] extends z.ZodType<infer T> ? T : never;
+    type _check = Expect<Equal<ErrorBody, { code: "NOT_FOUND" }>>;
+    type _conflictCheck = Expect<
+      Equal<ConflictErrorBody, { code: "CONFLICT" }>
+    >;
+    expect(e.errors?.[404].parse({ code: "NOT_FOUND" })).toEqual({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("@ts-expect-error — unknown statuses are rejected from errors", () => {
+    endpoint({
+      method: "GET",
+      path: "/",
+      response: z.object({ ok: z.boolean() }),
+      // @ts-expect-error `errors` is only for configured non-2xx responses
+      errors: {
+        200: z.object({ message: z.string() }),
+      },
+    });
+    endpoint({
+      method: "GET",
+      path: "/",
+      response: z.object({ ok: z.boolean() }),
+      // @ts-expect-error only configured error status codes are allowed
+      errors: {
+        499: z.object({ message: z.string() }),
+      },
+    });
+    endpoint({
+      method: "GET",
+      path: "/",
+      response: z.object({ ok: z.boolean() }),
+      errors: {
+        // @ts-expect-error 200 must not slip through beside a valid error status
+        200: z.object({ message: z.string() }),
+        409: z.object({ message: z.string() }),
+      },
+    });
+    expect(true).toBe(true);
+  });
 });
 
 describe("endpoint() separated request buckets (SE-12)", () => {

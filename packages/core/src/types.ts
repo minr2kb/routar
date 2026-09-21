@@ -186,17 +186,67 @@ export type AnyValidator<TOutput = unknown> =
   | Validator<TOutput>
   | StandardSchemaV1<unknown, TOutput>;
 
+/** HTTP status codes accepted by endpoint `errors`. */
+export type HttpErrorStatusCode =
+  | 400
+  | 401
+  | 402
+  | 403
+  | 404
+  | 405
+  | 406
+  | 407
+  | 408
+  | 409
+  | 410
+  | 411
+  | 412
+  | 413
+  | 414
+  | 415
+  | 416
+  | 417
+  | 418
+  | 421
+  | 422
+  | 423
+  | 424
+  | 425
+  | 426
+  | 428
+  | 429
+  | 431
+  | 451
+  | 500
+  | 501
+  | 502
+  | 503
+  | 504
+  | 505
+  | 506
+  | 507
+  | 508
+  | 510
+  | 511;
+
+/** @deprecated Use {@link HttpErrorStatusCode}. */
+export type HttpStatusCode = HttpErrorStatusCode;
+
+/** Maps common HTTP status codes to schemas for non-2xx response bodies. */
+export type ErrorSchemas = Partial<Record<HttpErrorStatusCode, AnyValidator>>;
+
 /**
  * Extracts the output type of an {@link AnyValidator} — the `.parse()` return
  * type for a {@link Validator}, or the Standard Schema output type. The
  * `Validator` branch is checked first so a schema satisfying both (e.g. Zod)
  * resolves through its `.parse()` signature.
  */
-export type ValidatorOutput<T> = T extends Validator<infer O>
-  ? O
-  : T extends StandardSchemaV1<unknown, infer O>
+export type ValidatorOutput<T> =
+  T extends Validator<infer O>
     ? O
-    : never;
+    : T extends StandardSchemaV1<unknown, infer O>
+      ? O
+      : never;
 
 /**
  * Shape of an endpoint's request parameters.
@@ -226,6 +276,7 @@ export interface EndpointSpec<
   TAdapter extends
     | ((raw: ValidatorOutput<TResponse>) => unknown)
     | undefined = undefined,
+  TErrors extends ErrorSchemas | undefined = undefined,
 > {
   method: HttpMethod;
   path: string;
@@ -238,7 +289,14 @@ export interface EndpointSpec<
    * When present, the endpoint's return type is the adapter's output type.
    */
   adapter?: TAdapter;
+  /** Validates non-2xx {@link HttpError.body} values by status code. */
+  errors?: TErrors;
 }
+
+// any: EndpointSpec carries validators and adapter inputs contravariantly; this
+// loose alias keeps heterogeneous router maps assignable without erasing each
+// endpoint's concrete type at the call site.
+export type AnyEndpointSpec = EndpointSpec<any, any, any, any>;
 
 /**
  * Resolves the final return type of an endpoint call.
@@ -246,16 +304,22 @@ export interface EndpointSpec<
  * - With `adapter`: returns the adapter's output type.
  * - Without `adapter`: returns `ValidatorOutput<TResponse>`.
  */
-export type InferResponse<TSpec extends EndpointSpec<any, any, any>> =
-  TSpec["adapter"] extends (raw: any) => infer R
+export type InferResponse<TSpec extends AnyEndpointSpec> =
+  TSpec["adapter"] extends (raw: never) => infer R
     ? R
     : ValidatorOutput<TSpec["response"]>;
+
+/** Extracts an endpoint's declared error body types by HTTP status code. */
+export type InferErrors<TSpec extends AnyEndpointSpec> =
+  TSpec["errors"] extends ErrorSchemas
+    ? { [K in keyof TSpec["errors"]]: ValidatorOutput<TSpec["errors"][K]> }
+    : {};
 
 /**
  * A single entry inside a {@link RouterEndpoints} map.
  * Either a leaf endpoint spec or a nested {@link RouterDef}.
  */
-export type RouterEntry = EndpointSpec<any, any, any> | RouterDef<any>;
+export type RouterEntry = AnyEndpointSpec | RouterDef<any>;
 
 /** A record of named {@link EndpointSpec}s or nested {@link RouterDef}s. */
 export type RouterEndpoints = Record<string, RouterEntry>;
@@ -286,11 +350,16 @@ export interface RouterDef<
 export type ApiTypes<TApi> = {
   // Skip the internal `$router` property that createApi stamps on the client.
   [K in keyof TApi as K extends "$router" ? never : K]: TApi[K] extends (
-    ...args: any[]
+    ...args: infer Args
   ) => Promise<infer R>
     ? {
-        request: Parameters<TApi[K]>[0];
+        request: Args[0];
         response: R;
+        errors: TApi[K] extends { $spec: infer TSpec }
+          ? TSpec extends AnyEndpointSpec
+            ? InferErrors<TSpec>
+            : {}
+          : {};
       }
     : TApi[K] extends object
       ? ApiTypes<TApi[K]>
@@ -353,7 +422,9 @@ export interface CreateApiOptions {
    * - `{ request?, response? }` — set each independently (each a
    *   {@link ValidationMode}).
    */
-  validate?: ValidationMode | { request?: ValidationMode; response?: ValidationMode };
+  validate?:
+    | ValidationMode
+    | { request?: ValidationMode; response?: ValidationMode };
   /**
    * Called when validation fails under `'warn'` mode (instead of throwing).
    * Use it to report schema drift to your observability stack. Never called

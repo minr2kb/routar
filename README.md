@@ -304,6 +304,20 @@ createApi(executor, todoRouter, {
 });
 ```
 
+**Error response schemas** — add `errors` to an endpoint to validate known non-2xx bodies by status. Matching failures still throw `HttpError`, but `err.body` is schema-validated; an invalid declared error body throws `ValidationError` (or reports via `onValidationError` in `'warn'` mode):
+
+```ts
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: { path: z.object({ id: z.number() }) },
+  response: TodoSchema,
+  errors: {
+    404: z.object({ code: z.literal('NOT_FOUND') }),
+  },
+});
+```
+
 ---
 
 ### `createParser(spec)`
@@ -572,6 +586,7 @@ controller.abort();
 | `HttpError` | `@routar/core` | Any executor (fetch, Axios, ky) returns a non-2xx status — the original transport error is on `err.cause` |
 
 > Under `validate: 'warn'`, validation failures do **not** throw — they pass the raw value through and call `onValidationError` instead.
+> Declared endpoint `errors` schemas validate matching `HttpError.body` values; undeclared statuses keep the original `HttpError`.
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

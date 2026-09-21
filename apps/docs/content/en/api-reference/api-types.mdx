@@ -14,6 +14,7 @@ type TodoApiTypes = ApiTypes<typeof todoApi>
 
 type CreateRequest  = TodoApiTypes['create']['request']   // { body: { title: string } }
 type CreateResponse = TodoApiTypes['create']['response']  // Todo
+type DetailErrors   = TodoApiTypes['getDetail']['errors'] // { 404: NotFound }
 type ListResponse   = TodoApiTypes['getList']['response'] // Todo[]
 ```
 
@@ -31,14 +32,14 @@ type CreateTodoInput = ApiTypes<typeof todoApi>['create']['request']
 
 ## Type shape
 
-The resulting type is an object keyed by endpoint name, each with `request` and `response` fields:
+The resulting type is an object keyed by endpoint name, each with `request`, `response`, and `errors` fields:
 
 ```ts
 type TodoApiTypes = ApiTypes<typeof todoApi>
 // {
-//   getList:   { request: {};                          response: Todo[] }
-//   getDetail: { request: { path: { id: number } };   response: Todo   }
-//   create:    { request: { body: { title: string } }; response: Todo  }
+//   getList:   { request: {};                          response: Todo[]; errors: {} }
+//   getDetail: { request: { path: { id: number } };   response: Todo;   errors: { 404: NotFound } }
+//   create:    { request: { body: { title: string } }; response: Todo;   errors: {} }
 // }
 ```
 

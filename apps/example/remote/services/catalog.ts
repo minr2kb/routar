@@ -22,7 +22,9 @@ export const CatalogRouter = defineRouter("/catalog", {
       method: "GET",
       path: "/",
       request: {
-        query: z.object({ categoryId: z.coerce.number().optional() }).optional(),
+        query: z
+          .object({ categoryId: z.coerce.number().optional() })
+          .optional(),
       },
       response: z.array(ProductSchema),
     }),
@@ -38,16 +40,28 @@ export const CatalogRouter = defineRouter("/catalog", {
       method: "POST",
       path: "/",
       request: {
-        body: z.object({ name: z.string().min(1), price: z.number().positive(), categoryId: z.number() }),
+        body: z.object({
+          name: z.string().min(1),
+          price: z.number().positive(),
+          categoryId: z.number(),
+        }),
       },
       response: ProductSchema,
+      errors: {
+        "400": z.object({
+          message: z.string(),
+        }),
+      },
     }),
     update: endpoint({
       method: "PATCH",
       path: "/:id",
       request: {
         path: z.object({ id: z.coerce.number() }),
-        body: z.object({ name: z.string().optional(), price: z.number().optional() }),
+        body: z.object({
+          name: z.string().optional(),
+          price: z.number().optional(),
+        }),
       },
       response: ProductSchema,
     }),
@@ -62,13 +76,21 @@ export const CatalogRouter = defineRouter("/catalog", {
       method: "POST",
       path: "/search",
       request: {
-        body: z.object({ q: z.string(), _page: z.number().optional(), _limit: z.number().optional() }),
+        body: z.object({
+          q: z.string(),
+          _page: z.number().optional(),
+          _limit: z.number().optional(),
+        }),
       },
       response: z.array(ProductSchema),
     }),
   }),
   categories: defineRouter("/categories", {
-    getList: endpoint({ method: "GET", path: "/", response: z.array(CategorySchema) }),
+    getList: endpoint({
+      method: "GET",
+      path: "/",
+      response: z.array(CategorySchema),
+    }),
   }),
 });
 
@@ -82,7 +104,8 @@ export const catalogQuery = createQueries(catalogApi, {
     products: {
       search: {
         initialPageParam: 1,
-        getNextPageParam: (last, pages) => (last.length === PER_PAGE ? pages.length + 1 : undefined),
+        getNextPageParam: (last, pages) =>
+          last.length === PER_PAGE ? pages.length + 1 : undefined,
         pageParam: (page) => ({ body: { _page: page, _limit: PER_PAGE } }),
       },
     },

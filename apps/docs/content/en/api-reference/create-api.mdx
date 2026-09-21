@@ -101,6 +101,26 @@ const api = createApi(executor, todoRouter, {
 
 In `'warn'` mode a parse failure passes the **raw** data through (no outage) and calls `onValidationError(error, context)` instead of throwing — the drift-observation middle ground between full validation and `validate: false`. `onValidationError` is never called under `true` (which throws) or `false` (which skips).
 
+## Error response validation
+
+If an endpoint declares `errors`, `createApi` also validates matching `HttpError.body` values:
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+    errors: {
+      404: z.object({ code: z.literal('NOT_FOUND') }),
+    },
+  }),
+})
+```
+
+A valid error body is re-thrown as `HttpError` with the validated `body`. An invalid declared error body throws `ValidationError`, or reports through `onValidationError` in `'warn'` mode. Undeclared statuses are not touched.
+
 ## SSR/CSR pattern
 
 The typical pattern is to create two clients from the same router — one for CSR, one for SSR:

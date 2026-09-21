@@ -38,6 +38,7 @@ endpoint({
 | `response` | `AnyValidator<T>` | Yes | Schema for validating the response. Any object with `.parse(data): T`, or a [Standard Schema](#standard-schema). |
 | `request` | `{ path?, query?, body? }` | No | The request schema — a [bucket-map](#request-buckets) of standalone validators, one per part. When `path` has `:param` segments, `request.path` is required. |
 | `adapter` | `(raw: T) => U` | No | Transform the validated response. |
+| `errors` | `Partial<Record<HttpErrorStatusCode, AnyValidator>>` | No | Schemas for validating `HttpError.body` on matching non-2xx status codes. Only configured error status codes are accepted. |
 
 ## Request buckets
 
@@ -56,6 +57,26 @@ endpoint({
 ```
 
 Path-param enforcement still applies: when `path` has `:param` segments, `request.path` is required and must cover them.
+
+## Error response schemas
+
+Use `errors` to describe non-2xx response bodies by HTTP status. Executors still throw `HttpError`; when the status has a declared schema, `createApi` validates `err.body` before re-throwing the `HttpError`.
+
+```ts
+const NotFoundSchema = z.object({ code: z.literal('NOT_FOUND') })
+
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: { path: z.object({ id: z.number() }) },
+  response: TodoSchema,
+  errors: {
+    404: NotFoundSchema,
+  },
+})
+```
+
+If the declared error body fails validation, `createApi` throws `ValidationError` (or reports it through `onValidationError` under `validate: 'warn'`). Status codes without an `errors` entry keep the original `HttpError` unchanged.
 
 ## Standard Schema
 

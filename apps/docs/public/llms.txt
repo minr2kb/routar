@@ -14,9 +14,9 @@ Define your API once — reuse it across any transport (fetch, axios, ky), envir
 
 ## Core API
 
-[endpoint(spec)](https://routar.vercel.app/api-reference): Define a single typed endpoint. Enforces path params at compile time. Accepts `request` as a `{ path?, query?, body? }` map of standalone validators (`request.path` is required when the path has `:param` segments). `request`/`response` accept any `.parse()` object or a Standard Schema (`~standard`, e.g. ArkType) via `AnyValidator`.
+[endpoint(spec)](https://routar.vercel.app/api-reference): Define a single typed endpoint. Enforces path params at compile time. Accepts `request` as a `{ path?, query?, body? }` map of standalone validators (`request.path` is required when the path has `:param` segments). `request`/`response`/`errors` accept any `.parse()` object or a Standard Schema (`~standard`, e.g. ArkType) via `AnyValidator`; `errors` maps HTTP status codes to schemas for non-2xx `HttpError.body` validation.
 [defineRouter(prefix, endpoints)](https://routar.vercel.app/api-reference): Group endpoints under a shared URL prefix. Supports arbitrary nesting.
-[createApi(executor, router, options?)](https://routar.vercel.app/api-reference): Build a fully-typed API client. Each endpoint becomes an async function `(params, signalOrOptions?) => Promise<Response>` — the 2nd arg is an `AbortSignal` or `{ signal?, headers?, timeout? }` (per-call options). `options.validate` is `boolean | 'warn' | { request?, response? }`; `'warn'` passes raw data through and calls `options.onValidationError(err, ctx)` instead of throwing (drift observation).
+[createApi(executor, router, options?)](https://routar.vercel.app/api-reference): Build a fully-typed API client. Each endpoint becomes an async function `(params, signalOrOptions?) => Promise<Response>` — the 2nd arg is an `AbortSignal` or `{ signal?, headers?, timeout? }` (per-call options). `options.validate` is `boolean | 'warn' | { request?, response? }`; `'warn'` passes raw data through and calls `options.onValidationError(err, ctx)` instead of throwing (drift observation). Declared endpoint `errors` schemas validate matching `HttpError.body` values before rethrow.
 [createParser(spec)](https://routar.vercel.app/api-reference/create-parser): Derive server-side, validate-or-throw request/response parsers from an `endpoint()` spec — the server counterpart to `createApi`. Returns `parseResponse(raw)` (always) plus `parseRequest({ path?, query?, body? })` (present only when the spec has a `request`; conditionally dropped from the type otherwise). No HTTP status mapping — throws the original error (`ZodError` / `StandardSchemaError`) on invalid input, so it's framework-agnostic (Next.js Route Handlers, Hono, Express). `parseResponse` validates the pure `response` schema (adapter not applied). From `@routar/core`.
 [createExecutor(transport, options?)](https://routar.vercel.app/api-reference): Wrap any HTTP client with routar's plugin system. Pass `plugins` via options.
 [dispatchExecutor(resolver)](https://routar.vercel.app/api-reference): Pick executor at request time — use for SSR/CSR routing without duplicate API instances.
@@ -60,14 +60,14 @@ Error typing: augment TanStack's `Register` interface (`interface Register { def
 
 ## Type Utilities
 
-[ApiTypes<TApi>](https://routar.vercel.app/api-reference): Extract `{ request, response }` types from an API client.
+[ApiTypes<TApi>](https://routar.vercel.app/api-reference): Extract `{ request, response, errors }` types from an API client.
 [PathParams<TPath>](https://routar.vercel.app/api-reference): Extract `:param` names from a path string as a union type.
 
 ## Errors
 
 - `ValidationError` — request/response schema mismatch (`@routar/core`)
 - `StandardSchemaError` — Standard Schema (`~standard`) validation issues; wrapped as the `cause` of a `ValidationError`, with the structured `issues` array preserved (`@routar/core`)
-- `HttpError` — non-2xx response from any executor (fetch, Axios, ky; has `.status`, `.statusText`, `.body`, `.cause`). Axios/ky native errors are normalized to `HttpError`, original on `.cause`
+- `HttpError` — non-2xx response from any executor (fetch, Axios, ky; has `.status`, `.statusText`, `.body`, `.cause`). Axios/ky native errors are normalized to `HttpError`, original on `.cause`; declared endpoint `errors` schemas validate matching `.body` values
 - `TimeoutError` — request exceeded `createFetchExecutor`'s `timeout` **or** a per-call `timeout` (has `.ms`)
 
 Other exports: `AnyValidator`, `StandardSchemaV1` (vendored type), `runValidator(validator, data)` (validate-or-throw for `.parse` or `~standard`), `EndpointCallOptions`, `ValidationMode`, `ValidationErrorContext`.

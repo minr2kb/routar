@@ -4,6 +4,7 @@ import {
   createApi,
   defineRouter,
   endpoint,
+  HttpError,
   StandardSchemaError,
   type StandardSchemaV1,
   TimeoutError,
@@ -28,7 +29,7 @@ const standardValidator = <T>(opts: {
   },
 });
 
-const makeValidator = <T>(value: T) => ({
+const makeValidator = <T>(_value: T) => ({
   parse: (data: unknown) => data as T,
 });
 const failValidator = {
@@ -38,6 +39,11 @@ const failValidator = {
 };
 const mockExecutor = <T>(response: T) => ({
   execute: mock(async () => response),
+});
+const failingExecutor = (error: unknown) => ({
+  execute: mock(async () => {
+    throw error;
+  }),
 });
 
 describe("createApi", () => {
@@ -189,6 +195,53 @@ describe("createApi", () => {
         get: { method: "GET" as const, path: "/", response: failValidator },
       });
       await expect(api.get({})).rejects.toBeInstanceOf(ValidationError);
+    });
+
+    it("validates declared HttpError body schemas by status", async () => {
+      const executor = failingExecutor(
+        new HttpError(404, "Not Found", { code: "NOT_FOUND" }),
+      );
+      const api = createApi(executor, "/todos", {
+        get: endpoint({
+          method: "GET" as const,
+          path: "/:id",
+          request: { path: z.object({ id: z.number() }) },
+          response: z.object({ id: z.number() }),
+          errors: {
+            404: z.object({ code: z.literal("NOT_FOUND") }),
+          },
+        }),
+      });
+
+      try {
+        await api.get({ path: { id: 1 } });
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpError);
+        expect((err as HttpError).body).toEqual({ code: "NOT_FOUND" });
+        return;
+      }
+      throw new Error("expected HttpError");
+    });
+
+    it("throws ValidationError when a declared HttpError body schema fails", async () => {
+      const executor = failingExecutor(
+        new HttpError(404, "Not Found", { code: "WRONG" }),
+      );
+      const api = createApi(executor, "/todos", {
+        get: endpoint({
+          method: "GET" as const,
+          path: "/:id",
+          request: { path: z.object({ id: z.number() }) },
+          response: z.object({ id: z.number() }),
+          errors: {
+            404: z.object({ code: z.literal("NOT_FOUND") }),
+          },
+        }),
+      });
+
+      await expect(api.get({ path: { id: 1 } })).rejects.toBeInstanceOf(
+        ValidationError,
+      );
     });
   });
 

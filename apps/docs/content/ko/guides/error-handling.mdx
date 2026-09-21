@@ -15,6 +15,8 @@ description: ValidationError, HttpError, TimeoutError 처리. 모든 executor에
 
 모든 트랜스포트는 HTTP 실패를 `HttpError`로 정규화합니다. Axios와 ky executor는 각자의 네이티브 에러(`AxiosError`, ky `HTTPError`)를 잡아 응답에서 `status`·`statusText`·`body`를 채운 `HttpError`로 다시 throw합니다. 원본 트랜스포트 에러는 `err.cause`에 보존되므로 필요할 때 `AxiosError` 고유 필드에 접근할 수 있습니다.
 
+엔드포인트는 알려진 non-2xx body에 대해 `errors` 스키마를 선언할 수 있습니다. 매칭되는 `HttpError.body`는 `createApi`가 검증하며, 선언된 에러 body가 유효하지 않으면 응답 검증이 `'warn'` 모드가 아닌 한 `ValidationError`를 throw합니다.
+
 ## 에러 처리
 
 ```ts
@@ -74,6 +76,32 @@ try {
 ```
 
 `onError` 플러그인도 동일하게 정규화된 `HttpError`를 받으므로 플러그인 코드 역시 트랜스포트에 무관합니다. (응답이 없는 에러, 즉 네트워크 실패나 취소는 정규화할 HTTP 상태가 없으므로 원본 그대로 다시 throw됩니다.)
+
+## 타입이 있는 에러 body
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+    errors: {
+      404: z.object({ code: z.literal('NOT_FOUND') }),
+    },
+  }),
+})
+
+try {
+  await todoApi.getDetail({ path: { id: 404 } })
+} catch (err) {
+  if (err instanceof HttpError && err.status === 404) {
+    console.log(err.body) // 404 스키마로 검증된 body
+  }
+}
+```
+
+스키마가 선언되지 않은 상태 코드는 기존 `HttpError` 그대로 유지됩니다. `validate: false`는 성공 응답 검증과 선언된 에러 body 검증을 모두 건너뜁니다.
 
 ## 서버 에러만 재시도
 

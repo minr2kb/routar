@@ -303,6 +303,20 @@ createApi(executor, todoRouter, {
 });
 ```
 
+**에러 응답 스키마**: 엔드포인트에 `errors`를 추가하면 알려진 non-2xx body를 상태 코드별로 검증합니다. 매칭되는 실패는 여전히 `HttpError`를 throw하지만 `err.body`가 스키마로 검증됩니다. 선언된 에러 body가 유효하지 않으면 `ValidationError`를 throw합니다(`'warn'` 모드에서는 `onValidationError`로 보고):
+
+```ts
+endpoint({
+  method: 'GET',
+  path: '/:id',
+  request: { path: z.object({ id: z.number() }) },
+  response: TodoSchema,
+  errors: {
+    404: z.object({ code: z.literal('NOT_FOUND') }),
+  },
+});
+```
+
 ---
 
 ### `createParser(spec)`
@@ -571,6 +585,7 @@ controller.abort();
 | `HttpError` | `@routar/core` | 모든 executor(fetch, Axios, ky)가 2xx가 아닌 상태 코드 반환 시: 원본 트랜스포트 에러는 `err.cause`에 보존 |
 
 > `validate: 'warn'`에서는 검증 실패가 throw하지 **않습니다.** raw 값을 통과시키고 대신 `onValidationError`를 호출합니다.
+> 엔드포인트 `errors` 스키마는 매칭되는 `HttpError.body`를 검증합니다. 선언되지 않은 상태 코드는 기존 `HttpError` 그대로 유지됩니다.
 
 ```ts
 import { TimeoutError, ValidationError } from '@routar/core';

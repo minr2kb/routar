@@ -15,6 +15,8 @@ description: Handle ValidationError, HttpError, and TimeoutError — transport e
 
 All transports normalize HTTP failures to `HttpError`. The Axios and ky executors catch their native errors (`AxiosError`, ky `HTTPError`) and re-throw an `HttpError` with `status`, `statusText`, and `body` populated from the response. The original transport error is preserved on `err.cause`, so you can still reach `AxiosError`-specific fields when you need them.
 
+Endpoints can declare `errors` schemas for known non-2xx bodies. Matching `HttpError.body` values are validated by `createApi`; invalid declared error bodies throw `ValidationError` unless response validation is in `'warn'` mode.
+
 ## Handling errors
 
 ```ts
@@ -78,6 +80,32 @@ try {
 ```
 
 `onError` plugins see the same normalized `HttpError`, so plugin code is transport-agnostic too. (Network failures and cancellations — errors with no response — are re-thrown unchanged, since there is no HTTP status to normalize.)
+
+## Typed error bodies
+
+```ts
+const todoRouter = defineRouter('/todos', {
+  getDetail: endpoint({
+    method: 'GET',
+    path: '/:id',
+    request: { path: z.object({ id: z.number() }) },
+    response: TodoSchema,
+    errors: {
+      404: z.object({ code: z.literal('NOT_FOUND') }),
+    },
+  }),
+})
+
+try {
+  await todoApi.getDetail({ path: { id: 404 } })
+} catch (err) {
+  if (err instanceof HttpError && err.status === 404) {
+    console.log(err.body) // validated against the 404 schema
+  }
+}
+```
+
+Statuses without a declared schema keep their original `HttpError`. `validate: false` skips both success-response and declared error-body validation.
 
 ## Retry only on server errors
 
